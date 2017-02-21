@@ -1,0 +1,22 @@
+﻿  Building 'UsbMon' with toolset 'WindowsKernelModeDriver10.0' and the 'Desktop' target platform.
+  Stamping x64\Debug\UsbMon.inf [Version] section with DriverVer=02/21/2017,19.45.3.174
+  Driver.c
+  UsbMon.vcxproj -> C:\Users\kelvinchan\Documents\Visual Studio 2015\Projects\UsbMon\x64\Debug\UsbMon.sys
+  UsbMon.vcxproj -> C:\Users\kelvinchan\Documents\Visual Studio 2015\Projects\UsbMon\x64\Debug\UsbMon.pdb (Full PDB)
+  Done Adding Additional Store
+  Successfully signed: C:\Users\kelvinchan\Documents\Visual Studio 2015\Projects\UsbMon\x64\Debug\UsbMon.sys
+  
+  ........................
+  Signability test complete.
+  
+  Errors:
+  None
+  
+  Warnings:
+  None
+  
+  Catalog generation complete.
+  C:\Users\kelvinchan\Documents\Visual Studio 2015\Projects\UsbMon\x64\Debug\UsbMon\stacktrace.cat
+  Done Adding Additional Store
+  Successfully signed: C:\Users\kelvinchan\Documents\Visual Studio 2015\Projects\UsbMon\x64\Debug\UsbMon\stacktrace.cat
+  
