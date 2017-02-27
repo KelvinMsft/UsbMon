@@ -10,7 +10,11 @@
 
 #pragma warning (disable : 4100)
  
-
+typedef struct _HID_DEVICE_NODE
+{
+	PDEVICE_OBJECT					device_object;
+	PUSBD_INTERFACE_INFORMATION		InterfaceDesc;
+}HID_DEVICE_NODE, *PHID_DEVICE_NODE;
 
 typedef struct _HID_USB_DEVICE_EXTENSION {
 	ULONG64							   status;			//+0x0	
@@ -23,11 +27,11 @@ typedef struct _HID_USB_DEVICE_EXTENSION {
 static_assert(sizeof(HID_USB_DEVICE_EXTENSION) == 0x60, "Size Check");
    
  
-DRIVER_DISPATCH* pDispatchInternalDeviceControl;
-DRIVER_DISPATCH* pDispatchPnP;
-
-volatile LONG g_irp_count = 0;
-
+DRIVER_DISPATCH*  pDispatchInternalDeviceControl = NULL;
+DRIVER_DISPATCH*  pDispatchPnP  = NULL;
+PHID_DEVICE_NODE* pHidWhiteList = NULL;
+volatile LONG g_irp_count	  = 0;
+volatile LONG g_current_index = 0;
 typedef struct PENDINGIRP
 {
 	RT_LIST_ENTRY entry;
@@ -52,7 +56,7 @@ typedef enum
 }USB_HUB_VERSION;
 
 #define USB_MAXCHILDREN 127
-
+#define ARRAY_SIZE      100
 typedef enum _DEVICE_PNP_STATE {
 	NotStarted = 0,         // Not started
 	Started,                // After handling of START_DEVICE IRP
@@ -76,6 +80,11 @@ PENDINGIRP head;
 VOID	   DumpUrb(PURB urb); 
 NTSTATUS   GetUsbHub(USB_HUB_VERSION usb_hub_version, PDRIVER_OBJECT* pDriverObj);
  
+BOOLEAN SearchByDevice(PDEVICE_OBJECT device_object)
+{
+	 
+	return FALSE;
+}
 
 //-----------------------------------------------------------------------------------------
  VOID RemoveAllPendingIrpFromList()
@@ -112,7 +121,7 @@ VOID DriverUnload(
 
 	PDRIVER_OBJECT pDriverObj = NULL; 
 
-	if (NT_SUCCESS(GetUsbHub(USB2, &pDriverObj)))
+	if (NT_SUCCESS(GetUsbHub(USB3, &pDriverObj)))
 	{
 		if (pDriverObj)
 		{
@@ -142,23 +151,12 @@ NTSTATUS  MyCompletionCallback(
 	HIJACK_CONTEXT* pContext = (HIJACK_CONTEXT*)Context;
 	  
  	//DumpUrb(pContext->urb);
-
-	//RTRemoveEntryList(&pContext->pending_irp->entry);  
-
+ 
 	if (&pContext->pending_irp->entry)
 	{
 		ExFreePool(&pContext->pending_irp->entry);
 	}
-	// Extract HIJACK_CONTEXT
-
-	// ......................
-
-	// if mouse 
-	// ....
-	// if keyboard 
-	// ....
-
-	//Extract HIJACK_CONTEXT
+	// Extract HIJACK_CONTEXT  
 
 	InterlockedDecrement(&g_irp_count);
 
@@ -186,6 +184,10 @@ NTSTATUS DispatchPnP(
 BOOLEAN CheckDeviceObject(PDEVICE_OBJECT hid_device_object)
 {
 	 
+	HID_DEVICE_NODE* ptr = pHidWhiteList[0]; 
+	STACK_TRACE_DEBUG_INFO("LastDevice DriverObj: %ws device_obj:%I64X \r\n", ptr->device_object, ptr->InterfaceDesc);
+
+	/*
 	if (!hid_device_object)
 	{
 		return FALSE;
@@ -217,9 +219,9 @@ BOOLEAN CheckDeviceObject(PDEVICE_OBJECT hid_device_object)
 	{
 		return TRUE;
 	}
-	
+	*/
 	 
-	return FALSE;
+	return TRUE;
 }
 
 
@@ -278,9 +280,9 @@ NTSTATUS DispatchInternalDeviceControl(
 
 				irpStack->CompletionRoutine = MyCompletionCallback;
 				irpStack->Context = hijack;
-			}
 
-			InterlockedIncrement(&g_irp_count);
+				InterlockedIncrement(&g_irp_count);
+			} 
 		}
 	}  
 	return pDispatchInternalDeviceControl(DeviceObject, Irp);
@@ -349,22 +351,30 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT object, PUNICODE_STRING String)
 	WCHAR* Usbhub3 = GetUsbHubDriverNameByVersion(USB3); 
 	STACK_TRACE_DEBUG_INFO("Usb Hun3: %ws \r\n", Usbhub3);
 
-	pDriverObj = NULL;
-//	GetUsbHub(USB2, &pDriverObj);
+
+	if (!pHidWhiteList)
+	{
+		pHidWhiteList = (PHID_DEVICE_NODE*)ExAllocatePoolWithTag(NonPagedPool, sizeof(PHID_DEVICE_NODE) * ARRAY_SIZE,'ldih');
+	}
+	 
+	pDriverObj = NULL; 
+
 	GetDriverObjectByName(L"\\Driver\\hidusb", &pDriverObj);
+
 	if (pDriverObj)
 	{
 		STACK_TRACE_DEBUG_INFO("DriverObj: %I64X \r\n", pDriverObj);
 		PDEVICE_OBJECT device_object = pDriverObj->DeviceObject;
 		while (device_object)
 		{
-
+			HID_USB_DEVICE_EXTENSION* mini_extension   = NULL;
+			HID_DEVICE_EXTENSION* hid_common_extension = NULL;
 			WCHAR DeviceName[256] = { 0 };
 			GetDeviceName(device_object, DeviceName);
 			STACK_TRACE_DEBUG_INFO("---------------------------------------\r\n");
 			STACK_TRACE_DEBUG_INFO("DeviceObj: %I64X  DriverName: %ws DeviceName: %ws \r\n", device_object, device_object->DriverObject->DriverName.Buffer, DeviceName);
 
-			HID_DEVICE_EXTENSION* hid_common_extension = (HID_DEVICE_EXTENSION*)device_object->DeviceExtension;
+			hid_common_extension = (HID_DEVICE_EXTENSION*)device_object->DeviceExtension;
 			if (!hid_common_extension)
 			{
 				return STATUS_UNSUCCESSFUL;
@@ -372,7 +382,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT object, PUNICODE_STRING String)
 
 			STACK_TRACE_DEBUG_INFO("Extension_common: %I64X sizeof: %x \r\n", hid_common_extension, sizeof(HID_USB_DEVICE_EXTENSION));
 
-			HID_USB_DEVICE_EXTENSION* mini_extension = (HID_USB_DEVICE_EXTENSION*)hid_common_extension->MiniDeviceExtension;
+			mini_extension = (HID_USB_DEVICE_EXTENSION*)hid_common_extension->MiniDeviceExtension;
 			if (!mini_extension)
 			{
 				return STATUS_UNSUCCESSFUL;
@@ -401,6 +411,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT object, PUNICODE_STRING String)
 			STACK_TRACE_DEBUG_INFO("		--->Length: %I64X \r\n", mini_extension->InterfaceDesc->Length);
 			STACK_TRACE_DEBUG_INFO("		--->AlternateSetting: %I64X \r\n", mini_extension->InterfaceDesc->AlternateSetting);
 
+			/*
 			HID_DESCRIPTOR* hid_desc = (HID_DESCRIPTOR*)(mini_extension + 0x57);
 
 			STACK_TRACE_DEBUG_INFO("  --->DescList : %I64X \r\n", FIELD_OFFSET(HID_USB_DEVICE_EXTENSION, descriptorList));
@@ -409,19 +420,23 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT object, PUNICODE_STRING String)
 			STACK_TRACE_DEBUG_INFO("	--->bCountry: %I64X \r\n", hid_desc->bCountry);
 			STACK_TRACE_DEBUG_INFO("	--->bDescriptorType: %I64X \r\n", hid_desc->bDescriptorType);
 			STACK_TRACE_DEBUG_INFO("	--->bLength: %I64X \r\n", hid_desc->bLength);
-			STACK_TRACE_DEBUG_INFO("	--->bNumDescriptors: %I64X \r\n", hid_desc->bNumDescriptors);
-			//STACK_TRACE_DEBUG_INFO("	--->DescriptorList: %I64X \r\n", hid_desc->DescriptorList[0]);
-			/*
-			STACK_TRACE_DEBUG_INFO("	--->bcdHID: %I64X \r\n", mini_extension->descriptorList->bcdHID);
-			STACK_TRACE_DEBUG_INFO("	--->bCountry: %I64X \r\n", mini_extension->descriptorList->bCountry);
-			STACK_TRACE_DEBUG_INFO("	--->bDescriptorType: %I64X \r\n", mini_extension->descriptorList->bDescriptorType);
-			STACK_TRACE_DEBUG_INFO("	--->bLength: %I64X \r\n", mini_extension->descriptorList->bLength);
-			STACK_TRACE_DEBUG_INFO("	--->bNumDescriptors: %I64X \r\n", mini_extension->descriptorList->bNumDescriptors);
-			STACK_TRACE_DEBUG_INFO("	--->DescriptorList: %I64X \r\n", mini_extension->descriptorList->DescriptorList[0]);
+			STACK_TRACE_DEBUG_INFO("	--->bNumDescriptors: %I64X \r\n", hid_desc->bNumDescriptors); 
 			*/
-
+			if (mini_extension->InterfaceDesc->Class == 3 && 
+				mini_extension->InterfaceDesc->Protocol == 1)
+			{
+  
+				HID_DEVICE_NODE* node = ExAllocatePool(NonPagedPool, sizeof(HID_DEVICE_NODE));
+				RtlZeroMemory(node,sizeof(HID_DEVICE_NODE));
+				node->device_object = device_object;
+				node->InterfaceDesc = mini_extension->InterfaceDesc;
+				pHidWhiteList[g_current_index] = node;
+				g_current_index++;
+				STACK_TRACE_DEBUG_INFO("Added one element :%x \r\n", g_current_index);  
+			}
 			STACK_TRACE_DEBUG_INFO("---------------------------------------\r\n");
 			device_object = device_object->NextDevice;
+
 		}
 	}
 	pDriverObj = NULL;
