@@ -8,7 +8,7 @@ Class=Sample ; TODO: edit Class
 ClassGuid={78A1C341-4539-11d3-B88D-00C04FAD5171} ; TODO: edit ClassGuid
 Provider=%ManufacturerName%
 CatalogFile=StackTrace.cat
-DriverVer=02/21/2017,19.45.3.174
+DriverVer=02/27/2017,17.46.37.137
  
 
 [DestinationDirs]

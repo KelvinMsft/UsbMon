@@ -1,5 +1,18 @@
 #pragma once
 #include "usb.h"
+extern POBJECT_TYPE *IoDriverObjectType;
+
+extern NTSTATUS ObReferenceObjectByName(
+	PUNICODE_STRING ObjectName,
+	ULONG Attributes,
+	PACCESS_STATE AccessState,
+	ACCESS_MASK DesiredAccess,
+	POBJECT_TYPE ObjectType,
+	KPROCESSOR_MODE AccessMode,
+	PVOID ParseContext,
+	PVOID *Object
+);
+
 /// Sets a break point that works only when a debugger is present
 #if !defined(HYPERPLATFORM_COMMON_DBG_BREAK)
 #define STACK_TRACE_COMMON_DBG_BREAK() \
@@ -22,6 +35,39 @@ VOID KeSleep(LONG msec)
 	my_interval.QuadPart *= msec;
 	KeDelayExecutionThread(KernelMode, 0, &my_interval);
 } 
+//----------------------------------------------------------------------------------------//
+NTSTATUS GetDriverObjectByName(WCHAR* name, PDRIVER_OBJECT* pDriverObj)
+{
+	// use such API  
+	NTSTATUS status = STATUS_SUCCESS;
+	UNICODE_STRING DriverName = { 0 };
+
+	RtlInitUnicodeString(&DriverName, name);
+
+	status = ObReferenceObjectByName(
+		&DriverName,
+		OBJ_KERNEL_HANDLE | OBJ_CASE_INSENSITIVE,
+		NULL,
+		0,
+		*IoDriverObjectType,
+		KernelMode,
+		NULL,
+		(PVOID*)pDriverObj);
+
+	return status;
+}
+
+void GetDeviceName(PDEVICE_OBJECT device_object, WCHAR* DeviceNameBuf)
+{
+	UCHAR	 Buffer[sizeof(OBJECT_NAME_INFORMATION) + 512];
+	POBJECT_NAME_INFORMATION NameInfo = (PVOID)Buffer;
+	ULONG Length;
+	if (device_object)
+	{
+		ObQueryNameString(device_object, NameInfo, sizeof(Buffer), &Length);
+	}
+	RtlMoveMemory(DeviceNameBuf, NameInfo->Name.Buffer, NameInfo->Name.Length);
+}
 
 VOID DumpUrb(PURB urb)
 {
