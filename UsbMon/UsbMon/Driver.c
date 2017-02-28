@@ -239,12 +239,18 @@ BOOLEAN CheckIfDeviceObjectExist(PDEVICE_OBJECT hid_device_object)
 PDEVICE_OBJECT TraceHidDeviceObject(PDEVICE_OBJECT device_object)
 {
 	PDEVICE_OBJECT ret_device_obj = device_object;
+
+	if (!g_pDriverObj)
+	{
+		GetDriverObjectByName(L"\\Driver\\hidusb", &g_pDriverObj);
+	}
+
 	if (!g_pDriverObj)
 	{
 		return NULL;
 	}
 
-	while (ret_device_obj)
+ 	while (ret_device_obj)
 	{
 		//STACK_TRACE_DEBUG_INFO("DriverObj: %I64X DriverName: %ws \r\n DeviceObj: %I64X DeviceName: %ws \r\n",device_obj->DriverObject, device_obj->DriverObject->DriverName.Buffer, device_obj, device_name, device_obj->AttachedDevice);
 		if (ret_device_obj->DriverObject == g_pDriverObj)
