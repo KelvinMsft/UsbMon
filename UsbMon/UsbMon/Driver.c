@@ -43,6 +43,7 @@ typedef enum _DEVICE_PNP_STATE {
 ////
 
 //PENDINGIRP	  g_head;
+DRIVER_DISPATCH*  g_pDispatchInternalDeviceControlForCcgp = NULL;
 DRIVER_DISPATCH*  g_pDispatchInternalDeviceControl = NULL;
 DRIVER_DISPATCH*  g_pDispatchPnP  = NULL;
 PHID_DEVICE_NODE* g_pHidWhiteList = NULL;
@@ -94,15 +95,22 @@ VOID DriverUnload(
 
 	PDRIVER_OBJECT pDriverObj = NULL; 
 
-	if (NT_SUCCESS(GetUsbHub(USB3, &pDriverObj)))
+	if (NT_SUCCESS(GetUsbHub(USB2, &pDriverObj)))
 	{
 		if (pDriverObj && g_pDispatchInternalDeviceControl)
 		{
 			InterlockedExchange64((LONG64 volatile *)&pDriverObj->MajorFunction[IRP_MJ_INTERNAL_DEVICE_CONTROL], (LONG64)g_pDispatchInternalDeviceControl);
-			STACK_TRACE_DEBUG_INFO("Unloaded Driver");
+			g_pDispatchInternalDeviceControl = NULL;
 		}
 	}  
-	
+	if (NT_SUCCESS(GetUsbHub(USB_COMPOSITE, &pDriverObj)))
+	{
+		if (pDriverObj && g_pDispatchInternalDeviceControlForCcgp)
+		{
+			InterlockedExchange64((LONG64 volatile *)&pDriverObj->MajorFunction[IRP_MJ_INTERNAL_DEVICE_CONTROL], (LONG64)g_pDispatchInternalDeviceControlForCcgp);
+			g_pDispatchInternalDeviceControlForCcgp = NULL;
+		}
+	}
 	while (g_irp_count)
 	{
 		KeSleep(0);
@@ -170,40 +178,15 @@ NTSTATUS DispatchPnP(
 }
 -----------------------------------------------------------------------*/
 
-NTSTATUS CheckPipeHandle(PDEVICE_OBJECT hid_device_object, USBD_PIPE_INFORMATION* info_array)
+NTSTATUS CheckPipeHandle(USBD_PIPE_HANDLE pipe_handle_from_urb, USBD_PIPE_INFORMATION* pipe_handle_from_whitelist, ULONG NumberOfPipes)
 {
 	NTSTATUS status = STATUS_UNSUCCESSFUL;
 	do {
-		HID_DEVICE_EXTENSION*	  hid_common_extension = NULL;
-		HID_USB_DEVICE_EXTENSION* mini_extension   = NULL;
-		USBD_PIPE_INFORMATION*    pipe_information = { 0 };
-		ULONG	i = 0;
-
-		if (!hid_device_object)
+		ULONG i;
+		for (i = 0; i < NumberOfPipes; i++)
 		{
-			break;
-		}
-
-		hid_common_extension = (HID_DEVICE_EXTENSION*)hid_device_object->DeviceExtension;
-		if (!hid_common_extension)
-		{
-			break;
-		}
-
-		mini_extension = (HID_USB_DEVICE_EXTENSION*)hid_common_extension->MiniDeviceExtension;
-		if (!mini_extension)
-		{
-			break;
-		}
-		pipe_information = &mini_extension->InterfaceDesc->Pipes[0];
-		if (!pipe_information)
-		{
-			break;
-		}
-
-		for (i = 0; i < mini_extension->InterfaceDesc->NumberOfPipes; i++)
-		{
-			if (pipe_information[i].PipeHandle == info_array[i].PipeHandle)
+			STACK_TRACE_DEBUG_INFO("pipe_handle_from_urb: %I64x pipe_handle_from_whitelist[]: %I64x \r\n", pipe_handle_from_urb, pipe_handle_from_whitelist[i].PipeHandle);
+			if (pipe_handle_from_urb == pipe_handle_from_whitelist[i].PipeHandle)
 			{
 				status = STATUS_SUCCESS;
 				break;
@@ -216,22 +199,36 @@ NTSTATUS CheckPipeHandle(PDEVICE_OBJECT hid_device_object, USBD_PIPE_INFORMATION
 }
 //----------------------------------------------------------------------------------------// 
 
-BOOLEAN CheckIfDeviceObjectExist(PDEVICE_OBJECT hid_device_object)
+BOOLEAN CheckIfDeviceObjectExist(PDEVICE_OBJECT hid_device_object, USBD_PIPE_HANDLE handle)
 {
 	BOOLEAN exist = FALSE;
 	int i = 0;
 	while (g_pHidWhiteList[i])
 	{
+		STACK_TRACE_DEBUG_INFO("hid_device_object: %I64x \r\n", hid_device_object);
+
  		if (g_pHidWhiteList[i]->device_object == hid_device_object)
 		{
-			if (NT_SUCCESS(CheckPipeHandle(hid_device_object, g_pHidWhiteList[i]->InterfaceDesc->Pipes)))
+			NTSTATUS status = CheckPipeHandle(handle,
+					g_pHidWhiteList[i]->InterfaceDesc->Pipes,
+					g_pHidWhiteList[i]->InterfaceDesc->NumberOfPipes
+			);
+
+			if (NT_SUCCESS(status))
 			{
+				STACK_TRACE_DEBUG_INFO("Handle Matched: %I64x \r\n", handle);
 				STACK_TRACE_DEBUG_INFO("Matched DeviceObject in Array: %I64X Input Device: %I64X\r\n", g_pHidWhiteList[i]->device_object, hid_device_object);
 				exist = TRUE;
 			}
+			else
+			{
+				STACK_TRACE_DEBUG_INFO("Handle not Matched: %I64x \r\n", handle);
+			}
 		}
+
 		i++;
 	}
+
 	return exist;
 }
 
@@ -252,7 +249,11 @@ PDEVICE_OBJECT TraceHidDeviceObject(PDEVICE_OBJECT device_object)
 
  	while (ret_device_obj)
 	{
-		//STACK_TRACE_DEBUG_INFO("DriverObj: %I64X DriverName: %ws \r\n DeviceObj: %I64X DeviceName: %ws \r\n",device_obj->DriverObject, device_obj->DriverObject->DriverName.Buffer, device_obj, device_name, device_obj->AttachedDevice);
+		WCHAR device_name[256] = { 0 };
+		GetDeviceName(ret_device_obj, device_name);
+	//	STACK_TRACE_DEBUG_INFO("DriverObj: %I64X DriverName: %ws DeviceObj: %I64X DeviceName: %ws \r\n",
+		//	ret_device_obj->DriverObject, ret_device_obj->DriverObject->DriverName.Buffer, ret_device_obj, device_name);
+
 		if (ret_device_obj->DriverObject == g_pDriverObj)
 		{
 			//STACK_TRACE_DEBUG_INFO("LastDevice DriverObj: %ws \r\n device_obj:%I64X \r\n", device_obj->DriverObject->DriverName.Buffer, device_obj);
@@ -275,6 +276,7 @@ NTSTATUS DispatchInternalDeviceControl(
 		PIO_STACK_LOCATION irpStack = NULL;
 		PDEVICE_OBJECT	device_obj  = NULL;
 		PURB urb					= NULL;
+
 		//PENDINGIRP*	new_entry  = (PENDINGIRP*)ExAllocatePoolWithTag(NonPagedPool, sizeof(PENDINGIRP), 'kcaj');		
 
 		irpStack = IoGetCurrentIrpStackLocation(Irp);
@@ -290,14 +292,22 @@ NTSTATUS DispatchInternalDeviceControl(
 		}
 
 		hijack = (HIJACK_CONTEXT*)ExAllocatePoolWithTag(NonPagedPool, sizeof(HIJACK_CONTEXT), 'kcaj');
- 
-		device_obj = TraceHidDeviceObject(DeviceObject);
-		if (!device_obj)
+		
+		if (!hijack)
 		{
 			break;
 		}
 		
-		if (CheckIfDeviceObjectExist(device_obj))
+		RtlZeroMemory(hijack, sizeof(HIJACK_CONTEXT));
+
+		device_obj = TraceHidDeviceObject(DeviceObject);
+		if (!device_obj)
+		{
+			//STACK_TRACE_DEBUG_INFO("cannot find device_obj \r\n");
+			break;
+		}
+		
+		if (CheckIfDeviceObjectExist(device_obj,urb->UrbBulkOrInterruptTransfer.PipeHandle))
 		{
 			// TODO: Insert if keyboard / mouse device
 			// new_entry->irp = Irp;
@@ -312,11 +322,80 @@ NTSTATUS DispatchInternalDeviceControl(
 			irpStack->CompletionRoutine = MyCompletionCallback;
 			irpStack->Context = hijack;
 
+			STACK_TRACE_DEBUG_INFO("Targeted \r\n");
 			InterlockedIncrement(&g_irp_count);
 		}
 
 	} while (0);
+
 	return g_pDispatchInternalDeviceControl(DeviceObject, Irp);
+}
+
+//----------------------------------------------------------------------------------------// 
+NTSTATUS DispatchInternalDeviceControlForCcgp(
+	_Inout_ struct _DEVICE_OBJECT *DeviceObject,
+	_Inout_ struct _IRP           *Irp
+)
+{
+	do
+	{
+		HIJACK_CONTEXT* hijack = NULL;
+		PIO_STACK_LOCATION irpStack = NULL;
+		PDEVICE_OBJECT	device_obj = NULL;
+		PURB urb = NULL;
+
+		//PENDINGIRP*	new_entry  = (PENDINGIRP*)ExAllocatePoolWithTag(NonPagedPool, sizeof(PENDINGIRP), 'kcaj');		
+
+		irpStack = IoGetCurrentIrpStackLocation(Irp);
+		if (irpStack->Parameters.DeviceIoControl.IoControlCode != IOCTL_INTERNAL_USB_SUBMIT_URB)
+		{
+			break;
+		}
+
+		urb = (PURB)irpStack->Parameters.Others.Argument1;
+		if (urb->UrbHeader.Function != URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER)
+		{
+			break;
+		}
+
+		hijack = (HIJACK_CONTEXT*)ExAllocatePoolWithTag(NonPagedPool, sizeof(HIJACK_CONTEXT), 'kcaj');
+
+		if (!hijack)
+		{
+			break;
+		}
+
+		RtlZeroMemory(hijack, sizeof(HIJACK_CONTEXT));
+
+		device_obj = TraceHidDeviceObject(DeviceObject);
+		if (!device_obj)
+		{
+			STACK_TRACE_DEBUG_INFO("cannot find device_obj \r\n");
+			break;
+		}
+
+		if (CheckIfDeviceObjectExist(device_obj, urb->UrbBulkOrInterruptTransfer.PipeHandle))
+		{
+			// TODO: Insert if keyboard / mouse device
+			// new_entry->irp = Irp;
+			// RTInsertTailList(&head.entry, &new_entry->entry);
+			hijack->routine = irpStack->CompletionRoutine;
+			hijack->Context = irpStack->Context;
+			hijack->DeviceObject = DeviceObject;
+			hijack->Irp = Irp;
+			hijack->urb = urb;
+			//hijack->pending_irp = new_entry; 
+
+			irpStack->CompletionRoutine = MyCompletionCallback;
+			irpStack->Context = hijack;
+
+			STACK_TRACE_DEBUG_INFO("Targeted \r\n");
+			InterlockedIncrement(&g_irp_count);
+		}
+
+	} while (0);
+
+	return g_pDispatchInternalDeviceControlForCcgp(DeviceObject, Irp);
 }
 //----------------------------------------------------------------------------------------//
 NTSTATUS DriverEntry(PDRIVER_OBJECT object, PUNICODE_STRING String)
@@ -348,25 +427,46 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT object, PUNICODE_STRING String)
 	if (NT_SUCCESS(SearchAllHidRelation(&device_object_list, &size)))
 	{
 		STACK_TRACE_DEBUG_INFO("device_object_list: %I64X size: %x \r\n", device_object_list, size);
-		if (device_object_list && size)
-		{
-			g_pHidWhiteList = device_object_list;
-			g_current_index = size;
-			pDriverObj = NULL;
-			GetUsbHub(USB3, &pDriverObj);
-			if (!pDriverObj)
+
+		//if (NT_SUCCESS(SearchAllUsbCcgpRelation(&device_object_list, &size)))
+	//	{
+			STACK_TRACE_DEBUG_INFO("device_object_list_usbccgp: %I64X size: %x \r\n", device_object_list, size);
+			if (device_object_list && size)
 			{
-				GetUsbHub(USB3_NEW, &pDriverObj);
-			}
-			if (!pDriverObj)
-			{ 
-				return 0;
-			}
-			g_pDispatchInternalDeviceControl = (DRIVER_DISPATCH*)InterlockedExchange64(
+				g_pHidWhiteList = device_object_list;
+				g_current_index = size;
+
+				pDriverObj = NULL;
+				/*GetUsbHub(USB3, &pDriverObj);
+
+				if (!pDriverObj)
+				{
+					GetUsbHub(USB3_NEW, &pDriverObj);
+				}
+				*/
+				if (!pDriverObj)
+				{
+					GetUsbHub(USB2, &pDriverObj);
+				}
+
+				if (!pDriverObj)
+				{
+					return 0;
+				}
+
+				g_pDispatchInternalDeviceControl = (DRIVER_DISPATCH*)InterlockedExchange64(
 					(LONG64 volatile *)&pDriverObj->MajorFunction[IRP_MJ_INTERNAL_DEVICE_CONTROL],
 					(LONG64)DispatchInternalDeviceControl
-			);
-		}
+				);
+
+				GetUsbHub(USB_COMPOSITE, &pDriverObj);
+				g_pDispatchInternalDeviceControlForCcgp = (DRIVER_DISPATCH*)InterlockedExchange64(
+					(LONG64 volatile *)&pDriverObj->MajorFunction[IRP_MJ_INTERNAL_DEVICE_CONTROL],
+					(LONG64)DispatchInternalDeviceControlForCcgp
+				);
+
+			}
+		//}
 	}
 	object->DriverUnload = DriverUnload;
 
