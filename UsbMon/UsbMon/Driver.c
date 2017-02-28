@@ -2,7 +2,7 @@
 #include <fltKernel.h>
 
 #include "UsbUtil.h" 
-
+#include "UsbHid.h"
 #pragma warning (disable : 4100)
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -103,7 +103,7 @@ VOID DriverUnload(
 
 	if (NT_SUCCESS(GetUsbHub(USB3, &pDriverObj)))
 	{
-		if (pDriverObj)
+		if (pDriverObj && g_pDispatchInternalDeviceControl)
 		{
 			InterlockedExchange64((LONG64 volatile *)&pDriverObj->MajorFunction[IRP_MJ_INTERNAL_DEVICE_CONTROL], (LONG64)g_pDispatchInternalDeviceControl);
 			STACK_TRACE_DEBUG_INFO("Unloaded Driver");
@@ -266,74 +266,25 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT object, PUNICODE_STRING String)
 	WCHAR* Usbhub3 = GetUsbHubDriverNameByVersion(USB3); 
 	STACK_TRACE_DEBUG_INFO("Usb Hun3: %ws \r\n", Usbhub3);
 
-
-	if (!g_pHidWhiteList)
+	PHID_DEVICE_NODE* device_object_list = NULL;
+	ULONG size = 0;
+	if (NT_SUCCESS(SearchAllHidRelation(&device_object_list, &size)))
 	{
-		g_pHidWhiteList = (PHID_DEVICE_NODE*)ExAllocatePoolWithTag(NonPagedPool, sizeof(PHID_DEVICE_NODE) * ARRAY_SIZE,'ldih');
-		RtlZeroMemory(g_pHidWhiteList, sizeof(PHID_DEVICE_NODE)*ARRAY_SIZE);
-	}
-	 
-	pDriverObj = NULL; 
-
-	GetDriverObjectByName(L"\\Driver\\hidusb", &pDriverObj);
-
-	if (pDriverObj)
-	{
-		STACK_TRACE_DEBUG_INFO("DriverObj: %I64X \r\n", pDriverObj);
-		PDEVICE_OBJECT device_object = pDriverObj->DeviceObject;
-		while (device_object)
+		STACK_TRACE_DEBUG_INFO("device_object_list: %I64X size: %x \r\n", device_object_list, size);
+		if (device_object_list && size)
 		{
-			HID_USB_DEVICE_EXTENSION* mini_extension   = NULL;
-			HID_DEVICE_EXTENSION* hid_common_extension = NULL;
-			WCHAR DeviceName[256] = { 0 };
-			GetDeviceName(device_object, DeviceName);
-			STACK_TRACE_DEBUG_INFO("---------------------------------------\r\n");
-			STACK_TRACE_DEBUG_INFO("DeviceObj: %I64X  DriverName: %ws DeviceName: %ws \r\n", device_object, device_object->DriverObject->DriverName.Buffer, DeviceName);
+			g_pHidWhiteList = device_object_list;
+			g_current_index = size;
+			pDriverObj = NULL;
+			GetUsbHub(USB3, &pDriverObj);
 
-			hid_common_extension = (HID_DEVICE_EXTENSION*)device_object->DeviceExtension;
-			if (!hid_common_extension)
-			{
-				return STATUS_UNSUCCESSFUL;
-			}
+			g_pDispatchInternalDeviceControl = (DRIVER_DISPATCH*)InterlockedExchange64(
+				(LONG64 volatile *)&pDriverObj->MajorFunction[IRP_MJ_INTERNAL_DEVICE_CONTROL],
+				(LONG64)DispatchInternalDeviceControl
+			);
 
-			STACK_TRACE_DEBUG_INFO("Extension_common: %I64X sizeof: %x \r\n", hid_common_extension, sizeof(HID_USB_DEVICE_EXTENSION));
-
-			mini_extension = (HID_USB_DEVICE_EXTENSION*)hid_common_extension->MiniDeviceExtension;
-			if (!mini_extension)
-			{
-				return STATUS_UNSUCCESSFUL;
-			}
-
-			DumpHidMiniDriverExtension(hid_common_extension); 
-
-			if (mini_extension->InterfaceDesc->Class == 3 && 
-				mini_extension->InterfaceDesc->Protocol == 2)
-			{
-  
-				HID_DEVICE_NODE* node = ExAllocatePool(NonPagedPool, sizeof(HID_DEVICE_NODE));
-				RtlZeroMemory(node,sizeof(HID_DEVICE_NODE));
-				node->device_object = device_object;
-				node->InterfaceDesc = mini_extension->InterfaceDesc;
-				g_pHidWhiteList[g_current_index] = node;
-				g_current_index++;
-				STACK_TRACE_DEBUG_INFO("Inserted one element: %I64x InferfaceDesc: %I64X device_object: %I64x \r\n", node->device_object, node->InterfaceDesc, device_object);
-				STACK_TRACE_DEBUG_INFO("Added one element :%x \r\n", g_current_index);  
-			}
-
-			STACK_TRACE_DEBUG_INFO("---------------------------------------\r\n");
-			device_object = device_object->NextDevice; 
 		}
 	}
-
-	pDriverObj = NULL;
-	GetUsbHub(USB3, &pDriverObj); 
-
-	g_pDispatchInternalDeviceControl = (DRIVER_DISPATCH*)InterlockedExchange64(
-			(LONG64 volatile *)&pDriverObj->MajorFunction[IRP_MJ_INTERNAL_DEVICE_CONTROL],
-			(LONG64)DispatchInternalDeviceControl
-		);
-
-	
 	object->DriverUnload = DriverUnload;
 
 	return 0;
