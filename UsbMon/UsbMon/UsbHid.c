@@ -27,8 +27,7 @@ NTSTATUS SearchAllHidRelation(
 			HID_DEVICE_EXTENSION* hid_common_extension = NULL;
 			WCHAR DeviceName[256] = { 0 };
 			GetDeviceName(device_object, DeviceName);
-			STACK_TRACE_DEBUG_INFO("---------------------------------------\r\n");
-			STACK_TRACE_DEBUG_INFO("DeviceObj: %I64X  DriverName: %ws DeviceName: %ws \r\n", device_object, device_object->DriverObject->DriverName.Buffer, DeviceName);
+ 			STACK_TRACE_DEBUG_INFO("DeviceObj: %I64X  DriverName: %ws DeviceName: %ws \r\n", device_object, device_object->DriverObject->DriverName.Buffer, DeviceName);
 
 			hid_common_extension = (HID_DEVICE_EXTENSION*)device_object->DeviceExtension;
 			if (!hid_common_extension)
@@ -49,7 +48,6 @@ NTSTATUS SearchAllHidRelation(
 			if (mini_extension->InterfaceDesc->Class == 3 &&
 				mini_extension->InterfaceDesc->Protocol == 2)
 			{
-
 				HID_DEVICE_NODE* node = ExAllocatePool(NonPagedPool, sizeof(HID_DEVICE_NODE));
 				RtlZeroMemory(node, sizeof(HID_DEVICE_NODE));
 				node->device_object = device_object;
@@ -60,9 +58,9 @@ NTSTATUS SearchAllHidRelation(
 				STACK_TRACE_DEBUG_INFO("Added one element :%x \r\n", current_size);
 			}
 
-			STACK_TRACE_DEBUG_INFO("---------------------------------------\r\n");
-			device_object = device_object->NextDevice;
+ 			device_object = device_object->NextDevice;
 		}
+
 		if (current_size > 0 && hid_relation)
 		{
 			*device_object_list = hid_relation;

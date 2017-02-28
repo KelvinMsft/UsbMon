@@ -27,6 +27,8 @@ WCHAR* GetUsbHubDriverNameByVersion(USB_HUB_VERSION usb_hub_version)
 	case USB3:
 		ret = L"\\Driver\\iusb3hub";
 		break;
+	case USB3_NEW:
+		ret = L"\\Driver\\USBHUB3";
 	default:
 		break;
 	}
@@ -60,7 +62,9 @@ NTSTATUS GetUsbHub(USB_HUB_VERSION usb_hub_version, PDRIVER_OBJECT* pDriverObj)
 
 void DumpHidExtension(HID_DEVICE_EXTENSION* hid_common_extension, HID_USB_DEVICE_EXTENSION* mini_extension)
 {
- 
+	ULONG i = 0; 
+	STACK_TRACE_DEBUG_INFO("---------------------------------------\r\n");
+
 	STACK_TRACE_DEBUG_INFO(" --->PhysicalDeviceObject: %I64X \r\n", hid_common_extension->PhysicalDeviceObject);
 	STACK_TRACE_DEBUG_INFO(" --->DriverObject: %I64X \r\n", hid_common_extension->PhysicalDeviceObject->DriverObject);
 	STACK_TRACE_DEBUG_INFO(" --->NextDeviceObject: %I64X \r\n", hid_common_extension->NextDeviceObject);
@@ -82,7 +86,21 @@ void DumpHidExtension(HID_DEVICE_EXTENSION* hid_common_extension, HID_USB_DEVICE
 	STACK_TRACE_DEBUG_INFO("		--->Protocol: %I64X \r\n", mini_extension->InterfaceDesc->Protocol);
 	STACK_TRACE_DEBUG_INFO("		--->NumOfPipes: %I64X \r\n", mini_extension->InterfaceDesc->NumberOfPipes);
 	STACK_TRACE_DEBUG_INFO("		--->Length: %I64X \r\n", mini_extension->InterfaceDesc->Length);
-	STACK_TRACE_DEBUG_INFO("		--->AlternateSetting: %I64X \r\n", mini_extension->InterfaceDesc->AlternateSetting);
+	STACK_TRACE_DEBUG_INFO("		--->AlternateSetting: %I64X \r\n\r\n", mini_extension->InterfaceDesc->AlternateSetting);
+
+ 	for (i = 0; i < mini_extension->InterfaceDesc->NumberOfPipes; i++)
+	{
+		USBD_PIPE_INFORMATION* Pipe_Information = &mini_extension->InterfaceDesc->Pipes[i];
+		STACK_TRACE_DEBUG_INFO("  --->Pipe id: %x Information: %I64X \r\n",i, Pipe_Information);
+		STACK_TRACE_DEBUG_INFO("		--->PipeHandle: %I64X \r\n", Pipe_Information->PipeHandle); 
+		STACK_TRACE_DEBUG_INFO("		--->PipeAddress: %I64X \r\n", Pipe_Information->EndpointAddress); 
+		STACK_TRACE_DEBUG_INFO("		--->PipeInterval: %I64X \r\n", Pipe_Information->Interval);
+		STACK_TRACE_DEBUG_INFO("		--->PipeInterval: %I64X \r\n", Pipe_Information->MaximumPacketSize);
+		STACK_TRACE_DEBUG_INFO("		--->PipeInterval: %I64X \r\n", Pipe_Information->MaximumTransferSize);
+	}
+
+
+	STACK_TRACE_DEBUG_INFO("---------------------------------------\r\n");
 
 	/*
 	HID_DESCRIPTOR* hid_desc = (HID_DESCRIPTOR*)(mini_extension + 0x57);

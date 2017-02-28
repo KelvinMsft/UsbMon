@@ -12,6 +12,7 @@ typedef struct _HID_DEVICE_NODE
 {
 	PDEVICE_OBJECT					device_object;
 	PUSBD_INTERFACE_INFORMATION		InterfaceDesc;
+	USBD_PIPE_HANDLE				PipeHandle;    //Represent Mouse Or Keyboard Pipe
 }HID_DEVICE_NODE, *PHID_DEVICE_NODE;
 
 typedef struct _HID_USB_DEVICE_EXTENSION {
