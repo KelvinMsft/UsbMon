@@ -3,6 +3,7 @@
 
 #include "UsbUtil.h" 
 #include "UsbHid.h"
+#include "IrpHook.h"
 #pragma warning (disable : 4100)
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -129,9 +130,10 @@ VOID DriverUnload(
 
 	if (NT_SUCCESS(GetUsbHub(USB3, &pDriverObj)))
 	{
-		if (pDriverObj && g_pDispatchInternalDeviceControl)
+		if (pDriverObj)
 		{
-			InterlockedExchange64((LONG64 volatile *)&pDriverObj->MajorFunction[IRP_MJ_INTERNAL_DEVICE_CONTROL], (LONG64)g_pDispatchInternalDeviceControl);
+			//InterlockedExchange64((LONG64 volatile *)&pDriverObj->MajorFunction[IRP_MJ_INTERNAL_DEVICE_CONTROL], (LONG64)g_pDispatchInternalDeviceControl);
+			RemoveAllIrpObject();
 			g_pDispatchInternalDeviceControl = NULL;
 		}
 	}  
@@ -302,14 +304,13 @@ NTSTATUS DispatchInternalDeviceControl(
 		}
 
 	} while (0);
-
+	
 	return g_pDispatchInternalDeviceControl(DeviceObject, Irp);
-}
-
+} 
 //----------------------------------------------------------------------------------------//
 NTSTATUS DriverEntry(PDRIVER_OBJECT object, PUNICODE_STRING String)
 {
-
+	//IRPHOOKOBJ* HookObj					 = NULL;
 	PDRIVER_OBJECT			  pDriverObj = NULL;
 	NTSTATUS					  status = STATUS_UNSUCCESSFUL;   
 
@@ -356,11 +357,9 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT object, PUNICODE_STRING String)
 		return status;
 	}
 
-	g_pDispatchInternalDeviceControl = (DRIVER_DISPATCH*)InterlockedExchange64(
-		(LONG64 volatile *)&pDriverObj->MajorFunction[IRP_MJ_INTERNAL_DEVICE_CONTROL],
-		(LONG64)DispatchInternalDeviceControl
-	); 
-
-	return status;
+	InitIrpHook();
+	g_pDispatchInternalDeviceControl = (PDRIVER_DISPATCH)DoIrpHook(pDriverObj, IRP_MJ_INTERNAL_DEVICE_CONTROL, DispatchInternalDeviceControl,Start);
+	
+ 	return status;
 }
  

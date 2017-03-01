@@ -137,6 +137,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <CallingConvention>FastCall</CallingConvention>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -146,6 +147,7 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="IrpHook.h" />
     <ClInclude Include="LinkedList.h" />
     <ClInclude Include="UsbType.h" />
     <ClInclude Include="UsbUtil.h" />
@@ -153,6 +155,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Driver.c" />
+    <ClCompile Include="IrpHook.c" />
     <ClCompile Include="UsbHid.c" />
     <ClCompile Include="UsbUtil.c" />
     <ClCompile Include="CommonUtil.c" />

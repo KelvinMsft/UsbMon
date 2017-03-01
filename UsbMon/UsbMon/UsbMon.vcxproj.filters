@@ -36,6 +36,9 @@
     <ClInclude Include="CommonUtil.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="IrpHook.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Driver.c">
@@ -48,6 +51,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="UsbHid.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="IrpHook.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
