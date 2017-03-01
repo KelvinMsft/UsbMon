@@ -138,38 +138,7 @@ VOID FreeListMemory()
 		}
 	}
 }
-//-----------------------------------------------------------------------------------------
-VOID DriverUnload(
-	_In_ struct _DRIVER_OBJECT *DriverObject
-)
-{
-	UNREFERENCED_PARAMETER(DriverObject);
-
-	//Repair all Irp hook
-	RemoveAllIrpObject();
-
-	//Repair all completion hook
-	if (RemoveAllPendingIrpFromList())
-	{
-		//Free all memory
-		FreeListMemory();
-	}
-	STACK_TRACE_DEBUG_INFO("IRP finished All \r\n");
-
-	while (g_current_index > 0)
-	{
-		if (g_pHidWhiteList[g_current_index])
-		{
-			ExFreePool(g_pHidWhiteList[g_current_index]);
-			g_pHidWhiteList[g_current_index] = NULL;
-		}
-		InterlockedDecrement(&g_current_index);
-	}
-
-	g_pDispatchInternalDeviceControl = NULL;
-
-	return;
-}
+ 
 //----------------------------------------------------------------------------------------// 
 HIJACK_CONTEXT* GetRealContextByIrp(PIRP irp)
 {
@@ -256,7 +225,6 @@ NTSTATUS CheckPipeHandle(USBD_PIPE_HANDLE pipe_handle_from_urb, USBD_PIPE_INFORM
 				break;
 			}
 		}
-
 	} while (FALSE);
 
 	return status;
@@ -273,13 +241,11 @@ BOOLEAN CheckIfPipeHandleExist(USBD_PIPE_HANDLE handle)
 			g_pHidWhiteList[i]->InterfaceDesc->Pipes,
 			g_pHidWhiteList[i]->InterfaceDesc->NumberOfPipes
 		);
-
 		if (NT_SUCCESS(status))
 		{
 			STACK_TRACE_DEBUG_INFO("Handle Matched: %I64x \r\n", handle);
 			exist = TRUE;
 		}
-
 		i++;
 	}
 	return exist;
@@ -347,6 +313,7 @@ NTSTATUS DispatchInternalDeviceControl(
 
 	return g_pDispatchInternalDeviceControl(DeviceObject, Irp);
 }
+//----------------------------------------------------------------------------------------//
 NTSTATUS InitLinkedList()
 {
 	NTSTATUS status = STATUS_UNSUCCESSFUL;
@@ -364,6 +331,38 @@ NTSTATUS InitLinkedList()
 	
 	status = STATUS_SUCCESS; 
 	return status;
+}
+//-----------------------------------------------------------------------------------------
+VOID DriverUnload(
+	_In_ struct _DRIVER_OBJECT *DriverObject
+)
+{
+	UNREFERENCED_PARAMETER(DriverObject);
+
+	//Repair all Irp hook
+	RemoveAllIrpObject();
+
+	//Repair all completion hook
+	if (RemoveAllPendingIrpFromList())
+	{
+		//Free all memory
+		FreeListMemory();
+	}
+	STACK_TRACE_DEBUG_INFO("IRP finished All \r\n");
+
+	while (g_current_index > 0)
+	{
+		if (g_pHidWhiteList[g_current_index])
+		{
+			ExFreePool(g_pHidWhiteList[g_current_index]);
+			g_pHidWhiteList[g_current_index] = NULL;
+		}
+		InterlockedDecrement(&g_current_index);
+	}
+
+	g_pDispatchInternalDeviceControl = NULL;
+
+	return;
 }
 //----------------------------------------------------------------------------------------//
 NTSTATUS DriverEntry(PDRIVER_OBJECT object, PUNICODE_STRING String)
