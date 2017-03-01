@@ -1,7 +1,7 @@
 #include "UsbHid.h"
 #include "UsbUtil.h"
 
-NTSTATUS SearchAllHidRelation(
+NTSTATUS InitHidRelation(
 	PHID_DEVICE_NODE** device_object_list,
 	PULONG size
 )
@@ -49,7 +49,7 @@ NTSTATUS SearchAllHidRelation(
 
 		//TODO: Get all interfaces , and all keyboard device
 		if (mini_extension->InterfaceDesc->Class == 3 &&
-			mini_extension->InterfaceDesc->Protocol == 1)
+			(mini_extension->InterfaceDesc->Protocol == 1 || mini_extension->InterfaceDesc->Protocol == 2))
 		{
 			HID_DEVICE_NODE* node = ExAllocatePool(NonPagedPool, sizeof(HID_DEVICE_NODE));
 			RtlZeroMemory(node, sizeof(HID_DEVICE_NODE));
