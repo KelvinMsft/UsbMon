@@ -351,20 +351,19 @@ NTSTATUS InitPendingIrpLinkedList()
 		g_header = (PENDINGIRPLIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(PENDINGIRPLIST), 'kcaj');
 	}
 
-	if (!g_header)
+	if (g_header)
 	{
-		STACK_TRACE_DEBUG_INFO("Allocation Error \r\n"); 
-		return status;
-	} 
+		STACK_TRACE_DEBUG_INFO("Allocation Error \r\n");
+		RtlZeroMemory(g_header, sizeof(PENDINGIRPLIST));
 
-	RtlZeroMemory(g_header, sizeof(PENDINGIRPLIST));
+		RtlZeroMemory(g_header, sizeof(PENDINGIRPLIST));
+		RTInitializeListHead(&g_header->head);
+		KeInitializeSpinLock(&g_header->lock);
 
-	RtlZeroMemory(g_header, sizeof(PENDINGIRPLIST));
-	RTInitializeListHead(&g_header->head);
-	KeInitializeSpinLock(&g_header->lock);
-	
-	status = STATUS_SUCCESS; 
+		status = STATUS_SUCCESS;
+	}
 	return status;
+
 }
 
 //-----------------------------------------------------------------------------------------

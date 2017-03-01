@@ -220,15 +220,16 @@ NTSTATUS InitIrpHook()
 	if (!ListHeader)
 	{
 		ListHeader = (IRPHOOKLIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(IRPHOOKLIST), 'opri');
-	 
-		if (ListHeader)
-		{
-			RtlZeroMemory(ListHeader, sizeof(IRPHOOKLIST));
-			RTInitializeListHead(&ListHeader->head);
-			KeInitializeSpinLock(&ListHeader->lock);
-			status = STATUS_SUCCESS;
-		} 
 	}
+
+	if (ListHeader)
+	{
+		RtlZeroMemory(ListHeader, sizeof(IRPHOOKLIST));
+		RTInitializeListHead(&ListHeader->head);
+		KeInitializeSpinLock(&ListHeader->lock);
+		status = STATUS_SUCCESS;
+	} 
+
 	return status;
 }
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
