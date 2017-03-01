@@ -1,4 +1,4 @@
- 
+
 #include <fltKernel.h>
 
 #include "UsbUtil.h" 
@@ -15,9 +15,9 @@ typedef struct PENDINGIRP
 {
 	RT_LIST_ENTRY				entry;
 	PIRP				 		  Irp;
-	PIO_STACK_LOCATION		 IrpStack; 
+	PIO_STACK_LOCATION		 IrpStack;
 	IO_COMPLETION_ROUTINE* oldRoutine;
-	PVOID				   oldContext; 
+	PVOID				   oldContext;
 }PENDINGIRP, *PPENDINGIRP;
 
 
@@ -28,9 +28,9 @@ typedef struct HIJACK_CONTEXT
 	PVOID						Context;
 	IO_COMPLETION_ROUTINE*		routine;
 	PURB							urb;
-	PENDINGIRP*			    pending_irp; 
-}HIJACK_CONTEXT, *PHIJACK_CONTEXT;    
-  
+	PENDINGIRP*			    pending_irp;
+}HIJACK_CONTEXT, *PHIJACK_CONTEXT;
+
 
 typedef struct _PENDINGIRP_LIST
 {
@@ -48,24 +48,22 @@ typedef enum _DEVICE_PNP_STATE {
 	Deleted,                // After handling of REMOVE_DEVICE IRP
 	UnKnown                 // Unknown state
 } DEVICE_PNP_STATE;
- 
+
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////	Global Variable
 ////
 
-//PENDINGIRP	  head;
 DRIVER_DISPATCH*  g_pDispatchInternalDeviceControlForCcgp = NULL;
 DRIVER_DISPATCH*  g_pDispatchInternalDeviceControl = NULL;
-DRIVER_DISPATCH*  g_pDispatchPnP  = NULL;
+DRIVER_DISPATCH*  g_pDispatchPnP = NULL;
 PHID_DEVICE_NODE* g_pHidWhiteList = NULL;
-//volatile LONG	  g_irp_count	  = 0;
 volatile LONG	  g_current_index = 0;
-PDRIVER_OBJECT    g_pDriverObj	  = NULL;
-BOOLEAN			  g_bUnloaded	  = FALSE;
- 
-PENDINGIRPLIST*			 g_header = NULL;
+BOOLEAN			  g_bUnloaded = FALSE;
+
+PENDINGIRPLIST*	  g_header = NULL;
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////	Marco
 ////  
@@ -87,41 +85,6 @@ case IRP_MN_QUERY_INTERFACE:
 return g_pDispatchPnP(DeviceObject, Irp);
 }
 -----------------------------------------------------------------------*/
-
-//----------------------------------------------------------------------------------------//  
-PDEVICE_OBJECT TraceHidDeviceObject(PDEVICE_OBJECT device_object)
-{
-	PDEVICE_OBJECT ret_device_obj = device_object;
-
-	if (!g_pDriverObj)
-	{
-		GetDriverObjectByName(L"\\Driver\\hidusb", &g_pDriverObj);
-	}
-
-	if (!g_pDriverObj)
-	{
-		return NULL;
-	}
-
-	while (ret_device_obj)
-	{
-		WCHAR device_name[256] = { 0 };
-		GetDeviceName(ret_device_obj, device_name);
-		//	STACK_TRACE_DEBUG_INFO("DriverObj: %I64X DriverName: %ws DeviceObj: %I64X DeviceName: %ws \r\n",
-		//	ret_device_obj->DriverObject, ret_device_obj->DriverObject->DriverName.Buffer, ret_device_obj, device_name);
-
-		if (ret_device_obj->DriverObject == g_pDriverObj)
-		{
-			//STACK_TRACE_DEBUG_INFO("LastDevice DriverObj: %ws \r\n device_obj:%I64X \r\n", device_obj->DriverObject->DriverName.Buffer, device_obj);
-			break;
-		}
-		ret_device_obj = ret_device_obj->AttachedDevice;
-	}
-
-	return ret_device_obj;
-}
- 
-//----------------------------------------------------------------------------------------//.
 NTSTATUS RemovePendingIrp(PENDINGIRP* pending_irp_node)
 {
 	NTSTATUS    status = STATUS_UNSUCCESSFUL;
@@ -136,45 +99,45 @@ NTSTATUS RemovePendingIrp(PENDINGIRP* pending_irp_node)
 	return status;
 }
 //----------------------------------------------------------------------------------------- 
- NTSTATUS RemoveAllPendingIrpFromList() 
- {
-	 NTSTATUS						   status = STATUS_UNSUCCESSFUL;
-	 PENDINGIRP							*pDev = NULL;
-	 RT_LIST_ENTRY				*pEntry,  *pn = NULL;
+NTSTATUS RemoveAllPendingIrpFromList()
+{
+	NTSTATUS						   status = STATUS_UNSUCCESSFUL;
+	PENDINGIRP							*pDev = NULL;
+	RT_LIST_ENTRY				*pEntry, *pn = NULL;
 
-	 RtEntryListForEachSafe(&g_header->head, pEntry, pn)
-	 {
-		 pDev = (PENDINGIRP *)pEntry;
-		 if (pDev)
-		 {
-			 status = RemovePendingIrp(pDev);
-		 }  
-	 }
-	  
-	 return status;
- }
+	RtEntryListForEachSafe(&g_header->head, pEntry, pn)
+	{
+		pDev = (PENDINGIRP *)pEntry;
+		if (pDev)
+		{
+			status = RemovePendingIrp(pDev);
+		}
+	}
 
- //-----------------------------------------------------------------------------------------
- VOID FreeListMemory()
- {
-	 NTSTATUS						   status = STATUS_UNSUCCESSFUL;
-	 PENDINGIRP							*pDev = NULL;
-	 RT_LIST_ENTRY				*pEntry, *pn = NULL;
-	 RtEntryListForEachSafe(&g_header->head, pEntry, pn)
-	 {
-		 PENDINGIRP* pDev = (PENDINGIRP *)pEntry;
-		 if (pDev)
-		 {
-			 KIRQL irql = 0;
-			 ExAcquireSpinLock(&g_header->lock, &irql);
-			 RTRemoveEntryList(&pDev->entry);
-			 ExReleaseSpinLock(&g_header->lock, irql);
+	return status;
+}
 
-			 ExFreePool(pDev);
-			 pDev = NULL;
-		 }
-	 } 
- }
+//-----------------------------------------------------------------------------------------
+VOID FreeListMemory()
+{
+	NTSTATUS						   status = STATUS_UNSUCCESSFUL;
+	PENDINGIRP							*pDev = NULL;
+	RT_LIST_ENTRY				*pEntry, *pn = NULL;
+	RtEntryListForEachSafe(&g_header->head, pEntry, pn)
+	{
+		PENDINGIRP* pDev = (PENDINGIRP *)pEntry;
+		if (pDev)
+		{
+			KIRQL irql = 0;
+			ExAcquireSpinLock(&g_header->lock, &irql);
+			RTRemoveEntryList(&pDev->entry);
+			ExReleaseSpinLock(&g_header->lock, irql);
+
+			ExFreePool(pDev);
+			pDev = NULL;
+		}
+	}
+}
 //-----------------------------------------------------------------------------------------
 VOID DriverUnload(
 	_In_ struct _DRIVER_OBJECT *DriverObject
@@ -183,16 +146,16 @@ VOID DriverUnload(
 	UNREFERENCED_PARAMETER(DriverObject);
 
 	//Repair all Irp hook
-	RemoveAllIrpObject();	
-		
+	RemoveAllIrpObject();
+
 	//Repair all completion hook
 	if (RemoveAllPendingIrpFromList())
-	{ 
+	{
 		//Free all memory
-		FreeListMemory(); 
+		FreeListMemory();
 	}
-	STACK_TRACE_DEBUG_INFO("IRP finished All \r\n"); 
-	 
+	STACK_TRACE_DEBUG_INFO("IRP finished All \r\n");
+
 	while (g_current_index > 0)
 	{
 		if (g_pHidWhiteList[g_current_index])
@@ -228,18 +191,18 @@ NTSTATUS  MyCompletionCallback(
 	_In_     PIRP           Irp,
 	_In_opt_ PVOID          Context
 )
-{   
- 
+{
+
 	HIJACK_CONTEXT*		   pContext = (HIJACK_CONTEXT*)Context;
-	PVOID					context = NULL; 
-	IO_COMPLETION_ROUTINE* callback = NULL;   
-	WCHAR			DeviceName[256]	= { 0 };
+	PVOID					context = NULL;
+	IO_COMPLETION_ROUTINE* callback = NULL;
+	WCHAR			DeviceName[256] = { 0 };
 
 	if (!pContext)
 	{
 		return STATUS_UNSUCCESSFUL;
 	}
-	 
+
 	if (!pContext->pending_irp)
 	{
 		return STATUS_UNSUCCESSFUL;
@@ -255,11 +218,11 @@ NTSTATUS  MyCompletionCallback(
 	if (!pContext)
 	{
 		return STATUS_UNSUCCESSFUL;
-	} 
+	}
 
-	context  = pContext->Context;
+	context = pContext->Context;
 	callback = pContext->routine;
-	  
+
 	KIRQL irql = 0;
 	ExAcquireSpinLock(&g_header->lock, &irql);
 	RTRemoveEntryList(&pContext->pending_irp->entry);
@@ -293,10 +256,10 @@ NTSTATUS CheckPipeHandle(USBD_PIPE_HANDLE pipe_handle_from_urb, USBD_PIPE_INFORM
 				break;
 			}
 		}
-		 
+
 	} while (FALSE);
 
-	return status; 
+	return status;
 }
 
 //----------------------------------------------------------------------------------------// 
@@ -307,13 +270,13 @@ BOOLEAN CheckIfPipeHandleExist(USBD_PIPE_HANDLE handle)
 	while (g_pHidWhiteList[i])
 	{
 		NTSTATUS status = CheckPipeHandle(handle,
-					g_pHidWhiteList[i]->InterfaceDesc->Pipes,
-					g_pHidWhiteList[i]->InterfaceDesc->NumberOfPipes
+			g_pHidWhiteList[i]->InterfaceDesc->Pipes,
+			g_pHidWhiteList[i]->InterfaceDesc->NumberOfPipes
 		);
 
 		if (NT_SUCCESS(status))
 		{
-			STACK_TRACE_DEBUG_INFO("Handle Matched: %I64x \r\n", handle); 
+			STACK_TRACE_DEBUG_INFO("Handle Matched: %I64x \r\n", handle);
 			exist = TRUE;
 		}
 
@@ -322,7 +285,7 @@ BOOLEAN CheckIfPipeHandleExist(USBD_PIPE_HANDLE handle)
 	return exist;
 }
 
- 
+
 //----------------------------------------------------------------------------------------// 
 NTSTATUS DispatchInternalDeviceControl(
 	_Inout_ struct _DEVICE_OBJECT *DeviceObject,
@@ -330,18 +293,18 @@ NTSTATUS DispatchInternalDeviceControl(
 )
 {
 	do
-	{ 
-		HIJACK_CONTEXT* hijack		= NULL;
-		PIO_STACK_LOCATION irpStack = NULL; 
-		PURB urb					= NULL;
-		PENDINGIRP*	new_entry		= NULL;  
+	{
+		HIJACK_CONTEXT* hijack = NULL;
+		PIO_STACK_LOCATION irpStack = NULL;
+		PURB urb = NULL;
+		PENDINGIRP*	new_entry = NULL;
 
 		irpStack = IoGetCurrentIrpStackLocation(Irp);
 		if (irpStack->Parameters.DeviceIoControl.IoControlCode != IOCTL_INTERNAL_USB_SUBMIT_URB)
 		{
 			break;
 		}
-		
+
 		urb = (PURB)irpStack->Parameters.Others.Argument1;
 		if (urb->UrbHeader.Function != URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER)
 		{
@@ -350,9 +313,9 @@ NTSTATUS DispatchInternalDeviceControl(
 
 		//If Urb pipe handle is used by HID mouse / kbd device. 
 		if (CheckIfPipeHandleExist(urb->UrbBulkOrInterruptTransfer.PipeHandle))
-		{ 	
-			hijack	   = (HIJACK_CONTEXT*)ExAllocatePoolWithTag(NonPagedPool, sizeof(HIJACK_CONTEXT), 'kcaj'); 
-			new_entry  = (PENDINGIRP*)ExAllocatePoolWithTag(NonPagedPool, sizeof(PENDINGIRP), 'kcaj');		
+		{
+			hijack = (HIJACK_CONTEXT*)ExAllocatePoolWithTag(NonPagedPool, sizeof(HIJACK_CONTEXT), 'kcaj');
+			new_entry = (PENDINGIRP*)ExAllocatePoolWithTag(NonPagedPool, sizeof(PENDINGIRP), 'kcaj');
 
 			if (hijack && new_entry)
 			{
@@ -364,7 +327,7 @@ NTSTATUS DispatchInternalDeviceControl(
 				new_entry->oldContext = irpStack->Context;
 				new_entry->IrpStack = irpStack;
 				new_entry->Irp = Irp;
- 				RTInsertTailList(&g_header->head, &new_entry->entry);
+				RTInsertTailList(&g_header->head, &new_entry->entry);
 
 				//Fake Context for Completion Routine
 				hijack->routine = irpStack->CompletionRoutine;
@@ -381,40 +344,34 @@ NTSTATUS DispatchInternalDeviceControl(
 		}
 
 	} while (0);
-	
+
 	return g_pDispatchInternalDeviceControl(DeviceObject, Irp);
-} 
+}
+NTSTATUS InitLinkedList()
+{
+	NTSTATUS status = STATUS_UNSUCCESSFUL;
+	g_header = (PENDINGIRPLIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(PENDINGIRPLIST), 'kcaj');
+
+	if (!g_header)
+	{
+		STACK_TRACE_DEBUG_INFO("Allocation Error \r\n"); 
+		return status;
+	} 
+
+	RtlZeroMemory(g_header, sizeof(PENDINGIRPLIST));
+	RTInitializeListHead(&g_header->head);
+	KeInitializeSpinLock(&g_header->lock);
+	
+	status = STATUS_SUCCESS; 
+	return status;
+}
 //----------------------------------------------------------------------------------------//
 NTSTATUS DriverEntry(PDRIVER_OBJECT object, PUNICODE_STRING String)
 {
-	//IRPHOOKOBJ* HookObj					 = NULL;
 	PDRIVER_OBJECT			  pDriverObj = NULL;
-	NTSTATUS					  status = STATUS_UNSUCCESSFUL;   
-
-	WCHAR* Usbhub = GetUsbHubDriverNameByVersion(USB);
-	STACK_TRACE_DEBUG_INFO("Usb Hub: %ws \r\n", Usbhub);
-
-	WCHAR* Usbhub2 = GetUsbHubDriverNameByVersion(USB2);
-	STACK_TRACE_DEBUG_INFO("Usb Hub2: %ws \r\n", Usbhub2);
-
-	WCHAR* Usbhub3 = GetUsbHubDriverNameByVersion(USB3);
-	STACK_TRACE_DEBUG_INFO("Usb Hub3: %ws \r\n", Usbhub3);
-	
-	WCHAR* Usbhub_new = GetUsbHubDriverNameByVersion(USB3_NEW);
-	STACK_TRACE_DEBUG_INFO("Usb Hub3_w8 above: %ws \r\n", Usbhub_new);
-	
-	WCHAR* Usb_ccgp = GetUsbHubDriverNameByVersion(USB_COMPOSITE);
-	STACK_TRACE_DEBUG_INFO("Usb CCGP: %ws \r\n", Usb_ccgp);
-
+	NTSTATUS					  status = STATUS_UNSUCCESSFUL;
+	  
 	object->DriverUnload = DriverUnload;
-	
-	pDriverObj = NULL;
-	status = GetDriverObjectByName(L"\\Driver\\hidusb", &g_pDriverObj);
-
-	if (!NT_SUCCESS(status) || !g_pDriverObj)
-	{
-		return status;
-	}
 
 	status = InitHidRelation(&g_pHidWhiteList, &(ULONG)g_current_index);
 
@@ -422,39 +379,21 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT object, PUNICODE_STRING String)
 	{
 		return status;
 	}
-	  
-	STACK_TRACE_DEBUG_INFO("device_object_list: %I64X size: %x \r\n", g_pHidWhiteList, g_current_index);
-	  
-	pDriverObj = NULL; 
-	status = GetUsbHub(USB2, &pDriverObj);	// iusbhub
 
+	STACK_TRACE_DEBUG_INFO("device_object_list: %I64X size: %x \r\n", g_pHidWhiteList, g_current_index);
+
+	status = GetUsbHub(USB2, &pDriverObj);	// iusbhub
 	if (!NT_SUCCESS(status) || !pDriverObj)
 	{
-		STACK_TRACE_DEBUG_INFO("GetUsbHub Error \r\n"); 
+		STACK_TRACE_DEBUG_INFO("GetUsbHub Error \r\n");
 		return status;
 	}
-
-	g_header = (PENDINGIRPLIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(PENDINGIRPLIST), 'kcaj');
-	//g_header->head = (PENDINGIRP*)ExAllocatePoolWithTag(NonPagedPool, sizeof(PENDINGIRP), 'kcaj');
-	if (!g_header)
-	{
-		STACK_TRACE_DEBUG_INFO("Allocation Error \r\n");
-		status = STATUS_UNSUCCESSFUL;
-		return status;
-	}
-	RtlZeroMemory(g_header, sizeof(PENDINGIRPLIST));
-	RTInitializeListHead(&g_header->head);
-	KeInitializeSpinLock(&g_header->lock); 
+	 
+	InitLinkedList();
 
 	InitIrpHook();
 
-	g_pDispatchInternalDeviceControl = (PDRIVER_DISPATCH)DoIrpHook(
-		pDriverObj, 
-		IRP_MJ_INTERNAL_DEVICE_CONTROL, 
-		DispatchInternalDeviceControl,
-		Start
-	);
-	
- 	return status;
+	g_pDispatchInternalDeviceControl = (PDRIVER_DISPATCH)DoIrpHook(pDriverObj,IRP_MJ_INTERNAL_DEVICE_CONTROL,DispatchInternalDeviceControl,	Start);
+
+	return status;
 }
- 

@@ -12,6 +12,28 @@ extern NTSTATUS ObReferenceObjectByName(
 	PVOID ParseContext,
 	PVOID *Object
 );
+
+
+//----------------------------------------------------------------------------------------//
+VOID PrintAllHidDriverName()
+{
+	WCHAR* Usbhub = GetUsbHubDriverNameByVersion(USB);
+	STACK_TRACE_DEBUG_INFO("Usb Hub: %ws \r\n", Usbhub);
+
+	WCHAR* Usbhub2 = GetUsbHubDriverNameByVersion(USB2);
+	STACK_TRACE_DEBUG_INFO("Usb Hub2: %ws \r\n", Usbhub2);
+
+	WCHAR* Usbhub3 = GetUsbHubDriverNameByVersion(USB3);
+	STACK_TRACE_DEBUG_INFO("Usb Hub3: %ws \r\n", Usbhub3);
+
+	WCHAR* Usbhub_new = GetUsbHubDriverNameByVersion(USB3_NEW);
+	STACK_TRACE_DEBUG_INFO("Usb Hub3_w8 above: %ws \r\n", Usbhub_new);
+
+	WCHAR* Usb_ccgp = GetUsbHubDriverNameByVersion(USB_COMPOSITE);
+	STACK_TRACE_DEBUG_INFO("Usb CCGP: %ws \r\n", Usb_ccgp);
+
+}
+
 //----------------------------------------------------------------------------------------//
 WCHAR* GetUsbHubDriverNameByVersion(USB_HUB_VERSION usb_hub_version)
 {
