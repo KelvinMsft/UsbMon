@@ -53,7 +53,7 @@ DRIVER_DISPATCH*  g_pDispatchInternalDeviceControlForCcgp = NULL;
 DRIVER_DISPATCH*  g_pDispatchInternalDeviceControl = NULL;
 DRIVER_DISPATCH*  g_pDispatchPnP  = NULL;
 PHID_DEVICE_NODE* g_pHidWhiteList = NULL;
-volatile LONG	  g_irp_count	  = 0;
+//volatile LONG	  g_irp_count	  = 0;
 volatile LONG	  g_current_index = 0;
 PDRIVER_OBJECT    g_pDriverObj	  = NULL;
 BOOLEAN			  g_bUnloaded	  = FALSE;
@@ -131,8 +131,6 @@ NTSTATUS RemovePendingIrp(PENDINGIRP* pending_irp_node)
 		InterlockedExchange64(&pending_irp->IrpStack->CompletionRoutine, pending_irp->oldRoutine);
 			
 		ExReleaseSpinLock(&pending_irp->spin_lock, irql);
-		
-		InterlockedDecrement(&g_irp_count); 
 		
 		status = STATUS_SUCCESS;
 	}
@@ -266,7 +264,6 @@ NTSTATUS  MyCompletionCallback(
 		KIRQL irql = 0;
 		ExAcquireSpinLock(&pContext->pending_irp->spin_lock, &irql);
 		RTRemoveEntryList(&pContext->pending_irp->entry);
-		InterlockedDecrement(&g_irp_count);
 		ExReleaseSpinLock(&pContext->pending_irp->spin_lock, irql);
 
 		//DumpUrb(pContext->urb); 
@@ -384,7 +381,7 @@ NTSTATUS DispatchInternalDeviceControl(
 
 			irpStack->CompletionRoutine = MyCompletionCallback;
 			irpStack->Context = hijack; 
-			InterlockedIncrement(&g_irp_count);
+			//InterlockedIncrement(&g_irp_count);
 		}
 
 	} while (0);
