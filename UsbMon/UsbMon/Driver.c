@@ -91,7 +91,6 @@ NTSTATUS RemovePendingIrp(PENDINGIRP* pending_irp_node)
 	PENDINGIRP* pending_irp = pending_irp_node;
 	if (pending_irp)
 	{
-		g_bUnloaded = TRUE;
 		InterlockedExchange64(&pending_irp->IrpStack->Context, pending_irp->oldContext);
 		InterlockedExchange64(&pending_irp->IrpStack->CompletionRoutine, pending_irp->oldRoutine);
 		status = STATUS_SUCCESS;
@@ -161,7 +160,7 @@ NTSTATUS  MyCompletionCallback(
 	_In_opt_ PVOID          Context
 )
 {
-
+	KIRQL					   irql = 0;
 	HIJACK_CONTEXT*		   pContext = (HIJACK_CONTEXT*)Context;
 	PVOID					context = NULL;
 	IO_COMPLETION_ROUTINE* callback = NULL;
@@ -192,7 +191,15 @@ NTSTATUS  MyCompletionCallback(
 	context = pContext->Context;
 	callback = pContext->routine;
 
-	KIRQL irql = 0;
+	//Rarely call here when driver unloading, Safely call because driver_unload 
+	//will handle all element in the list. we dun need to free and unlink it,
+	//otherwise, system crash.
+	if (g_bUnloaded && callback && context)
+	{
+		STACK_TRACE_DEBUG_INFO("Safely call \r\n");
+		return callback(DeviceObject, Irp, context);
+	}
+
 	ExAcquireSpinLock(&g_header->lock, &irql);
 	RTRemoveEntryList(&pContext->pending_irp->entry);
 	ExReleaseSpinLock(&g_header->lock, irql);
@@ -339,6 +346,8 @@ VOID DriverUnload(
 {
 	UNREFERENCED_PARAMETER(DriverObject);
 
+	g_bUnloaded = TRUE;
+
 	//Repair all Irp hook
 	RemoveAllIrpObject();
 
@@ -388,11 +397,24 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT object, PUNICODE_STRING String)
 		return status;
 	}
 	
-	InitPendingIrpLinkedList();
+	//Init Irp Linked-List
+	status = InitPendingIrpLinkedList();
+	if (!NT_SUCCESS(status))
+	{
+		return status;
+	}
+	//Init Irp Hook for URB transmit
+	status = InitIrpHook();
+	if (!NT_SUCCESS(status))
+	{
+		return status;
+	}
 
-	InitIrpHook();
-
+	//Do Irp Hook for URB transmit
 	g_pDispatchInternalDeviceControl = (PDRIVER_DISPATCH)DoIrpHook(pDriverObj,IRP_MJ_INTERNAL_DEVICE_CONTROL,DispatchInternalDeviceControl,	Start);
-
+	if (!g_pDispatchInternalDeviceControl)
+	{
+		return status;
+	}
 	return status;
 }
