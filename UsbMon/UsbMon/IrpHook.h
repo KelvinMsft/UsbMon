@@ -1,3 +1,6 @@
+#ifndef __IRP_HOOK_HEARER_
+#define __IRP_HOOK_HEADER_
+
 #include <fltKernel.h>
 #include "LinkedList.h"
 
@@ -74,3 +77,5 @@ NTSTATUS	InsertIrpObject(
 //	
 //
 NTSTATUS	InitIrpHook();
+
+#endif
