@@ -20,36 +20,29 @@ typedef enum
 //// Prototype
 //// 
 /* -----------------------------------------------------------------------------------------------------------------
-
-
 */
 VOID DumpUrb(
-	PURB urb
+	_In_ PURB urb
 );
 
 /* -----------------------------------------------------------------------------------------------------------------
-	Parameter 1: hid_common_extension 
 */
 
 VOID DumpHidMiniDriverExtension(
-	HID_DEVICE_EXTENSION* hid_common_extension
+	_In_ HID_DEVICE_EXTENSION* hid_common_extension
 );
 
 /* -----------------------------------------------------------------------------------------------------------------
- 
-
 */
 NTSTATUS GetUsbHub(
-	USB_HUB_VERSION usb_hub_version,
-	PDRIVER_OBJECT* pDriverObj
+	_In_  USB_HUB_VERSION usb_hub_version,
+	_Out_ PDRIVER_OBJECT* pDriverObj
 );
 
 /* -----------------------------------------------------------------------------------------------------------------
- 
-
 */
 WCHAR* GetUsbHubDriverNameByVersion(
-	USB_HUB_VERSION usb_hub_version
+	_In_ USB_HUB_VERSION usb_hub_version
 );
 
 #endif

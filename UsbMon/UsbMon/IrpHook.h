@@ -1,6 +1,11 @@
 #include <fltKernel.h>
 #include "LinkedList.h"
 
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////	Types
+////
+
 typedef enum
 {
 	Start = 0,
@@ -19,10 +24,53 @@ typedef struct IRPHOOKOBJ
 }IRPHOOKOBJ, *PIRPHOOKOBJ;
 #pragma pack() 
 
-PVOID		DoIrpHook(PDRIVER_OBJECT driver_object, ULONG IrpCode, PVOID ProxyFunction,Action action); 
-IRPHOOKOBJ*	CreateIrpObject(PDRIVER_OBJECT driver_object, ULONG IrpCode, PVOID oldFunction, PVOID newFunction);
-IRPHOOKOBJ* GetIrpHookObject(PDRIVER_OBJECT driver_object, ULONG IrpCode);
-NTSTATUS	RemoveIrpObject(IRPHOOKOBJ* IrpObject);
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////	Implementation
+////
+
+//--------------------------------------------------------------------------------------
+//	
+//
+PVOID	DoIrpHook(
+	_In_		PDRIVER_OBJECT	driver_object, 
+	_In_		ULONG			IrpCode, 
+	_In_		PVOID			NewFunction, 
+	_In_opt_	IRPHOOKOBJ*		hook_obj, 
+	_In_		Action			action
+);
+//--------------------------------------------------------------------------------------
+//	
+//
+IRPHOOKOBJ*	CreateIrpObject(
+	_In_	PDRIVER_OBJECT driver_object,
+	_In_	ULONG		   IrpCode,
+	_In_	PVOID		   oldFunction,
+	_In_	PVOID		   newFunction
+);
+//--------------------------------------------------------------------------------------
+//	
+//
+IRPHOOKOBJ* GetIrpHookObject(
+	_In_ PDRIVER_OBJECT driver_object,
+	_In_ ULONG IrpCode
+);
+//--------------------------------------------------------------------------------------
+//	
+//
+NTSTATUS	RemoveIrpObject(
+	_In_ IRPHOOKOBJ* IrpObject
+);
+//--------------------------------------------------------------------------------------
+//	
+//
 NTSTATUS	RemoveAllIrpObject();
-NTSTATUS	InsertIrpObject(IRPHOOKOBJ* HookObj); 
+//--------------------------------------------------------------------------------------
+//	
+//
+NTSTATUS	InsertIrpObject(
+	_In_ IRPHOOKOBJ* HookObj
+); 
+//--------------------------------------------------------------------------------------
+//	
+//
 NTSTATUS	InitIrpHook();

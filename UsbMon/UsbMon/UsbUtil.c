@@ -1,5 +1,11 @@
 #include "UsbUtil.h"
 
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////// 
+////	Global/Extern Variable 
+//// 
+
 extern POBJECT_TYPE *IoDriverObjectType;
 
 extern NTSTATUS ObReferenceObjectByName(
@@ -13,6 +19,19 @@ extern NTSTATUS ObReferenceObjectByName(
 	PVOID *Object
 );
 
+
+/////////////////////////////////////////////////////////////////////////////////////////////// 
+////	Marco
+//// 
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////// 
+////	Prototype
+//// 
+
+/////////////////////////////////////////////////////////////////////////////////////////////// 
+////	Implementation
+//// 
 
 //----------------------------------------------------------------------------------------//
 VOID PrintAllHidDriverName()
@@ -35,7 +54,9 @@ VOID PrintAllHidDriverName()
 }
 
 //----------------------------------------------------------------------------------------//
-WCHAR* GetUsbHubDriverNameByVersion(USB_HUB_VERSION usb_hub_version)
+WCHAR* GetUsbHubDriverNameByVersion(
+	_In_ USB_HUB_VERSION usb_hub_version
+)
 {
 	WCHAR* ret = L"";
 	switch (usb_hub_version)
@@ -58,7 +79,10 @@ WCHAR* GetUsbHubDriverNameByVersion(USB_HUB_VERSION usb_hub_version)
 }
 
 //----------------------------------------------------------------------------------------//
-NTSTATUS GetUsbHub(USB_HUB_VERSION usb_hub_version, PDRIVER_OBJECT* pDriverObj)
+NTSTATUS GetUsbHub(
+	_In_ USB_HUB_VERSION usb_hub_version, 
+	_Out_ PDRIVER_OBJECT* pDriverObj
+)
 {
 	// use such API  
 	NTSTATUS status = STATUS_SUCCESS;
@@ -82,7 +106,10 @@ NTSTATUS GetUsbHub(USB_HUB_VERSION usb_hub_version, PDRIVER_OBJECT* pDriverObj)
 }
 
 
-void DumpHidExtension(HID_DEVICE_EXTENSION* hid_common_extension, HID_USB_DEVICE_EXTENSION* mini_extension)
+void DumpHidExtension(
+	_In_ HID_DEVICE_EXTENSION* hid_common_extension, 
+	_In_ HID_USB_DEVICE_EXTENSION* mini_extension
+)
 {
 	ULONG i = 0; 
 	STACK_TRACE_DEBUG_INFO("---------------------------------------\r\n");
@@ -139,7 +166,7 @@ void DumpHidExtension(HID_DEVICE_EXTENSION* hid_common_extension, HID_USB_DEVICE
 
 
 VOID	  DumpHidMiniDriverExtension(
-	HID_DEVICE_EXTENSION* hid_common_extension
+	_In_ HID_DEVICE_EXTENSION* hid_common_extension
 )
 {
 	if (!hid_common_extension)
@@ -155,7 +182,9 @@ VOID	  DumpHidMiniDriverExtension(
 	DumpHidExtension(hid_common_extension, hid_common_extension->MiniDeviceExtension);
 }
 
-VOID DumpUrb(PURB urb)
+VOID DumpUrb(
+	_In_ PURB urb
+)
 {
 	struct _URB_HEADER urb_header = urb->UrbHeader;;
 
