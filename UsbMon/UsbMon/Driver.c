@@ -346,13 +346,18 @@ NTSTATUS DispatchInternalDeviceControl(
 NTSTATUS InitPendingIrpLinkedList()
 {
 	NTSTATUS status = STATUS_UNSUCCESSFUL;
-	g_header = (PENDINGIRPLIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(PENDINGIRPLIST), 'kcaj');
+	if (!g_header) 
+	{
+		g_header = (PENDINGIRPLIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(PENDINGIRPLIST), 'kcaj');
+	}
 
 	if (!g_header)
 	{
 		STACK_TRACE_DEBUG_INFO("Allocation Error \r\n"); 
 		return status;
 	} 
+
+	RtlZeroMemory(g_header, sizeof(PENDINGIRPLIST));
 
 	RtlZeroMemory(g_header, sizeof(PENDINGIRPLIST));
 	RTInitializeListHead(&g_header->head);
