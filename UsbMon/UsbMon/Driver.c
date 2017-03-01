@@ -314,7 +314,7 @@ NTSTATUS DispatchInternalDeviceControl(
 	return g_pDispatchInternalDeviceControl(DeviceObject, Irp);
 }
 //----------------------------------------------------------------------------------------//
-NTSTATUS InitLinkedList()
+NTSTATUS InitPendingIrpLinkedList()
 {
 	NTSTATUS status = STATUS_UNSUCCESSFUL;
 	g_header = (PENDINGIRPLIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(PENDINGIRPLIST), 'kcaj');
@@ -387,8 +387,8 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT object, PUNICODE_STRING String)
 		STACK_TRACE_DEBUG_INFO("GetUsbHub Error \r\n");
 		return status;
 	}
-	 
-	InitLinkedList();
+	
+	InitPendingIrpLinkedList();
 
 	InitIrpHook();
 
