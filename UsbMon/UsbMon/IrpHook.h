@@ -11,8 +11,7 @@ typedef enum
 #pragma pack (8)
 typedef struct IRPHOOKOBJ
 {
-	RT_LIST_ENTRY   entry;
-	KSPIN_LOCK		lock;
+	RT_LIST_ENTRY   entry;  
 	PDRIVER_OBJECT driver_object;
 	ULONG IrpCode;
 	PVOID oldFunction;	

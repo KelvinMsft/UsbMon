@@ -5,14 +5,18 @@
 IRPHOOKOBJ* HookObjList[HOOKOBJ_COUNT] = { 0 };
 ULONG					  CurrentIndex = 0;
 */ 
-IRPHOOKOBJ* head = NULL;
+typedef struct _IRPHOOK_LIST {
+	LIST_ENTRY  head;
+	KSPIN_LOCK	lock;
+}IRPHOOKLIST, *PIRPHOOKLIST;
 
+IRPHOOKLIST* ListHeader = NULL;
 //----------------------------------------------------------------------------------------//.
 IRPHOOKOBJ* GetIrpHookObject(PDRIVER_OBJECT driver_object, ULONG IrpCode)
 {
 	IRPHOOKOBJ						*pDev    = NULL;
 	RT_LIST_ENTRY				*pEntry, *pn = NULL;
-	RtEntryListForEachSafe(&head->entry, pEntry, pn)
+	RtEntryListForEachSafe(&ListHeader->head, pEntry, pn)
 	{
 		pDev = (IRPHOOKOBJ *)pEntry;
 		if (pDev)
@@ -26,13 +30,34 @@ IRPHOOKOBJ* GetIrpHookObject(PDRIVER_OBJECT driver_object, ULONG IrpCode)
 	return pDev;
 }
 //----------------------------------------------------------------------------------------//.
+NTSTATUS RemoveIrpObject(IRPHOOKOBJ* IrpObject)
+{
+	NTSTATUS    status = STATUS_UNSUCCESSFUL;
+	IRPHOOKOBJ* hook_obj = IrpObject;
+	if (hook_obj)
+	{
+		KIRQL irql = 0;
+		ExAcquireSpinLock(&ListHeader->lock, &irql);
+		DoIrpHook(hook_obj->driver_object, hook_obj->IrpCode, hook_obj->oldFunction, Stop);
+		RTRemoveEntryList(&hook_obj->entry);
+		ExReleaseSpinLock(&ListHeader->lock, irql);
+
+		ExFreePool(hook_obj);
+		hook_obj = NULL; 
+
+		status = STATUS_SUCCESS;
+	}
+	return status;
+}
+
+//----------------------------------------------------------------------------------------//.
 NTSTATUS RemoveAllIrpObject()
 {
 	NTSTATUS    status					     = STATUS_UNSUCCESSFUL; 
 	IRPHOOKOBJ						*pDev    = NULL;
 	RT_LIST_ENTRY				*pEntry, *pn = NULL;
 
-	RtEntryListForEachSafe(&head->entry, pEntry, pn)
+	RtEntryListForEachSafe(&ListHeader->head, pEntry, pn)
 	{
 		pDev = (IRPHOOKOBJ *)pEntry;
 		if (pDev)
@@ -43,23 +68,7 @@ NTSTATUS RemoveAllIrpObject()
 	}
 	return status;
 }
-//----------------------------------------------------------------------------------------//.
-NTSTATUS RemoveIrpObject(IRPHOOKOBJ* IrpObject)
-{
-	NTSTATUS    status = STATUS_UNSUCCESSFUL;
-	IRPHOOKOBJ* hook_obj = IrpObject;
-	if (hook_obj)
-	{
-		KIRQL irql = 0;
-		ExAcquireSpinLock(&hook_obj->lock, &irql);
-		DoIrpHook(hook_obj->driver_object, hook_obj->IrpCode, hook_obj->oldFunction, Stop);
-		RTRemoveEntryList(&hook_obj->entry);
-		ExFreePool(hook_obj);
-		ExReleaseSpinLock(&hook_obj->lock, irql);
-		status = STATUS_SUCCESS;
-	}
-	return status;
-}
+
 //----------------------------------------------------------------------------------------//.
 NTSTATUS InsertIrpObject(IRPHOOKOBJ* HookObj)
 {	
@@ -70,9 +79,9 @@ NTSTATUS InsertIrpObject(IRPHOOKOBJ* HookObj)
 		status = STATUS_SUCCESS;
 	} 
 
-	ExAcquireSpinLock(&HookObj->lock, &irql);
-	RTInsertTailList(&head->entry, &HookObj->entry);
-	ExReleaseSpinLock(&HookObj->lock, irql);
+	ExAcquireSpinLock(&ListHeader->lock, &irql);
+	RTInsertTailList(&ListHeader->head, &HookObj->entry);
+	ExReleaseSpinLock(&ListHeader->lock, irql);
 
 	return status;
 }
@@ -92,7 +101,7 @@ IRPHOOKOBJ* CreateIrpObject(PDRIVER_OBJECT driver_object, ULONG IrpCode, PVOID o
 	HookObj->IrpCode = IrpCode;
 	HookObj->newFunction = newFunction;
 	HookObj->oldFunction = oldFunction;
-	KeInitializeSpinLock(&HookObj->lock);
+	KeInitializeSpinLock(&ListHeader->lock);
 	InsertIrpObject(HookObj);
 
 	return HookObj;
@@ -108,7 +117,7 @@ PVOID DoIrpHook(PDRIVER_OBJECT driver_object, ULONG IrpCode, PVOID NewFunction, 
 		return old_irp_function;
 	}
 
-	if (!head)
+	if (!ListHeader)
 	{
 		InitIrpHook();
 	}
@@ -133,13 +142,14 @@ PVOID DoIrpHook(PDRIVER_OBJECT driver_object, ULONG IrpCode, PVOID NewFunction, 
 NTSTATUS InitIrpHook()
 {
 	NTSTATUS status = STATUS_UNSUCCESSFUL;
-	if (!head)
+	if (!ListHeader)
 	{
-		head = (IRPHOOKOBJ*)ExAllocatePoolWithTag(NonPagedPool, sizeof(IRPHOOKOBJ), 'opri');
-		if (head)
+		ListHeader = (IRPHOOKLIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(IRPHOOKLIST), 'opri');
+	 
+		if (ListHeader)
 		{
-			RtlZeroMemory(head, sizeof(IRPHOOKOBJ)); 
-			RTInitializeListHead(&head->entry);
+			RtlZeroMemory(ListHeader, sizeof(IRPHOOKLIST));
+			RTInitializeListHead(&ListHeader->head);
 			status = STATUS_SUCCESS;
 		} 
 	}
