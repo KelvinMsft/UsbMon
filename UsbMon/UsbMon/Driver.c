@@ -354,9 +354,7 @@ NTSTATUS InitPendingIrpLinkedList()
 	if (g_header)
 	{
 		STACK_TRACE_DEBUG_INFO("Allocation Error \r\n");
-		RtlZeroMemory(g_header, sizeof(PENDINGIRPLIST));
-
-		RtlZeroMemory(g_header, sizeof(PENDINGIRPLIST));
+		RtlZeroMemory(g_header, sizeof(PENDINGIRPLIST)); 
 		RTInitializeListHead(&g_header->head);
 		KeInitializeSpinLock(&g_header->lock);
 
