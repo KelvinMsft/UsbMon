@@ -157,7 +157,9 @@ void DumpHidExtension(
 	STACK_TRACE_DEBUG_INFO("		--->bDescriptorType: %X \r\n", hid_desc->bDescriptorType);
 	STACK_TRACE_DEBUG_INFO("		--->bLength: %X \r\n", hid_desc->bLength);
 	STACK_TRACE_DEBUG_INFO("		--->bNumDescriptors: %X \r\n", hid_desc->bNumDescriptors);
-	
+	STACK_TRACE_DEBUG_INFO("		--->bReportType: %X \r\n", hid_desc->DescriptorList->bReportType);
+	STACK_TRACE_DEBUG_INFO("		--->wReportLength: %X \r\n", hid_desc->DescriptorList->wReportLength);
+
 	STACK_TRACE_DEBUG_INFO("-----------------------------------------------------------------------------\r\n");
 
 }
