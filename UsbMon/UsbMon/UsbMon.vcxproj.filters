@@ -24,9 +24,6 @@
     </Inf>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="LinkedList.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="UsbType.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -37,6 +34,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="IrpHook.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TList.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="UsbHid.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Urb.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -54,6 +60,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="IrpHook.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="TList.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Urb.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

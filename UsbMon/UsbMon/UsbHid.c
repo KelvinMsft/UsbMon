@@ -25,10 +25,10 @@
 //-------------------------------------------------------------------------------------------//
 HID_DEVICE_NODE* CreateHidDeviceNode(
 	_In_ PDEVICE_OBJECT device_object, 
-	_In_ PUSBD_INTERFACE_INFORMATION interfaces
+	_In_ HID_USB_DEVICE_EXTENSION* mini_extension
 )
 {
-	if (!device_object || !interfaces)
+	if (!device_object || !mini_extension)
 	{
 		return NULL;
 	}
@@ -40,15 +40,15 @@ HID_DEVICE_NODE* CreateHidDeviceNode(
 	}
 
 	RtlZeroMemory(node, sizeof(HID_DEVICE_NODE));
-	node->device_object = device_object;
-	node->InterfaceDesc = interfaces;
+	node->device_object  = device_object;
+	node->mini_extension = mini_extension;
 
 	return node;
 }
 //---------------------------------------------------------------------------------------------------------//
 BOOLEAN  IsKeyboardOrMouseDevice(
-	_In_  PDEVICE_OBJECT			   device_object, 
-	_Out_ PUSBD_INTERFACE_INFORMATION* usb_interfaces
+	_In_  PDEVICE_OBJECT				   device_object, 
+	_Out_ PHID_USB_DEVICE_EXTENSION*   hid_mini_extension
 )
 {
 	HID_USB_DEVICE_EXTENSION* mini_extension    = NULL;
@@ -69,7 +69,7 @@ BOOLEAN  IsKeyboardOrMouseDevice(
 	if (!mini_extension)
 	{
 		return FALSE;
-	}
+	} 
 
 	DumpHidMiniDriverExtension(hid_common_extension);
 
@@ -77,34 +77,37 @@ BOOLEAN  IsKeyboardOrMouseDevice(
 		(mini_extension->InterfaceDesc->Protocol == 1 ||		//Keyboard
 		 mini_extension->InterfaceDesc->Protocol == 2))			//Mouse
 	{
-		*usb_interfaces = mini_extension->InterfaceDesc;
+		*hid_mini_extension = mini_extension;
 		return TRUE;
 	}
-
+	 
 	return FALSE;
 }
 //----------------------------------------------------------------------------------------------------------//
 NTSTATUS InitHidRelation(
-	_Out_ PHID_DEVICE_NODE** device_object_list,
+	_Out_ PHID_DEVICE_LIST* device_object_list,
 	_Out_ PULONG size
 )
 {
 	PDEVICE_OBJECT	 device_object = NULL;
 	PDRIVER_OBJECT	    pDriverObj = NULL;
-	PHID_DEVICE_NODE* hid_relation = NULL;
+	HID_DEVICE_LIST*  hid_relation = NULL;
 	ULONG			  current_size = 0;
-
+	
+	
 	if (!hid_relation)
 	{
-		hid_relation = (PHID_DEVICE_NODE*)ExAllocatePoolWithTag(NonPagedPool, sizeof(PHID_DEVICE_NODE) * ARRAY_SIZE, 'ldih');
+		hid_relation = (HID_DEVICE_LIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(HID_DEVICE_LIST), 'ldih');
 	}
 	if (!hid_relation)
 	{
 		return STATUS_UNSUCCESSFUL;
-	}
+	} 
 
-	RtlZeroMemory(hid_relation, sizeof(PHID_DEVICE_NODE) * ARRAY_SIZE);
+	RtlZeroMemory(hid_relation, sizeof(HID_DEVICE_LIST));
 
+	hid_relation->head = NewChainListHeaderEx(LISTFLAG_SPINLOCK | LISTFLAG_AUTOFREE, NULL, 0);
+ 
 	GetDriverObjectByName(HID_USB_DEVICE, &pDriverObj);
 	if (!pDriverObj)
 	{
@@ -116,15 +119,15 @@ NTSTATUS InitHidRelation(
 	device_object = pDriverObj->DeviceObject;
 	while (device_object)
 	{
-		PUSBD_INTERFACE_INFORMATION interfaces = NULL;
-		if (IsKeyboardOrMouseDevice(device_object,&interfaces))
+		HID_USB_DEVICE_EXTENSION* mini_extension = NULL; 
+		if (IsKeyboardOrMouseDevice(device_object, &mini_extension))
 		{
-			if (interfaces && hid_relation)
+			if (mini_extension && hid_relation)
 			{
-				HID_DEVICE_NODE* node = CreateHidDeviceNode(device_object, interfaces);
-				hid_relation[current_size] = node;
+				HID_DEVICE_NODE* node = CreateHidDeviceNode(device_object, mini_extension);
+				AddToChainListTail(hid_relation->head, node);
 				current_size++;
-				STACK_TRACE_DEBUG_INFO("Inserted one element: %I64x InferfaceDesc: %I64X device_object: %I64x \r\n", node->device_object, node->InterfaceDesc, device_object);
+				STACK_TRACE_DEBUG_INFO("Inserted one element: %I64x InferfaceDesc: %I64X device_object: %I64x \r\n", node->device_object, node->mini_extension, device_object);
 				STACK_TRACE_DEBUG_INFO("Added one element :%x \r\n", current_size);
 			}
 		}

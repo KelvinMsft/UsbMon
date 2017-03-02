@@ -3,7 +3,7 @@
 
 NTSTATUS
 InitHidRelation(
-	PHID_DEVICE_NODE** device_object_list,
+	PHID_DEVICE_LIST* device_object_list,
 	PULONG size
 );
 

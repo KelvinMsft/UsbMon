@@ -148,7 +148,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IrpHook.h" />
-    <ClInclude Include="LinkedList.h" />
+    <ClInclude Include="TList.h" />
+    <ClInclude Include="Urb.h" />
+    <ClInclude Include="UsbHid.h" />
     <ClInclude Include="UsbType.h" />
     <ClInclude Include="UsbUtil.h" />
     <ClInclude Include="CommonUtil.h" />
@@ -156,6 +158,8 @@
   <ItemGroup>
     <ClCompile Include="Driver.c" />
     <ClCompile Include="IrpHook.c" />
+    <ClCompile Include="TList.c" />
+    <ClCompile Include="Urb.c" />
     <ClCompile Include="UsbHid.c" />
     <ClCompile Include="UsbUtil.c" />
     <ClCompile Include="CommonUtil.c" />

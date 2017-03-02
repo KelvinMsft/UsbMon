@@ -1,6 +1,6 @@
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      #include "IrpHook.h"
-#include "LinkedList.h"
-
+#include "TList.h"
+#include "CommonUtil.h"
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -8,10 +8,14 @@
 ////
 ////
 typedef struct _IRPHOOK_LIST {
-	LIST_ENTRY  head;
-	KSPIN_LOCK	lock;
+	TChainListHeader*  head; 
 }IRPHOOKLIST, *PIRPHOOKLIST;
 
+typedef struct SEARCHPARAM
+{
+	PDRIVER_OBJECT driver_object;
+	ULONG				 IrpCode;
+}SEARCHPARAM, *PSEARCHPARAM;
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -27,108 +31,85 @@ typedef struct _IRPHOOK_LIST {
 ////
 IRPHOOKLIST* ListHeader = NULL;
 
+
+
 ///////////////////////////////////////////////////////////////////////////////////////////////
 ////	Prototype
 ////
 ////
+
+
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 ////	Implementation
 ////
 ////
 ////
-
-//----------------------------------------------------------------------------------------//.
+ 
+ 
+//--------------------------------------------------------------------------------------------//
+ULONG SearchIrpHookObjectCallback(
+	_In_ IRPHOOKOBJ* IrpObject,	
+	_In_ void* Context
+)
+{
+	SEARCHPARAM* param = (SEARCHPARAM*)Context;
+	if (IrpObject->driver_object == param->driver_object && IrpObject->IrpCode == param->IrpCode)
+	{	
+		STACK_TRACE_DEBUG_INFO("SearchIrpHookObjectCallback Once \r\n");
+		return CLIST_FINDCB_RET;
+	}
+	return CLIST_FINDCB_CTN;
+}
+//--------------------------------------------------------------------------------------------//
 IRPHOOKOBJ* GetIrpHookObject(
 	_In_ PDRIVER_OBJECT driver_object, 
 	_In_ ULONG IrpCode)
 {
-	IRPHOOKOBJ						*pDev    = NULL;
-	RT_LIST_ENTRY				*pEntry, *pn = NULL;
-	RtEntryListForEachSafe(&ListHeader->head, pEntry, pn)
-	{
-		pDev = (IRPHOOKOBJ *)pEntry;
-		if (pDev)
-		{
-			if (pDev->driver_object == driver_object &&	pDev->IrpCode == IrpCode)
-			{
-				break;
-			}
-		}
-	}
-	return pDev;
-}
+	SEARCHPARAM param = { 0 };
+	param.driver_object = driver_object;
+	param.IrpCode = IrpCode;
+	return QueryFromChainListByCallback(ListHeader->head, SearchIrpHookObjectCallback, &param); 
+} 
 
-
-
-//----------------------------------------------------------------------------------------//.
-NTSTATUS RemoveIrpObject(
-	_In_ IRPHOOKOBJ* IrpObject)
+//--------------------------------------------------------------------------------------------//
+ULONG RemoveIrpHookCallback(
+	_In_ IRPHOOKOBJ* IrpObject,
+	_In_ void* Context
+)
 {
-	NTSTATUS    status = STATUS_UNSUCCESSFUL;
-	IRPHOOKOBJ* hook_obj = IrpObject;
+	UNREFERENCED_PARAMETER(Context); 
+ 	IRPHOOKOBJ* hook_obj = IrpObject;
 	if (hook_obj)
-	{
-		KIRQL irql = 0;
-	
-		DoIrpHook(hook_obj->driver_object, hook_obj->IrpCode, hook_obj->oldFunction, hook_obj , Stop);
-		hook_obj = NULL; 
-		status = STATUS_SUCCESS;
-	}
-	return status;
+	{ 
+		DoIrpHook(hook_obj->driver_object, hook_obj->IrpCode, hook_obj->oldFunction, Stop);
+		STACK_TRACE_DEBUG_INFO("RemoveIrpHookCallback Once \r\n");
+		hook_obj = NULL;  
+	}  
+	return CLIST_FINDCB_CTN | CLIST_FINDCB_DEL;
 }
 
-//----------------------------------------------------------------------------------------//.
+//--------------------------------------------------------------------------------------------//
 NTSTATUS RemoveAllIrpObject()
 {
-	NTSTATUS    status					     = STATUS_UNSUCCESSFUL; 
-	IRPHOOKOBJ						*pDev    = NULL;
-	RT_LIST_ENTRY				*pEntry, *pn = NULL;
-
-	RtEntryListForEachSafe(&ListHeader->head, pEntry, pn)
-	{
-		pDev = (IRPHOOKOBJ *)pEntry;
-		if (pDev)
-		{
-			RemoveIrpObject(pDev);
-		}
-		status = STATUS_SUCCESS;
-	}
-
+	NTSTATUS    status = STATUS_UNSUCCESSFUL;  
 	if (ListHeader)
-	{
+	{ 
+		QueryFromChainListByCallback(ListHeader->head, RemoveIrpHookCallback, NULL); 
 		ExFreePool(ListHeader);
-		ListHeader = NULL;
-	}
-	return status;
-}
-
-//----------------------------------------------------------------------------------------//.
-NTSTATUS InsertIrpObject(
-	_In_ IRPHOOKOBJ* HookObj)
-{	
-	NTSTATUS status = STATUS_UNSUCCESSFUL; 
-	KIRQL	   irql = 0;
-	if (HookObj)
-	{
+		ListHeader = NULL; 
 		status = STATUS_SUCCESS;
-	} 
-
-	ExAcquireSpinLock(&ListHeader->lock, &irql);
-	RTInsertTailList(&ListHeader->head, &HookObj->entry);
-	ExReleaseSpinLock(&ListHeader->lock, irql);
+	}
 
 	return status;
 }
-
-
-//----------------------------------------------------------------------------------------//.
+ 
+//--------------------------------------------------------------------------------------------//
 IRPHOOKOBJ* CreateIrpObject(
 	_In_ PDRIVER_OBJECT driver_object, 
 	_In_ ULONG IrpCode, 
 	_In_ PVOID oldFunction, 
-	_In_ PVOID newFunction
-)
+	_In_ PVOID newFunction)
 { 
 	IRPHOOKOBJ* HookObj = (IRPHOOKOBJ*)ExAllocatePoolWithTag(NonPagedPool, sizeof(IRPHOOKOBJ), 'opri');
 
@@ -143,36 +124,20 @@ IRPHOOKOBJ* CreateIrpObject(
 	HookObj->IrpCode = IrpCode;
 	HookObj->newFunction = newFunction;
 	HookObj->oldFunction = oldFunction;
-	KeInitializeSpinLock(&ListHeader->lock);
-	InsertIrpObject(HookObj);
-
+ 
+	if (!AddToChainListTail(ListHeader->head, HookObj))
+	{
+		ExFreePool(HookObj);
+		HookObj = NULL;
+	}
 	return HookObj;
 }
 
-
-//----------------------------------------------------------------------------------------//
-VOID DestoryIrpObject(
-	_In_ IRPHOOKOBJ* hook_obj)
-{
-	if (hook_obj)
-	{
-		KIRQL irql = 0;
-		ExAcquireSpinLock(&ListHeader->lock, &irql);
-		RTRemoveEntryList(&hook_obj->entry);
-		ExReleaseSpinLock(&ListHeader->lock, irql);
-		ExFreePool(hook_obj);
-		hook_obj = NULL;
-	}
-	return ;
-}
-
-
-//----------------------------------------------------------------------------------------//
+//--------------------------------------------------------------------------------------------//
 PVOID DoIrpHook(
 	_In_	  PDRIVER_OBJECT driver_object, 
 	_In_	  ULONG IrpCode, 
 	_In_	  PVOID NewFunction, 
-	_In_opt_  IRPHOOKOBJ* hook_obj, 
 	_In_  	  Action action
 )
 {
@@ -204,32 +169,44 @@ PVOID DoIrpHook(
 		{
 			//repair hook, if created fail.
 			InterlockedExchange64((LONG64 volatile *)&driver_object->MajorFunction[IrpCode],(LONG64)old_irp_function);
+			old_irp_function = NULL;
 		}
-	}
-	else if (action == Stop && hook_obj)
-	{
-		DestoryIrpObject(hook_obj);
-	}
+	} 
+
 	return old_irp_function;
 }
 
-//----------------------------------------------------------------------------------------//
+//--------------------------------------------------------------------------------------------//
+//ÃèÊö:
+// 1. Create Header
+// 2. Create List
+//
 NTSTATUS InitIrpHook()
 {
 	NTSTATUS status = STATUS_UNSUCCESSFUL;
+
 	if (!ListHeader)
 	{
-		ListHeader = (IRPHOOKLIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(IRPHOOKLIST), 'opri');
+		ListHeader = (IRPHOOKLIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(IRPHOOKLIST), 'opri');  
 	}
 
-	if (ListHeader)
+	if (!ListHeader)
 	{
-		RtlZeroMemory(ListHeader, sizeof(IRPHOOKLIST));
-		RTInitializeListHead(&ListHeader->head);
-		KeInitializeSpinLock(&ListHeader->lock);
-		status = STATUS_SUCCESS;
-	} 
+		status = STATUS_UNSUCCESSFUL;
+		return status;
+	}
 
+	RtlZeroMemory(ListHeader, sizeof(IRPHOOKLIST));
+	ListHeader->head = NewChainListHeaderEx(LISTFLAG_SPINLOCK | LISTFLAG_AUTOFREE, NULL, 0);
+	 
+	if (!ListHeader->head)
+	{
+		ExFreePool(ListHeader);
+		ListHeader = NULL;			
+		status = STATUS_UNSUCCESSFUL;
+		return status;
+	} 	 
+	status = STATUS_SUCCESS;
 	return status;
 }
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
+//--------------------------------------------------------------------------------------------//

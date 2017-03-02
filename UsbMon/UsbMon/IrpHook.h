@@ -1,9 +1,7 @@
 #ifndef __IRP_HOOK_HEARER_
 #define __IRP_HOOK_HEADER_
 
-#include <fltKernel.h>
-#include "LinkedList.h"
-
+#include <fltKernel.h> 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////	Types
@@ -18,8 +16,7 @@ typedef enum
 
 #pragma pack (8)
 typedef struct IRPHOOKOBJ
-{
-	RT_LIST_ENTRY   entry;  
+{  
 	PDRIVER_OBJECT driver_object;
 	ULONG IrpCode;
 	PVOID oldFunction;	
@@ -37,8 +34,7 @@ typedef struct IRPHOOKOBJ
 PVOID	DoIrpHook(
 	_In_		PDRIVER_OBJECT	driver_object, 
 	_In_		ULONG			IrpCode, 
-	_In_		PVOID			NewFunction, 
-	_In_opt_	IRPHOOKOBJ*		hook_obj, 
+	_In_		PVOID			NewFunction,  
 	_In_		Action			action
 );
 //--------------------------------------------------------------------------------------
@@ -57,22 +53,12 @@ IRPHOOKOBJ* GetIrpHookObject(
 	_In_ PDRIVER_OBJECT driver_object,
 	_In_ ULONG IrpCode
 );
-//--------------------------------------------------------------------------------------
-//	
-//
-NTSTATUS	RemoveIrpObject(
-	_In_ IRPHOOKOBJ* IrpObject
-);
+
 //--------------------------------------------------------------------------------------
 //	
 //
 NTSTATUS	RemoveAllIrpObject();
-//--------------------------------------------------------------------------------------
-//	
-//
-NTSTATUS	InsertIrpObject(
-	_In_ IRPHOOKOBJ* HookObj
-); 
+
 //--------------------------------------------------------------------------------------
 //	
 //
