@@ -18,9 +18,9 @@ typedef enum
 typedef struct IRPHOOKOBJ
 {  
 	PDRIVER_OBJECT driver_object;
-	ULONG IrpCode;
-	PVOID oldFunction;	
-	PVOID newFunction;
+	ULONG				 IrpCode;
+	PDRIVER_DISPATCH oldFunction;
+	PDRIVER_DISPATCH newFunction;
 }IRPHOOKOBJ, *PIRPHOOKOBJ;
 #pragma pack() 
 
@@ -62,6 +62,6 @@ NTSTATUS	RemoveAllIrpObject();
 //--------------------------------------------------------------------------------------
 //	
 //
-NTSTATUS	InitIrpHook();
+NTSTATUS	InitIrpHookLinkedList();
 
 #endif

@@ -151,7 +151,7 @@ PVOID DoIrpHook(
 
 	if (!ListHeader)
 	{
-		if (!NT_SUCCESS(InitIrpHook()))
+		if (!NT_SUCCESS(InitIrpHookLinkedList()))
 		{
 			return old_irp_function;
 		}
@@ -181,7 +181,7 @@ PVOID DoIrpHook(
 // 1. Create Header
 // 2. Create List
 //
-NTSTATUS InitIrpHook()
+NTSTATUS InitIrpHookLinkedList()
 {
 	NTSTATUS status = STATUS_UNSUCCESSFUL;
 

@@ -300,6 +300,7 @@ NTSTATUS DispatchInternalDeviceControl(
 	_Inout_ struct _IRP           *Irp
 )
 {
+	IRPHOOKOBJ* object = GetIrpHookObject(DeviceObject->DriverObject, IRP_MJ_INTERNAL_DEVICE_CONTROL);
 	do
 	{
 		HIJACK_CONTEXT* hijack = NULL;
@@ -360,7 +361,11 @@ NTSTATUS DispatchInternalDeviceControl(
 		}
 
 	} while (0);
-
+	 
+	if (object)
+	{
+		return object->oldFunction(DeviceObject, Irp);
+	}
 	return g_pDispatchInternalDeviceControl(DeviceObject, Irp);
 }
 //----------------------------------------------------------------------------------------//
@@ -399,7 +404,6 @@ NTSTATUS DriverEntry(
 	object->DriverUnload = DriverUnload;
 
 	status = InitHidRelation(&g_HidPipeList, &(ULONG)g_current_index);
-
 	if (!NT_SUCCESS(status) || (!g_HidPipeList && !g_current_index))
 	{
 		STACK_TRACE_DEBUG_INFO("No keyboard Or Mouse \r\n");  
@@ -423,7 +427,7 @@ NTSTATUS DriverEntry(
 		return status;
 	}
 	//Init Irp Hook for URB transmit
-	status = InitIrpHook();
+	status = InitIrpHookLinkedList();
 	if (!NT_SUCCESS(status))
 	{
 		STACK_TRACE_DEBUG_INFO("InitIrpHook Error \r\n");
@@ -431,7 +435,7 @@ NTSTATUS DriverEntry(
 	}
 
 	//Do Irp Hook for URB transmit
-	g_pDispatchInternalDeviceControl = (PDRIVER_DISPATCH)DoIrpHook(pDriverObj,IRP_MJ_INTERNAL_DEVICE_CONTROL,DispatchInternalDeviceControl, Start);
+	g_pDispatchInternalDeviceControl = (PDRIVER_DISPATCH)DoIrpHook(pDriverObj,IRP_MJ_INTERNAL_DEVICE_CONTROL,DispatchInternalDeviceControl, Start); 
 	if (!g_pDispatchInternalDeviceControl)
 	{
 		STACK_TRACE_DEBUG_INFO("DoIrpHook Error \r\n"); 
