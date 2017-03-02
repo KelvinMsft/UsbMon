@@ -216,12 +216,6 @@ NTSTATUS  MyCompletionCallback(
 
 	STACK_TRACE_DEBUG_INFO("Class: %x Protocol: %x \r\n" , pContext->node->mini_extension->InterfaceDesc->Class, pContext->node->mini_extension->InterfaceDesc->Protocol);
 
-	/*for (i = 0; i < hidDescriptor->bNumDescriptors; i++) {
-		if (hidDescriptor->DescriptorList[i].bReportType == HID_REPORT_DESCRIPTOR_TYPE) {
-			rawReportDescriptorLength = (ULONG)hidDescriptor->DescriptorList[i].wReportLength;
-			break;
-		}
-	}*/
 	//DumpUrb(pContext->urb); 
 
 	GetDeviceName(DeviceObject, DeviceName);
@@ -300,7 +294,6 @@ NTSTATUS DispatchInternalDeviceControl(
 	_Inout_ struct _IRP           *Irp
 )
 {
-	IRPHOOKOBJ* object = GetIrpHookObject(DeviceObject->DriverObject, IRP_MJ_INTERNAL_DEVICE_CONTROL);
 	do
 	{
 		HIJACK_CONTEXT* hijack = NULL;
@@ -361,7 +354,7 @@ NTSTATUS DispatchInternalDeviceControl(
 		}
 
 	} while (0);
-	 
+	IRPHOOKOBJ* object = GetIrpHookObject(DeviceObject->DriverObject, IRP_MJ_INTERNAL_DEVICE_CONTROL);
 	if (object)
 	{
 		return object->oldFunction(DeviceObject, Irp);
@@ -435,7 +428,7 @@ NTSTATUS DriverEntry(
 	}
 
 	//Do Irp Hook for URB transmit
-	g_pDispatchInternalDeviceControl = (PDRIVER_DISPATCH)DoIrpHook(pDriverObj,IRP_MJ_INTERNAL_DEVICE_CONTROL,DispatchInternalDeviceControl, Start); 
+	g_pDispatchInternalDeviceControl = (PDRIVER_DISPATCH)DoIrpHook(pDriverObj,IRP_MJ_INTERNAL_DEVICE_CONTROL,DispatchInternalDeviceControl, Start);	
 	if (!g_pDispatchInternalDeviceControl)
 	{
 		STACK_TRACE_DEBUG_INFO("DoIrpHook Error \r\n"); 

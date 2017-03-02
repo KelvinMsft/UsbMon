@@ -56,7 +56,6 @@ ULONG SearchIrpHookObjectCallback(
 	SEARCHPARAM* param = (SEARCHPARAM*)Context;
 	if (IrpObject->driver_object == param->driver_object && IrpObject->IrpCode == param->IrpCode)
 	{	
-		STACK_TRACE_DEBUG_INFO("SearchIrpHookObjectCallback Once \r\n");
 		return CLIST_FINDCB_RET;
 	}
 	return CLIST_FINDCB_CTN;

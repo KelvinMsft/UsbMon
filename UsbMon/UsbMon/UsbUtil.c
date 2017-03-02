@@ -112,7 +112,7 @@ void DumpHidExtension(
 )
 {
 	ULONG i = 0; 
-	STACK_TRACE_DEBUG_INFO("---------------------------------------\r\n");
+	STACK_TRACE_DEBUG_INFO("-----------------------------------------------------------------------------\r\n");
 
 	STACK_TRACE_DEBUG_INFO(" --->PhysicalDeviceObject: %I64X \r\n", hid_common_extension->PhysicalDeviceObject);
 	STACK_TRACE_DEBUG_INFO(" --->DriverObject: %I64X \r\n", hid_common_extension->PhysicalDeviceObject->DriverObject);
@@ -149,16 +149,17 @@ void DumpHidExtension(
 	}
 
 
-	STACK_TRACE_DEBUG_INFO("---------------------------------------\r\n"); 
 	HID_DESCRIPTOR* hid_desc = &(mini_extension)->HidDescriptor; 
 	 
-	STACK_TRACE_DEBUG_INFO("  --->HidDescriptor: %I64X \r\n", &hid_desc);
-	STACK_TRACE_DEBUG_INFO("		--->bcdHID: %I64X \r\n", hid_desc->bcdHID);
-	STACK_TRACE_DEBUG_INFO("		--->bCountry: %I64X \r\n", hid_desc->bCountry);
-	STACK_TRACE_DEBUG_INFO("		--->bDescriptorType: %I64X \r\n", hid_desc->bDescriptorType);
-	STACK_TRACE_DEBUG_INFO("		--->bLength: %I64X \r\n", hid_desc->bLength);
-	STACK_TRACE_DEBUG_INFO("		--->bNumDescriptors: %I64X \r\n", hid_desc->bNumDescriptors);
-	 
+	STACK_TRACE_DEBUG_INFO("  --->HidDescriptor: %IX \r\n", &hid_desc);
+	STACK_TRACE_DEBUG_INFO("		--->bcdHID: %X \r\n", hid_desc->bcdHID);
+	STACK_TRACE_DEBUG_INFO("		--->bCountry: %X \r\n", hid_desc->bCountry);
+	STACK_TRACE_DEBUG_INFO("		--->bDescriptorType: %X \r\n", hid_desc->bDescriptorType);
+	STACK_TRACE_DEBUG_INFO("		--->bLength: %X \r\n", hid_desc->bLength);
+	STACK_TRACE_DEBUG_INFO("		--->bNumDescriptors: %X \r\n", hid_desc->bNumDescriptors);
+	
+	STACK_TRACE_DEBUG_INFO("-----------------------------------------------------------------------------\r\n");
+
 }
 
 
