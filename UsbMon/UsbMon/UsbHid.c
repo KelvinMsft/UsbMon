@@ -5,6 +5,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////// 
 //// Global/Extern Variable 
 //// 
+HID_DEVICE_LIST* g_hid_relation = NULL;
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////// 
@@ -83,6 +84,42 @@ BOOLEAN  IsKeyboardOrMouseDevice(
 	 
 	return FALSE;
 }
+//---------------------------------------------------------------------------------------------------------//
+NTSTATUS FreeHidRelation()
+{
+	//Free White List
+	if (g_hid_relation)
+	{
+		if (g_hid_relation->head)
+		{
+			CHAINLIST_SAFE_FREE(g_hid_relation->head);
+		}
+		ExFreePool(g_hid_relation);
+		g_hid_relation = NULL;
+	}
+}
+//----------------------------------------------------------------------------------------------------------//
+NTSTATUS ReleaseHidRelation()
+{
+	NTSTATUS status = STATUS_SUCCESS;
+	if (!g_hid_relation)
+	{
+		status = STATUS_UNSUCCESSFUL;
+		return status;
+	}
+	InterlockedIncrement64(&g_hid_relation->RefCount);
+	return status;
+}
+//----------------------------------------------------------------------------------------------------------//
+NTSTATUS AcquireHidRelation(
+	_Out_ PHID_DEVICE_LIST* device_object_list,
+	_Out_ PULONG size
+)
+{
+	*device_object_list = g_hid_relation;
+	*size = g_hid_relation->currentSize;
+	InterlockedIncrement64(&g_hid_relation->RefCount);
+}
 //----------------------------------------------------------------------------------------------------------//
 NTSTATUS InitHidRelation(
 	_Out_ PHID_DEVICE_LIST* device_object_list,
@@ -91,26 +128,32 @@ NTSTATUS InitHidRelation(
 {
 	PDEVICE_OBJECT	 device_object = NULL;
 	PDRIVER_OBJECT	    pDriverObj = NULL;
-	HID_DEVICE_LIST*  hid_relation = NULL;
 	ULONG			  current_size = 0;
 	
 	
-	if (!hid_relation)
+	if (!g_hid_relation)
 	{
-		hid_relation = (HID_DEVICE_LIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(HID_DEVICE_LIST), 'ldih');
+		g_hid_relation = (HID_DEVICE_LIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(HID_DEVICE_LIST), 'ldih');
 	}
-	if (!hid_relation)
+
+	if (!g_hid_relation)
 	{
 		return STATUS_UNSUCCESSFUL;
 	} 
 
-	RtlZeroMemory(hid_relation, sizeof(HID_DEVICE_LIST));
+	RtlZeroMemory(g_hid_relation, sizeof(HID_DEVICE_LIST));
 
-	hid_relation->head = NewChainListHeaderEx(LISTFLAG_SPINLOCK | LISTFLAG_AUTOFREE, NULL, 0);
- 
+	g_hid_relation->head = NewChainListHeaderEx(LISTFLAG_SPINLOCK | LISTFLAG_AUTOFREE, NULL, 0);
+
+	if (!g_hid_relation->head)
+	{
+		return STATUS_UNSUCCESSFUL;
+	}
+
 	GetDriverObjectByName(HID_USB_DEVICE, &pDriverObj);
 	if (!pDriverObj)
 	{
+		FreeHidRelation();
 		return STATUS_UNSUCCESSFUL;
 	}
 
@@ -122,10 +165,10 @@ NTSTATUS InitHidRelation(
 		HID_USB_DEVICE_EXTENSION* mini_extension = NULL; 
 		if (IsKeyboardOrMouseDevice(device_object, &mini_extension))
 		{
-			if (mini_extension && hid_relation)
+			if (mini_extension && g_hid_relation)
 			{
 				HID_DEVICE_NODE* node = CreateHidDeviceNode(device_object, mini_extension);
-				AddToChainListTail(hid_relation->head, node);
+				AddToChainListTail(g_hid_relation->head, node);
 				current_size++;
 				STACK_TRACE_DEBUG_INFO("Inserted one element: %I64x InferfaceDesc: %I64X device_object: %I64x \r\n", node->device_object, node->mini_extension, device_object);
 				STACK_TRACE_DEBUG_INFO("Added one element :%x \r\n", current_size);
@@ -134,13 +177,15 @@ NTSTATUS InitHidRelation(
  		device_object = device_object->NextDevice;
 	}
 
-	if (current_size > 0 && hid_relation)
+	if (current_size > 0 && g_hid_relation)
 	{
-		*device_object_list = hid_relation;
+		*device_object_list = g_hid_relation;
 		*size = current_size;
+		g_hid_relation->RefCount = 1;
 		return STATUS_SUCCESS;
 	}  
-	
+
+	FreeHidRelation();
 	return STATUS_UNSUCCESSFUL;
 }
  

@@ -16,6 +16,7 @@ typedef struct _HID_DEVICE_LIST
 {
 	TChainListHeader*					  	 head; 
 	ULONG							  currentSize;
+	ULONG								 RefCount;
 } HID_DEVICE_LIST, *PHID_DEVICE_LIST; 
 
 

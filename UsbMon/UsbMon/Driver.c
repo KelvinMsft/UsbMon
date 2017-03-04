@@ -17,6 +17,7 @@
 
 typedef struct PENDINGIRP
 {
+	PIRP						  Irp;
 	PIO_STACK_LOCATION		 IrpStack; 
 	PVOID					oldContext;
 	IO_COMPLETION_ROUTINE*	oldRoutine;  
@@ -34,6 +35,7 @@ typedef struct HIJACK_CONTEXT
 typedef struct _PENDINGIRP_LIST
 {
 	TChainListHeader*	head; 
+	ULONG			RefCount;
 }PENDINGIRPLIST, *PPENDINGIRPLIST;
  
 
@@ -69,6 +71,45 @@ PHID_DEVICE_LIST  g_HidPipeList		   = NULL;
 //// 
 ////
 
+//----------------------------------------------------------------------------------------//
+NTSTATUS InitPendingIrpLinkedList()
+{
+	NTSTATUS status = STATUS_UNSUCCESSFUL;
+	if (!g_pending_irp_header)
+	{
+		g_pending_irp_header = (PENDINGIRPLIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(PENDINGIRPLIST), 'kcaj');
+	}
+
+	if (g_pending_irp_header)
+	{
+		//STACK_TRACE_DEBUG_INFO("Allocation Error \r\n");
+		RtlZeroMemory(g_pending_irp_header, sizeof(PENDINGIRPLIST));
+		g_pending_irp_header->head = NewChainListHeaderEx(LISTFLAG_SPINLOCK | LISTFLAG_AUTOFREE, NULL, 0);
+	}
+
+	if (g_pending_irp_header->head)
+	{
+		g_pending_irp_header->RefCount = 1;
+		status = STATUS_SUCCESS;
+	}
+
+	return status;
+
+}
+//----------------------------------------------------------------------------------------//
+NTSTATUS FreePendingIrpList()
+{
+	if (g_pending_irp_header)
+	{
+		if (g_pending_irp_header->head)
+		{
+			CHAINLIST_SAFE_FREE(g_pending_irp_header->head);
+		}
+		ExFreePool(g_pending_irp_header);
+		g_pending_irp_header = NULL;
+	}
+}
+
 //-------------------------------------------------------------------------------------------//
 ULONG RemovePendingIrpCallback(
 	_In_ PENDINGIRP* pending_irp_node,
@@ -85,6 +126,7 @@ ULONG RemovePendingIrpCallback(
 	} 
 	return CLIST_FINDCB_CTN;
 }
+
 //----------------------------------------------------------------------------------------- 
 NTSTATUS RemoveAllPendingIrpFromList()
 {
@@ -111,26 +153,8 @@ VOID DriverUnload(
 	//Repair all completion hook
 	RemoveAllPendingIrpFromList();
 	 
-	if (g_pending_irp_header) 
-	{
-		if (g_pending_irp_header->head)
-		{
-			CHAINLIST_SAFE_FREE(g_pending_irp_header->head);
-		}
-		ExFreePool(g_pending_irp_header);
-		g_pending_irp_header = NULL;
-	}
-	
-	//Free White List
-	if (g_HidPipeList)
-	{
-		if (g_HidPipeList->head)
-		{
-			CHAINLIST_SAFE_FREE(g_HidPipeList->head);
-		}
-		ExFreePool(g_HidPipeList);
-		g_HidPipeList = NULL;
-	}
+	FreePendingIrpList();
+	FreeHidRelation();
 
 	return;
 } 
@@ -305,9 +329,12 @@ NTSTATUS DispatchInternalDeviceControl(
 		if (irpStack->Parameters.DeviceIoControl.IoControlCode != IOCTL_INTERNAL_USB_SUBMIT_URB)
 		{
 			break;
-		}
-
+		}	
 		urb = (PURB)irpStack->Parameters.Others.Argument1;
+		if (urb->UrbHeader.Function == URB_FUNCTION_GET_DESCRIPTOR_FROM_INTERFACE) 
+		{
+			STACK_TRACE_DEBUG_INFO("URB_FUNCTION_GET_DESCRIPTOR_FROM_INTERFACE \r\n");
+		}
 		if (urb->UrbHeader.Function != URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER)
 		{
 			break;
@@ -335,6 +362,7 @@ NTSTATUS DispatchInternalDeviceControl(
 
 			//Save all we need to use when unload driver / delete node , 
 			//Add to linked list
+			new_entry->Irp	      = Irp;
 			new_entry->oldRoutine = irpStack->CompletionRoutine;
 			new_entry->oldContext = irpStack->Context; 
 			new_entry->IrpStack   = irpStack;
@@ -342,48 +370,27 @@ NTSTATUS DispatchInternalDeviceControl(
 
 			//Fake Context for Completion Routine
 			hijack->DeviceObject = DeviceObject;
-			//hijack->Irp			 = Irp;
 			hijack->urb			 = urb;
 			hijack->node		 = node;
 			hijack->pending_irp  = new_entry;
 
 			//Completion Routine hook
-			irpStack->CompletionRoutine = MyCompletionCallback;
 			irpStack->Context = hijack;
-			
+			irpStack->CompletionRoutine = MyCompletionCallback;
 		}
-
 	} while (0);
+
+	
 	IRPHOOKOBJ* object = GetIrpHookObject(DeviceObject->DriverObject, IRP_MJ_INTERNAL_DEVICE_CONTROL);
 	if (object)
 	{
-		return object->oldFunction(DeviceObject, Irp);
+		if (object->oldFunction)
+		{
+			return object->oldFunction(DeviceObject, Irp);
+		}
 	}
+	
 	return g_pDispatchInternalDeviceControl(DeviceObject, Irp);
-}
-//----------------------------------------------------------------------------------------//
-NTSTATUS InitPendingIrpLinkedList()
-{
-	NTSTATUS status = STATUS_UNSUCCESSFUL;
-	if (!g_pending_irp_header)
-	{
-		g_pending_irp_header = (PENDINGIRPLIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(PENDINGIRPLIST), 'kcaj');
-	}
-
-	if (g_pending_irp_header)
-	{
-		//STACK_TRACE_DEBUG_INFO("Allocation Error \r\n");
-		RtlZeroMemory(g_pending_irp_header, sizeof(PENDINGIRPLIST));
-		g_pending_irp_header->head = NewChainListHeaderEx(LISTFLAG_SPINLOCK | LISTFLAG_AUTOFREE, NULL, 0);
-	}
-
-	if (g_pending_irp_header->head)
-	{
-		status = STATUS_SUCCESS;
-	}
-
-	return status;
-
 }
 
 //----------------------------------------------------------------------------------------//
@@ -408,6 +415,7 @@ NTSTATUS DriverEntry(
 	status = GetUsbHub(USB2, &pDriverObj);	// iusbhub
 	if (!NT_SUCCESS(status) || !pDriverObj)
 	{
+		FreeHidRelation();
 		STACK_TRACE_DEBUG_INFO("GetUsbHub Error \r\n");
 		return status;
 	}
@@ -417,12 +425,15 @@ NTSTATUS DriverEntry(
 	if (!NT_SUCCESS(status))
 	{
 		STACK_TRACE_DEBUG_INFO("InitPendingIrpLinkedList Error \r\n"); 
+		FreeHidRelation();
 		return status;
 	}
 	//Init Irp Hook for URB transmit
 	status = InitIrpHookLinkedList();
 	if (!NT_SUCCESS(status))
 	{
+		FreeHidRelation();
+		FreePendingIrpList();
 		STACK_TRACE_DEBUG_INFO("InitIrpHook Error \r\n");
 		return status;
 	}
@@ -431,7 +442,10 @@ NTSTATUS DriverEntry(
 	g_pDispatchInternalDeviceControl = (PDRIVER_DISPATCH)DoIrpHook(pDriverObj,IRP_MJ_INTERNAL_DEVICE_CONTROL,DispatchInternalDeviceControl, Start);	
 	if (!g_pDispatchInternalDeviceControl)
 	{
+		FreeHidRelation();
+		FreePendingIrpList();
 		STACK_TRACE_DEBUG_INFO("DoIrpHook Error \r\n"); 
+		status = STATUS_UNSUCCESSFUL;
 		return status;
 	}
 	return status;

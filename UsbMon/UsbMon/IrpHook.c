@@ -9,6 +9,7 @@
 ////
 typedef struct _IRPHOOK_LIST {
 	TChainListHeader*  head; 
+	ULONG		   RefCount;
 }IRPHOOKLIST, *PIRPHOOKLIST;
 
 typedef struct SEARCHPARAM
@@ -205,6 +206,7 @@ NTSTATUS InitIrpHookLinkedList()
 		status = STATUS_UNSUCCESSFUL;
 		return status;
 	} 	 
+	ListHeader->RefCount = 1;
 	status = STATUS_SUCCESS;
 	return status;
 }

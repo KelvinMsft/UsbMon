@@ -7,4 +7,6 @@ InitHidRelation(
 	PULONG size
 );
 
+NTSTATUS 
+FreeHidRelation();
  
