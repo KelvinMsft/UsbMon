@@ -1,5 +1,5 @@
-#include <fltKernel.h>
-#include "UsbType.h"
+#include <fltKernel.h> 
+#include "local.h"
 
 NTSTATUS
 InitHidRelation(

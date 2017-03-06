@@ -1,5 +1,5 @@
-#include "UsbHid.h"
-#include "UsbUtil.h"
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    #include "UsbHid.h"
+#include "UsbUtil.h" 
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////// 
@@ -53,31 +53,48 @@ BOOLEAN  IsKeyboardOrMouseDevice(
 )
 {
 	HID_USB_DEVICE_EXTENSION* mini_extension    = NULL;
-	HID_DEVICE_EXTENSION* hid_common_extension  = NULL;
+	HIDCLASS_DEVICE_EXTENSION* hid_common_extension  = NULL;
 	WCHAR						DeviceName[256] = { 0 };
-
+	int i = 0;
 	GetDeviceName(device_object, DeviceName);
 	STACK_TRACE_DEBUG_INFO("DeviceObj: %I64X  DriverName: %ws DeviceName: %ws \r\n", device_object, device_object->DriverObject->DriverName.Buffer, DeviceName);
 
-	hid_common_extension = (HID_DEVICE_EXTENSION*)device_object->DeviceExtension;
+	hid_common_extension = (HIDCLASS_DEVICE_EXTENSION*)device_object->DeviceExtension;
 	if (!hid_common_extension)
 	{
 		return FALSE;
 	}
-
+ 
+	 
+	STACK_TRACE_DEBUG_INFO("\r\n");
 	STACK_TRACE_DEBUG_INFO("Extension_common: %I64X sizeof: %x \r\n", hid_common_extension, sizeof(HID_USB_DEVICE_EXTENSION));
-	mini_extension = (HID_USB_DEVICE_EXTENSION*)hid_common_extension->MiniDeviceExtension;
+	mini_extension = (HID_USB_DEVICE_EXTENSION*)hid_common_extension->hidExt.MiniDeviceExtension;
 	if (!mini_extension)
 	{
 		return FALSE;
 	} 
 
 	DumpHidMiniDriverExtension(hid_common_extension);
-
+	if (!hid_common_extension->isClientPdo)
+	{
+		*hid_mini_extension = NULL;
+		return FALSE; 
+	}
 	if ( mini_extension->InterfaceDesc->Class == 3 &&			//HidClass Device
 		(mini_extension->InterfaceDesc->Protocol == 1 ||		//Keyboard
 		 mini_extension->InterfaceDesc->Protocol == 2))			//Mouse
 	{
+		STACK_TRACE_DEBUG_INFO("Signature: %I64x \r\n", hid_common_extension->Signature);
+		STACK_TRACE_DEBUG_INFO("DescLen: %x \r\n ", hid_common_extension->fdoExt.rawReportDescriptionLength);
+		STACK_TRACE_DEBUG_INFO("isClientPdo: %x \r\n", hid_common_extension->isClientPdo);  	
+		STACK_TRACE_DEBUG_INFO("Byte: \r\n");
+		PUCHAR pRawReportDesc = hid_common_extension->fdoExt.rawReportDescription;
+		for (; i < 0x2E / 2; i++) 
+		{
+			STACK_TRACE_DEBUG_INFO("%x %x \r\n", *(pRawReportDesc), *(pRawReportDesc + 1));
+			(pRawReportDesc += 2);
+		}
+
 		*hid_mini_extension = mini_extension;
 		return TRUE;
 	}
@@ -188,4 +205,4 @@ NTSTATUS InitHidRelation(
 	FreeHidRelation();
 	return STATUS_UNSUCCESSFUL;
 }
- 
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           

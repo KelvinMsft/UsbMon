@@ -239,8 +239,20 @@ NTSTATUS  MyCompletionCallback(
 	}
 
 	STACK_TRACE_DEBUG_INFO("Class: %x Protocol: %x \r\n" , pContext->node->mini_extension->InterfaceDesc->Class, pContext->node->mini_extension->InterfaceDesc->Protocol);
+	if (pContext->urb->UrbBulkOrInterruptTransfer.TransferFlags & (USBD_TRANSFER_DIRECTION_IN | USBD_SHORT_TRANSFER_OK))
+	{
+		STACK_TRACE_DEBUG_INFO("Data: ");
+		PUCHAR ptr = (PUCHAR)pContext->urb->UrbBulkOrInterruptTransfer.TransferBuffer;
+		for (int i = 0; i < pContext->urb->UrbBulkOrInterruptTransfer.TransferBufferLength; i++)
+		{
+			STACK_TRACE_DEBUG_INFO("%x ", *ptr++);
 
+		} 
+	STACK_TRACE_DEBUG_INFO("\r\n");
+
+	}
 	//DumpUrb(pContext->urb); 
+
 
 	GetDeviceName(DeviceObject, DeviceName);
 	STACK_TRACE_DEBUG_INFO("Mouse/Keyboard DeviceName: %ws DriverName: %ws \r\n", DeviceObject->DriverObject->DriverName.Buffer, DeviceName);
@@ -412,7 +424,7 @@ NTSTATUS DriverEntry(
 
 	STACK_TRACE_DEBUG_INFO("Done Init --- Device_object_list: %I64X Size: %x \r\n", g_HidPipeList, g_current_index);
 
-	status = GetUsbHub(USB2, &pDriverObj);	// iusbhub
+	status = GetUsbHub(USB3, &pDriverObj);	// iusbhub
 	if (!NT_SUCCESS(status) || !pDriverObj)
 	{
 		FreeHidRelation();
