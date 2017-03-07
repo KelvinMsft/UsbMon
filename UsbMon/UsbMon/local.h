@@ -481,7 +481,7 @@ typedef struct _PDO_EXTENSION {
 	ULONG                   collectionIndex;
 	PDEVICE_OBJECT          pdo;                // represents a collection on the HID "bus"
 	PUNICODE_STRING         name;
-
+	char					reserved[28];
 	/*
 	*  This is a back-pointer to the original FDO's extension.
 	*/

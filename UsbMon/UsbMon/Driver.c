@@ -424,7 +424,7 @@ NTSTATUS DriverEntry(
 
 	STACK_TRACE_DEBUG_INFO("Done Init --- Device_object_list: %I64X Size: %x \r\n", g_HidPipeList, g_current_index);
 
-	status = GetUsbHub(USB3, &pDriverObj);	// iusbhub
+	status = GetUsbHub(USB2, &pDriverObj);	// iusbhub
 	if (!NT_SUCCESS(status) || !pDriverObj)
 	{
 		FreeHidRelation();
