@@ -1,5 +1,6 @@
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     #include "UsbHid.h"
 #include "UsbUtil.h" 
+#include "hidparser.h"
 #define HIDP_MAX_UNKNOWN_ITEMS 4
 struct _CHANNEL_REPORT_HEADER
 {
@@ -74,14 +75,17 @@ typedef struct _HIDP_CHANNEL_DESC
 		} Data;
 	};
 } HIDP_CHANNEL_DESC, *PHIDP_CHANNEL_DESC;
+typedef struct _HIDP_SYS_POWER_INFO {
+	ULONG   PowerButtonMask;
 
+} HIDP_SYS_POWER_INFO, *PHIDP_SYS_POWER_INFO;
 typedef struct _HIDP_PREPARSED_DATA
 {
 	LONG   Signature1, Signature2;
 	USHORT Usage;
 	USHORT UsagePage;
 
-	//HIDP_SYS_POWER_INFO;
+	HIDP_SYS_POWER_INFO;
 
 	// The following channel report headers point to data within
 	// the Data field below using array indices.
@@ -148,6 +152,44 @@ HID_DEVICE_NODE* CreateHidDeviceNode(
 
 	return node;
 }
+
+/*
+********************************************************************************
+*  GetReportIdentifier
+********************************************************************************
+*
+*
+*/
+PHIDP_REPORT_IDS GetReportIdentifier(FDO_EXTENSION *fdoExtension, ULONG reportId)
+{
+	PHIDP_REPORT_IDS result = NULL;
+	PHIDP_DEVICE_DESC deviceDesc = &fdoExtension->deviceDesc;
+	ULONG i;
+
+	if (deviceDesc->ReportIDs) {
+		for (i = 0; i < deviceDesc->ReportIDsLength; i++) {
+			if (deviceDesc->ReportIDs[i].ReportID == reportId) {
+				result = &deviceDesc->ReportIDs[i];
+				break;
+			}
+		}
+	}
+
+	if (fdoExtension->deviceSpecificFlags & DEVICE_FLAG_ALLOW_FEATURE_ON_NON_FEATURE_COLLECTION) {
+		/*
+		*  This call from HidpGetSetFeature can fail because we allow
+		*  feature access on non-feature collections.
+		*/
+	}
+	else {
+		if (!result) {
+			STACK_TRACE_DEBUG_INFO("Bad harware, returning NULL report ID");
+		}
+	}
+
+	return result;
+}
+
 /*
 ********************************************************************************
 *  GetHidclassCollection
@@ -195,7 +237,23 @@ PHIDP_COLLECTION_DESC GetCollectionDesc(FDO_EXTENSION *fdoExtension, ULONG colle
 	ASSERT(result);
 	return result;
 }
+VOID UnitTest(PVOID raw_buf, ULONG size)
+{
+	static HIDParser hParser;
+	static HIDData   hData;
 
+	ResetParser(&hParser);
+	hParser.ReportDescSize = size;
+	memcpy(hParser.ReportDesc, raw_buf, size);
+ 
+	int i = 0;
+	while (HIDParse(&hParser, &hData))
+	{
+		STACK_TRACE_DEBUG_INFO("UPage: %d ", hParser.UPage);  
+		STACK_TRACE_DEBUG_INFO("Count: %d ", hParser.Count);
+
+	}
+}
 //---------------------------------------------------------------------------------------------------------//
 BOOLEAN  IsKeyboardOrMouseDevice(
 	_In_  PDEVICE_OBJECT				   device_object, 
@@ -272,126 +330,131 @@ BOOLEAN  IsKeyboardOrMouseDevice(
 
 			HIDP_DEVICE_DESC* tmp = (HIDP_DEVICE_DESC*)((PUCHAR)fdoExt + 0x58);
 		 
-			STACK_TRACE_DEBUG_INFO("deviceDesc(FIELD_OFFSET): %x \r\n", FIELD_OFFSET(FDO_EXTENSION, deviceDesc));  
+///			STACK_TRACE_DEBUG_INFO("deviceDesc(FIELD_OFFSET): %x \r\n", FIELD_OFFSET(FDO_EXTENSION, deviceDesc));  
 
-			STACK_TRACE_DEBUG_INFO("(PUCHAR)fdoExt: %I64x \r\n", (PUCHAR)fdoExt + 0x58);
-			STACK_TRACE_DEBUG_INFO("(PUCHAR)fdoExt: %I64x \r\n",  &fdoExt->deviceDesc);
-			STACK_TRACE_DEBUG_INFO("+++++++++++++++++++++++++++++++++++++++++++++++++++++++\r\n");
+///			STACK_TRACE_DEBUG_INFO("(PUCHAR)fdoExt: %I64x \r\n", (PUCHAR)fdoExt + 0x58);
+///			STACK_TRACE_DEBUG_INFO("(PUCHAR)fdoExt: %I64x \r\n",  &fdoExt->deviceDesc);
 
+			UnitTest(fdoExt->rawReportDescription, fdoExt->rawReportDescriptionLength);
+#define HIDP_PREPARSED_DATA_SIGNATURE1 'PdiH'
+#define HIDP_PREPARSED_DATA_SIGNATURE2 'RDK '
+			 
+			PHIDP_COLLECTION_DESC collectionDesc = &tmp->CollectionDesc[0];
 			for (int i = 0; i < tmp->CollectionDescLength; i++)
-			{
- 				PHIDP_COLLECTION_DESC collectionDesc = &tmp->CollectionDesc[i];
-				//if (collectionDesc->CollectionNumber == pdoExt->collectionNum)
-					STACK_TRACE_DEBUG_INFO("Usage: %x \r\n", collectionDesc->Usage);
-					STACK_TRACE_DEBUG_INFO("UsagePage: %x \r\n", collectionDesc->UsagePage);
-					STACK_TRACE_DEBUG_INFO("InputLength: %x \r\n", collectionDesc->InputLength);
-					STACK_TRACE_DEBUG_INFO("OutputLength: %x \r\n", collectionDesc->OutputLength);
-					STACK_TRACE_DEBUG_INFO("CollectionNumber: %x \r\n", collectionDesc->CollectionNumber);
-					STACK_TRACE_DEBUG_INFO("PreparsedData: %I64x \r\n", collectionDesc->PreparsedData);
+			{	
+				STACK_TRACE_DEBUG_INFO("+++++++++++++++++++++++++++++++++++++++++++++++++++++++\r\n");
+				STACK_TRACE_DEBUG_INFO("[Collection] Usage: %xh \r\n", collectionDesc->Usage); 
+				STACK_TRACE_DEBUG_INFO("[Collection] UsagePage: %xh \r\n", collectionDesc->UsagePage);
+				STACK_TRACE_DEBUG_INFO("[Collection] InputLength: %xh \r\n", collectionDesc->InputLength);
+				STACK_TRACE_DEBUG_INFO("[Collection] OutputLength: %xh \r\n", collectionDesc->OutputLength);
+				STACK_TRACE_DEBUG_INFO("[Collection] FeatureLength: %xh \r\n", collectionDesc->FeatureLength);
+				STACK_TRACE_DEBUG_INFO("[Collection] CollectionNumber: %x \r\n", collectionDesc->CollectionNumber); 
+				STACK_TRACE_DEBUG_INFO("[Collection] PreparsedData: %I64x \r\n", collectionDesc->PreparsedData); 
+				if (collectionDesc->PreparsedData->Signature1 == HIDP_PREPARSED_DATA_SIGNATURE1)
+				{
+					STACK_TRACE_DEBUG_INFO("[Collection] Signature1 correct \r\n");
+				}
+				if (collectionDesc->PreparsedData->Signature2 == HIDP_PREPARSED_DATA_SIGNATURE2)
+				{
+					STACK_TRACE_DEBUG_INFO("[Collection] Signature2 correct \r\n");
+				}
+				STACK_TRACE_DEBUG_INFO("[Collection] Input Offset: %x  Index: %x \r\n", collectionDesc->PreparsedData->Input.Offset, collectionDesc->PreparsedData->Input.Index);
+				STACK_TRACE_DEBUG_INFO("[Collection] Output Offset: %x Index: %x \r\n", collectionDesc->PreparsedData->Output.Offset, collectionDesc->PreparsedData->Output.Index);
+				STACK_TRACE_DEBUG_INFO("[Collection] Feature Offset: %x Index: %x \r\n", collectionDesc->PreparsedData->Feature.Offset, collectionDesc->PreparsedData->Feature.Index);
+				  
+				HIDP_CHANNEL_DESC*            channel = &collectionDesc->PreparsedData->Data[collectionDesc->PreparsedData->Input.Offset];
+				for (int k = collectionDesc->PreparsedData->Input.Offset; k < collectionDesc->PreparsedData->Input.Index ; k++) 
+				{
+					STACK_TRACE_DEBUG_INFO("$$$$$$$$$$$$$$$$$$$Input$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\r\n");
+					STACK_TRACE_DEBUG_INFO("channel ReportID: %d \r\n", channel->ReportID);
+					STACK_TRACE_DEBUG_INFO("channel ReportSize: %d \r\n", channel->ReportSize);
+					STACK_TRACE_DEBUG_INFO("channel ReportCount: %d \r\n", channel->ReportCount);					
+					STACK_TRACE_DEBUG_INFO("channel IsButton: %x \r\n", channel->IsButton);
+					STACK_TRACE_DEBUG_INFO("channel IsAbsolute: %x \r\n", channel->IsAbsolute);
+					STACK_TRACE_DEBUG_INFO("channel IsRange: %x \r\n", channel->IsRange);
+					STACK_TRACE_DEBUG_INFO("channel IsConst: %x \r\n", channel->IsConst);
+					STACK_TRACE_DEBUG_INFO("channel IsAlias: %x \r\n", channel->IsAlias);
+					STACK_TRACE_DEBUG_INFO("channel IsDesignatorRange: %x \r\n", channel->IsDesignatorRange);
+					STACK_TRACE_DEBUG_INFO("channel IsStringRange: %x \r\n", channel->IsStringRange); 
+					STACK_TRACE_DEBUG_INFO("channel ByteOffset: %x \r\n", channel->ByteOffset);
+					STACK_TRACE_DEBUG_INFO("channel ByteEnd: %x \r\n", channel->ByteEnd); 
+					STACK_TRACE_DEBUG_INFO("channel BitOffset: %x \r\n", channel->BitOffset); 
+ 					STACK_TRACE_DEBUG_INFO("channel UsagePage: %x \r\n", channel->UsagePage); 
+					STACK_TRACE_DEBUG_INFO("channel LinkCollection: %x \r\n", channel->LinkCollection); 
+					STACK_TRACE_DEBUG_INFO("channel LinkUsage: %x \r\n", channel->LinkUsage);
+					STACK_TRACE_DEBUG_INFO("channel LinkUsagePage: %x \r\n", channel->LinkUsagePage);  
+					STACK_TRACE_DEBUG_INFO("channel Range: %x \r\n", channel->Range.DataIndexMax);
+					STACK_TRACE_DEBUG_INFO("channel Range: %x \r\n", channel->Range.DataIndexMin);	//Logical M
+					STACK_TRACE_DEBUG_INFO("channel Range: %x \r\n", channel->Range.DesignatorMax);
+					STACK_TRACE_DEBUG_INFO("channel Range: %x \r\n", channel->Range.DesignatorMin);
+					STACK_TRACE_DEBUG_INFO("channel Range: %x \r\n", channel->Range.StringMax);
+					STACK_TRACE_DEBUG_INFO("channel Range: %x \r\n", channel->Range.StringMin);
+					STACK_TRACE_DEBUG_INFO("channel Range: %x \r\n", channel->Range.UsageMin);
+					STACK_TRACE_DEBUG_INFO("channel Range: %x \r\n", channel->Range.UsageMax);
+					 
+					STACK_TRACE_DEBUG_INFO("channel Data: %x \r\n", channel->Data.LogicalMax);
+					STACK_TRACE_DEBUG_INFO("channel Data: %x \r\n", channel->Data.LogicalMin);
+					STACK_TRACE_DEBUG_INFO("channel Data: %x \r\n", channel->Data.PhysicalMax);
+					STACK_TRACE_DEBUG_INFO("channel Data: %x \r\n", channel->Data.PhysicalMin);
 
-					HIDP_VALUE_CAPS            valueCaps = { 0 };
-					ULONG	slength = 1;
+					STACK_TRACE_DEBUG_INFO("$$$$$$$$$$$$$$$$$$$Input$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\r\n");
+					channel++;
+				}
 
-					
-					STACK_TRACE_DEBUG_INFO("Offset: %x Index: %x \r\n", collectionDesc->PreparsedData->Input.Offset,collectionDesc->PreparsedData->Input.Index);
-					STACK_TRACE_DEBUG_INFO("Offset: %x Index: %x \r\n", collectionDesc->PreparsedData->Output.Offset,collectionDesc->PreparsedData->Output.Index);
-					STACK_TRACE_DEBUG_INFO("Offset: %x Index: %x \r\n", collectionDesc->PreparsedData->Feature.Offset,collectionDesc->PreparsedData->Feature.Index);
+			    channel = &collectionDesc->PreparsedData->Data[collectionDesc->PreparsedData->Output.Offset];
+				for (int k = collectionDesc->PreparsedData->Output.Offset; k < collectionDesc->PreparsedData->Output.Index; k++)
+				{
+					STACK_TRACE_DEBUG_INFO("$$$$$$$$$$$$$$$$$$$$$Output$$$$$$$$$$$$$$$$$$$$$$$$$$$\r\n");
+					STACK_TRACE_DEBUG_INFO("channel ReportID: %d \r\n", channel->ReportID);
+					STACK_TRACE_DEBUG_INFO("channel ReportSize: %d \r\n", channel->ReportSize);
+					STACK_TRACE_DEBUG_INFO("channel ReportCount: %d \r\n", channel->ReportCount);
+					STACK_TRACE_DEBUG_INFO("channel IsButton: %x \r\n", channel->IsButton);
+					STACK_TRACE_DEBUG_INFO("channel IsAbsolute: %x \r\n", channel->IsAbsolute);
+					STACK_TRACE_DEBUG_INFO("channel IsRange: %x \r\n", channel->IsRange);
+					STACK_TRACE_DEBUG_INFO("channel IsConst: %x \r\n", channel->IsConst);
+					STACK_TRACE_DEBUG_INFO("channel IsAlias: %x \r\n", channel->IsAlias);
+					STACK_TRACE_DEBUG_INFO("channel IsDesignatorRange: %x \r\n", channel->IsDesignatorRange);
+					STACK_TRACE_DEBUG_INFO("channel IsStringRange: %x \r\n", channel->IsStringRange);  
+					STACK_TRACE_DEBUG_INFO("channel ByteOffset: %x \r\n", channel->ByteOffset);
+					STACK_TRACE_DEBUG_INFO("channel BitOffset: %x \r\n", channel->BitOffset);
+					STACK_TRACE_DEBUG_INFO("channel UsagePage: %x \r\n", channel->UsagePage);			
+					STACK_TRACE_DEBUG_INFO("channel LinkCollection: %x \r\n", channel->LinkCollection); 
+					STACK_TRACE_DEBUG_INFO("channel LinkUsage: %x \r\n", channel->LinkUsage);
+					STACK_TRACE_DEBUG_INFO("channel LinkUsagePage: %x \r\n", channel->LinkUsagePage);
 
-					for (int j  =0; j  < collectionDesc->PreparsedData->Input.Index; j++) 
-					{
-						PHIDP_CHANNEL_DESC channel = &collectionDesc->PreparsedData->Data[j];
-						STACK_TRACE_DEBUG_INFO("LinkUsage: %x \r\n", channel->LinkUsage);
-						STACK_TRACE_DEBUG_INFO("LinkUsagePage: %x\r\n", channel->LinkUsagePage);
-						STACK_TRACE_DEBUG_INFO("LinkUsagePage: %x\r\n", channel->ReportID);
-						STACK_TRACE_DEBUG_INFO("LinkUsagePage: %x\r\n", channel->ReportSize);
-						STACK_TRACE_DEBUG_INFO("LinkUsagePage: %x\r\n", channel->ReportCount);
+					STACK_TRACE_DEBUG_INFO("channel Range: %x \r\n", channel->Range.DataIndexMax);
+					STACK_TRACE_DEBUG_INFO("channel Range: %x \r\n", channel->Range.DataIndexMin);
+					STACK_TRACE_DEBUG_INFO("channel Range: %x \r\n", channel->Range.DesignatorMax);
+					STACK_TRACE_DEBUG_INFO("channel Range: %x \r\n", channel->Range.DesignatorMin);
+					STACK_TRACE_DEBUG_INFO("channel Range: %x \r\n", channel->Range.StringMax);
+					STACK_TRACE_DEBUG_INFO("channel Range: %x \r\n", channel->Range.StringMin);
+					STACK_TRACE_DEBUG_INFO("channel Range: %x \r\n", channel->Range.UsageMin);
+					STACK_TRACE_DEBUG_INFO("channel Range: %x \r\n", channel->Range.UsageMax);
 
-					}
-
-					for (int j = 0; j < collectionDesc->PreparsedData->Output.Index; j++)
-					{
-						PHIDP_CHANNEL_DESC channel = &collectionDesc->PreparsedData->Data[j];
-						STACK_TRACE_DEBUG_INFO("###########Output#########\r\n");
-						STACK_TRACE_DEBUG_INFO("UsagePage: %x\r\n", channel->UsagePage);
-						STACK_TRACE_DEBUG_INFO("LinkUsage: %x\r\n", channel->LinkUsage);
-						STACK_TRACE_DEBUG_INFO("LinkUsagePage: %x\r\n", channel->LinkUsagePage);
-						STACK_TRACE_DEBUG_INFO("ReportID: %x\r\n", channel->ReportID);
-						STACK_TRACE_DEBUG_INFO("ReportSize: %x\r\n", channel->ReportSize);
-						STACK_TRACE_DEBUG_INFO("ReportCount: %x\r\n", channel->ReportCount);
-						STACK_TRACE_DEBUG_INFO("LogicalMax: %d\r\n", channel->Data.LogicalMax);
-						STACK_TRACE_DEBUG_INFO("LogicalMin: %d\r\n", channel->Data.LogicalMin);
-						STACK_TRACE_DEBUG_INFO("PhysicalMax: %d\r\n", channel->Data.PhysicalMax);
-						STACK_TRACE_DEBUG_INFO("PhysicalMin: %d\r\n", channel->Data.PhysicalMin);
-						if (channel->IsDesignatorRange)
-						{
-							STACK_TRACE_DEBUG_INFO("DesignatorMax: %x\r\n", channel->Range.DesignatorMax);
-							STACK_TRACE_DEBUG_INFO("DesignatorMin: %x\r\n", channel->Range.DesignatorMin);
-						}
-						if (channel->IsRange)
-						{
-							STACK_TRACE_DEBUG_INFO("UsageMax: %x\r\n", channel->Range.UsageMax);
-							STACK_TRACE_DEBUG_INFO("UsageMin: %x\r\n", channel->Range.UsageMin);
-						}
-						if (channel->IsStringRange)
-						{
-							STACK_TRACE_DEBUG_INFO("StringMin: %x\r\n", channel->Range.StringMin);
-							STACK_TRACE_DEBUG_INFO("StringMax: %x\r\n", channel->Range.StringMax);
-							
-							
-						}
-						STACK_TRACE_DEBUG_INFO("###########Output#########\r\n");
-
-
-					}
-			
-					for (int j = 0; j < collectionDesc->PreparsedData->Feature.Index; j++)
-					{	
-						PHIDP_CHANNEL_DESC channel = &collectionDesc->PreparsedData->Data[j];
-		
-						STACK_TRACE_DEBUG_INFO("##########Feature##########\r\n");
-						STACK_TRACE_DEBUG_INFO("UsagePage: %x\r\n", channel->UsagePage);
-						STACK_TRACE_DEBUG_INFO("LinkUsage: %x\r\n", channel->LinkUsage);
-						STACK_TRACE_DEBUG_INFO("LinkUsagePage: %x\r\n", channel->LinkUsagePage);
-						STACK_TRACE_DEBUG_INFO("ReportID: %x\r\n", channel->ReportID);
-						STACK_TRACE_DEBUG_INFO("ReportSize: %x\r\n", channel->ReportSize);
-						STACK_TRACE_DEBUG_INFO("ReportCount: %x\r\n", channel->ReportCount);
-						STACK_TRACE_DEBUG_INFO("LogicalMax: %d\r\n", channel->Data.LogicalMax);
-						STACK_TRACE_DEBUG_INFO("LogicalMin: %d\r\n", channel->Data.LogicalMin);
-						STACK_TRACE_DEBUG_INFO("PhysicalMax: %d\r\n", channel->Data.PhysicalMax);
-						STACK_TRACE_DEBUG_INFO("PhysicalMin: %d\r\n", channel->Data.PhysicalMin);
-						if (channel->IsDesignatorRange)
-						{
-							STACK_TRACE_DEBUG_INFO("DesignatorMax: %x\r\n", channel->Range.DesignatorMax);
-							STACK_TRACE_DEBUG_INFO("DesignatorMin: %x\r\n", channel->Range.DesignatorMin);
-						}
-						if (channel->IsRange)
-						{
-							STACK_TRACE_DEBUG_INFO("UsageMax: %x\r\n", channel->Range.UsageMax);
-							STACK_TRACE_DEBUG_INFO("UsageMin: %x\r\n", channel->Range.UsageMin);
-						}
-						if (channel->IsStringRange)
-						{
-							STACK_TRACE_DEBUG_INFO("StringMin: %x\r\n", channel->Range.StringMin);
-							STACK_TRACE_DEBUG_INFO("StringMax: %x\r\n", channel->Range.StringMax);
-						}
-						STACK_TRACE_DEBUG_INFO("##########Feature##########\r\n");
-					}
-					
+					STACK_TRACE_DEBUG_INFO("channel Data: %x \r\n", channel->Data.LogicalMax);
+					STACK_TRACE_DEBUG_INFO("channel Data: %x \r\n", channel->Data.LogicalMin);
+					STACK_TRACE_DEBUG_INFO("channel Data: %x \r\n", channel->Data.PhysicalMax);
+					STACK_TRACE_DEBUG_INFO("channel Data: %x \r\n", channel->Data.PhysicalMin);
+					STACK_TRACE_DEBUG_INFO("$$$$$$$$$$$$$$$$$$$$$Output$$$$$$$$$$$$$$$$$$$$$$$$$$$\r\n");
+					channel++;
+				}
+			 
+			 	STACK_TRACE_DEBUG_INFO("+++++++++++++++++++++++++++++++++++++++++++++++++++++++\r\n"); 
+				collectionDesc++;
 			}
 
-			STACK_TRACE_DEBUG_INFO("*******************************************************\r\n");
 			PHIDP_REPORT_IDS      reportDesc = &tmp->ReportIDs[0];
 			for (int i = 0; i < tmp->ReportIDsLength ; i++)
-			{
-				STACK_TRACE_DEBUG_INFO("ReportID: %xh \r\n", reportDesc->ReportID);
-				STACK_TRACE_DEBUG_INFO("InputLength: %xh \r\n", reportDesc->InputLength >>3 );
-				STACK_TRACE_DEBUG_INFO("OutputLength: %xh \r\n", reportDesc->OutputLength >> 3);
-				STACK_TRACE_DEBUG_INFO("FeatureLength: %xh \r\n", reportDesc->FeatureLength>>3);
-				STACK_TRACE_DEBUG_INFO("CollectionNumber: %x \r\n", reportDesc->CollectionNumber);
+			{ 
+				 STACK_TRACE_DEBUG_INFO("*******************************************************\r\n");
+				 STACK_TRACE_DEBUG_INFO("[Report] ReportID: %xh \r\n", reportDesc->ReportID);
+				 STACK_TRACE_DEBUG_INFO("[Report] InputLength: %xh \r\n", reportDesc->InputLength);
+				 STACK_TRACE_DEBUG_INFO("[Report] OutputLength: %xh \r\n", reportDesc->OutputLength);
+				 STACK_TRACE_DEBUG_INFO("[Report] FeatureLength: %xh \r\n", reportDesc->FeatureLength);
+				 STACK_TRACE_DEBUG_INFO("[Report] CollectionNumber: %x \r\n", reportDesc->CollectionNumber);
+				 STACK_TRACE_DEBUG_INFO("*******************************************************\r\n"); 
 				reportDesc++;
 			}
-			STACK_TRACE_DEBUG_INFO("*******************************************************\r\n");
-
 
 			STACK_TRACE_DEBUG_INFO("---------------------------------------------------------------------------------------------------- \r\n");
 
