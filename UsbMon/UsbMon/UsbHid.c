@@ -14,38 +14,37 @@ struct _CHANNEL_REPORT_HEADER
 
 typedef struct _HIDP_CHANNEL_DESC
 {
-	USHORT   UsagePage;
-	UCHAR    ReportID;
-	UCHAR    BitOffset;    // 0 to 8 value describing bit alignment
-
-	ULONG    BitField;   // The 8 (plus extra) bits associated with a main item
-
-	USHORT   ReportSize;   // HID defined report size
-	USHORT   ReportCount;  // HID defined report count
-	USHORT   ByteOffset;   // byte position of start of field in report packet
-	USHORT   BitLength;    // total bit length of this channel
-
-	USHORT   ByteEnd;      // First byte not containing bits of this channel.
-	USHORT   LinkCollection;  // A unique internal index pointer
-	USHORT   LinkUsagePage;
-	USHORT   LinkUsage;
-
-	ULONG    Units;
-	ULONG    UnitExp;
-
-	ULONG  MoreChannels : 1; // Are there more channel desc associated with
-							 // this array.  This happens if there is a
-							 // several usages for one main item.
-	ULONG  IsConst : 1; // Does this channel represent filler
-	ULONG  IsButton : 1; // Is this a channel of binary usages, not value usages.
-	ULONG  IsAbsolute : 1; // As apposed to relative
-	ULONG  IsRange : 1;
-	ULONG  IsAlias : 1; // a usage described in a delimiter
-	ULONG  IsStringRange : 1;
-	ULONG  IsDesignatorRange : 1;
-	ULONG  Reserved : 20;
-	ULONG  NumGlobalUnknowns : 4;
-
+	USHORT   UsagePage;		//+0x0
+	UCHAR    ReportID;		//+0x2
+	UCHAR    BitOffset;    // 0 to 8 value describing bit alignment	+0x3
+	USHORT   ReportSize;   // HID defined report size	+0x4
+	USHORT   ReportCount;  // HID defined report count	+0x6
+	USHORT   ByteOffset;   // byte position of start of field in report packet +0x8
+	USHORT   BitLength;    // total bit length of this channel	+0xA
+	ULONG    BitField;   // The 8 (plus extra) bits associated with a main item +0xC
+	USHORT   ByteEnd;      // First byte not containing bits of this channel. +0x10
+	USHORT   LinkCollection;  // A unique internal index pointer	+0x12
+	USHORT   LinkUsagePage;   // +0x14
+	USHORT   LinkUsage;		  // +0x16
+	union
+	{
+		struct
+		{
+			ULONG  MoreChannels : 1; // Are there more channel desc associated with
+									 // this array.  This happens if there is a
+									 // several usages for one main item.
+			ULONG  IsConst : 1; // Does this channel represent filler
+			ULONG  IsButton : 1; // Is this a channel of binary usages, not value usages.
+			ULONG  IsAbsolute : 1; // As apposed to relative
+			ULONG  IsRange : 1;
+			ULONG  IsAlias : 1; // a usage described in a delimiter
+			ULONG  IsStringRange : 1;
+			ULONG  IsDesignatorRange : 1;
+			ULONG  Reserved : 20;
+			ULONG  NumGlobalUnknowns : 4;
+		};
+		ULONG  all;
+	};
 	struct _HIDP_UNKNOWN_TOKEN GlobalUnknowns[HIDP_MAX_UNKNOWN_ITEMS];
 
 	union {
@@ -74,6 +73,9 @@ typedef struct _HIDP_CHANNEL_DESC
 			LONG     PhysicalMin, PhysicalMax;
 		} Data;
 	};
+
+	ULONG Units;
+	ULONG UnitExp;
 } HIDP_CHANNEL_DESC, *PHIDP_CHANNEL_DESC;
 typedef struct _HIDP_SYS_POWER_INFO {
 	ULONG   PowerButtonMask;
@@ -237,6 +239,7 @@ PHIDP_COLLECTION_DESC GetCollectionDesc(FDO_EXTENSION *fdoExtension, ULONG colle
 	ASSERT(result);
 	return result;
 }
+//---------------------------------------------------------------------------------------------------------//
 VOID UnitTest(PVOID raw_buf, ULONG size)
 {
 	static HIDParser hParser;
@@ -248,10 +251,15 @@ VOID UnitTest(PVOID raw_buf, ULONG size)
  
 	int i = 0;
 	while (HIDParse(&hParser, &hData))
+	{ 
+	}
+	for (int j = 0; j < hParser.Data.Path.Size; j++)
 	{
-		STACK_TRACE_DEBUG_INFO("UPage: %d ", hParser.UPage);  
-		STACK_TRACE_DEBUG_INFO("Count: %d ", hParser.Count);
-
+		STACK_TRACE_DEBUG_INFO("UPage: %x Usage: %x \r\n", hParser.Data.Path.Node[j].UPage, hParser.Data.Path.Node[j].Usage);
+		for (int i = 0; i < hParser.UsageSize; i++)
+		{
+			STACK_TRACE_DEBUG_INFO("UPage: %x Usage: %x \r\n", hParser.UsageTab[i].UPage, hParser.Data.Path.Node[i].Usage);
+		}
 	}
 }
 //---------------------------------------------------------------------------------------------------------//
@@ -335,7 +343,7 @@ BOOLEAN  IsKeyboardOrMouseDevice(
 ///			STACK_TRACE_DEBUG_INFO("(PUCHAR)fdoExt: %I64x \r\n", (PUCHAR)fdoExt + 0x58);
 ///			STACK_TRACE_DEBUG_INFO("(PUCHAR)fdoExt: %I64x \r\n",  &fdoExt->deviceDesc);
 
-			UnitTest(fdoExt->rawReportDescription, fdoExt->rawReportDescriptionLength);
+			//UnitTest(fdoExt->rawReportDescription, fdoExt->rawReportDescriptionLength);
 #define HIDP_PREPARSED_DATA_SIGNATURE1 'PdiH'
 #define HIDP_PREPARSED_DATA_SIGNATURE2 'RDK '
 			 
@@ -366,23 +374,42 @@ BOOLEAN  IsKeyboardOrMouseDevice(
 				for (int k = collectionDesc->PreparsedData->Input.Offset; k < collectionDesc->PreparsedData->Input.Index ; k++) 
 				{
 					STACK_TRACE_DEBUG_INFO("$$$$$$$$$$$$$$$$$$$Input$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\r\n");
-					STACK_TRACE_DEBUG_INFO("channel ReportID: %d \r\n", channel->ReportID);
-					STACK_TRACE_DEBUG_INFO("channel ReportSize: %d \r\n", channel->ReportSize);
-					STACK_TRACE_DEBUG_INFO("channel ReportCount: %d \r\n", channel->ReportCount);					
-					STACK_TRACE_DEBUG_INFO("channel IsButton: %x \r\n", channel->IsButton);
+					STACK_TRACE_DEBUG_INFO("channel UsagePage: %x   OFFSET_FIELD: %x \r\n", channel->UsagePage, FIELD_OFFSET(HIDP_CHANNEL_DESC, UsagePage));
+					STACK_TRACE_DEBUG_INFO("channel ReportID: %d    OFFSET_FIELD: %x \r\n", channel->ReportID, FIELD_OFFSET(HIDP_CHANNEL_DESC, ReportID));
+					STACK_TRACE_DEBUG_INFO("channel ReportSize: %d  OFFSET_FIELD: %x \r\n", channel->ReportSize, FIELD_OFFSET(HIDP_CHANNEL_DESC, ReportSize));
+					STACK_TRACE_DEBUG_INFO("channel ReportCount: %d OFFSET_FIELD: %x \r\n", channel->ReportCount, FIELD_OFFSET(HIDP_CHANNEL_DESC, ReportCount));
+					STACK_TRACE_DEBUG_INFO("channel ByteOffset: %d OFFSET_FIELD: %x \r\n", channel->ByteOffset, FIELD_OFFSET(HIDP_CHANNEL_DESC, ByteOffset));
+					STACK_TRACE_DEBUG_INFO("channel IsRange: %x \r\n", channel->IsRange, FIELD_OFFSET(HIDP_CHANNEL_DESC, all));
+					STACK_TRACE_DEBUG_INFO("channel IsButton: %x   \r\n", channel->IsButton);
 					STACK_TRACE_DEBUG_INFO("channel IsAbsolute: %x \r\n", channel->IsAbsolute);
-					STACK_TRACE_DEBUG_INFO("channel IsRange: %x \r\n", channel->IsRange);
 					STACK_TRACE_DEBUG_INFO("channel IsConst: %x \r\n", channel->IsConst);
 					STACK_TRACE_DEBUG_INFO("channel IsAlias: %x \r\n", channel->IsAlias);
 					STACK_TRACE_DEBUG_INFO("channel IsDesignatorRange: %x \r\n", channel->IsDesignatorRange);
 					STACK_TRACE_DEBUG_INFO("channel IsStringRange: %x \r\n", channel->IsStringRange); 
-					STACK_TRACE_DEBUG_INFO("channel ByteOffset: %x \r\n", channel->ByteOffset);
-					STACK_TRACE_DEBUG_INFO("channel ByteEnd: %x \r\n", channel->ByteEnd); 
-					STACK_TRACE_DEBUG_INFO("channel BitOffset: %x \r\n", channel->BitOffset); 
- 					STACK_TRACE_DEBUG_INFO("channel UsagePage: %x \r\n", channel->UsagePage); 
-					STACK_TRACE_DEBUG_INFO("channel LinkCollection: %x \r\n", channel->LinkCollection); 
-					STACK_TRACE_DEBUG_INFO("channel LinkUsage: %x \r\n", channel->LinkUsage);
-					STACK_TRACE_DEBUG_INFO("channel LinkUsagePage: %x \r\n", channel->LinkUsagePage);  
+					STACK_TRACE_DEBUG_INFO("channel ByteEnd: %x OFFSET_FIELD: %x \r\n", channel->ByteEnd, FIELD_OFFSET(HIDP_CHANNEL_DESC, ByteEnd));
+					STACK_TRACE_DEBUG_INFO("channel BitOffset: %x OFFSET_FIELD: %x \r\n", channel->BitOffset, FIELD_OFFSET(HIDP_CHANNEL_DESC, BitOffset));
+					STACK_TRACE_DEBUG_INFO("channel LinkCollection: %x OFFSET_FIELD: %x \r\n", channel->LinkCollection, FIELD_OFFSET(HIDP_CHANNEL_DESC, LinkCollection));
+					STACK_TRACE_DEBUG_INFO("channel LinkUsage: %x OFFSET_FIELD: %x \r\n", channel->LinkUsage, FIELD_OFFSET(HIDP_CHANNEL_DESC, LinkUsage));
+					STACK_TRACE_DEBUG_INFO("channel LinkUsagePage: %xOFFSET_FIELD: %x  \r\n", channel->LinkUsagePage, FIELD_OFFSET(HIDP_CHANNEL_DESC, LinkUsagePage));
+
+					STACK_TRACE_DEBUG_INFO("channel Range.DataIndexMax  %x OFFSET_FIELD: %X  \r\n", channel->Range.DataIndexMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.DataIndexMax));
+					STACK_TRACE_DEBUG_INFO("channel Range.DataIndexMin, %x OFFSET_FIELD: %X  \r\n", channel->Range.DataIndexMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.DataIndexMin));
+					STACK_TRACE_DEBUG_INFO("channel Range.DesignatorMax %x OFFSET_FIELD: %X  \r\n", channel->Range.DesignatorMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.DesignatorMax));
+					STACK_TRACE_DEBUG_INFO("channel Range.DesignatorMin %x OFFSET_FIELD: %X  \r\n", channel->Range.DesignatorMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.DesignatorMin));
+					
+					STACK_TRACE_DEBUG_INFO("channel Range.StringMax %x OFFSET_FIELD: %X  \r\n", channel->Range.StringMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.StringMax));
+					STACK_TRACE_DEBUG_INFO("channel Range.StringMin %x OFFSET_FIELD: %X  \r\n", channel->Range.StringMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.StringMin));
+					STACK_TRACE_DEBUG_INFO("channel Range.UsageMin  %x OFFSET_FIELD: %X  \r\n", channel->Range.UsageMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.UsageMin));
+					STACK_TRACE_DEBUG_INFO("channel Range.UsageMax  %x OFFSET_FIELD: %X  \r\n", channel->Range.UsageMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.UsageMax));
+
+					STACK_TRACE_DEBUG_INFO("channel button.LogicalMin %x OFFSET_FIELD: %X  \r\n", channel->button.LogicalMin  , FIELD_OFFSET(HIDP_CHANNEL_DESC, button.LogicalMin));
+					STACK_TRACE_DEBUG_INFO("channel button.LogicalMax %x OFFSET_FIELD: %X  \r\n", channel->button.LogicalMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, button.LogicalMax));
+					STACK_TRACE_DEBUG_INFO("channel Data.LogicalMin: %x	 OFFSET_FIELD: %X \r\n", channel->Data.LogicalMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Data.LogicalMin));
+					STACK_TRACE_DEBUG_INFO("channel Data.LogicalMax: %x	 OFFSET_FIELD: %X \r\n", channel->Data.LogicalMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Data.LogicalMax));
+					STACK_TRACE_DEBUG_INFO("channel Data.PhysicalMax: %x OFFSET_FIELD: %X  \r\n", channel->Data.PhysicalMin,  FIELD_OFFSET(HIDP_CHANNEL_DESC, Data.PhysicalMin));
+					STACK_TRACE_DEBUG_INFO("channel Data.PhysicalMax: %x OFFSET_FIELD: %X  \r\n", channel->Data.PhysicalMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Data.PhysicalMax));
+
+					/*
 					STACK_TRACE_DEBUG_INFO("channel Range: %x \r\n", channel->Range.DataIndexMax);
 					STACK_TRACE_DEBUG_INFO("channel Range: %x \r\n", channel->Range.DataIndexMin);	//Logical M
 					STACK_TRACE_DEBUG_INFO("channel Range: %x \r\n", channel->Range.DesignatorMax);
@@ -396,7 +423,7 @@ BOOLEAN  IsKeyboardOrMouseDevice(
 					STACK_TRACE_DEBUG_INFO("channel Data: %x \r\n", channel->Data.LogicalMin);
 					STACK_TRACE_DEBUG_INFO("channel Data: %x \r\n", channel->Data.PhysicalMax);
 					STACK_TRACE_DEBUG_INFO("channel Data: %x \r\n", channel->Data.PhysicalMin);
-
+					*/
 					STACK_TRACE_DEBUG_INFO("$$$$$$$$$$$$$$$$$$$Input$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\r\n");
 					channel++;
 				}
