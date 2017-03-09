@@ -154,7 +154,7 @@ VOID UnitTest(HIDCLASS_DEVICE_EXTENSION* hid_common_extension)
 	STACK_TRACE_DEBUG_INFO("OFFSET %x \r\n", FIELD_OFFSET(PDO_EXTENSION, deviceFdoExt));
 	STACK_TRACE_DEBUG_INFO("pdoExt Offset: %I64x \r\n", &hid_common_extension->pdoExt.deviceFdoExt);
 	STACK_TRACE_DEBUG_INFO("pdoExt Offset: %I64x \r\n", ((ULONG64)hid_common_extension) + 0x60);		//For Win7 deviceFdoExt offset by HIDCLASS_DEVICE_EXTENSION->PDO_EXTENSION.backptr
-
+	
 	WCHAR name[256] = { 0 };
 	HIDCLASS_DEVICE_EXTENSION* addr = (HIDCLASS_DEVICE_EXTENSION*)pdoExt->deviceFdoExt;
 	fdoExt = &addr->fdoExt;
@@ -167,9 +167,10 @@ VOID UnitTest(HIDCLASS_DEVICE_EXTENSION* hid_common_extension)
 	STACK_TRACE_DEBUG_INFO("Pdo->CollectionNum: %I64x \r\n", pdoExt->collectionNum);
 	// = (HIDP_DEVICE_DESC*)((PUCHAR)fdoExt + 0x58);
 	HIDP_DEVICE_DESC tmp = { 0 }; // = (HIDP_DEVICE_DESC*)((PUCHAR)fdoExt + 0x58);
+	STACK_TRACE_DEBUG_INFO("[rawReportDescription] %I64x rawReportDescriptionLength: %xh \r\n", fdoExt->rawReportDescription, fdoExt->rawReportDescriptionLength);
 
 	MyGetCollectionDescription(fdoExt->rawReportDescription, fdoExt->rawReportDescriptionLength, NonPagedPool, &tmp);
-
+	
 	//UnitTest(fdoExt->rawReportDescription, fdoExt->rawReportDescriptionLength);
 #define HIDP_PREPARSED_DATA_SIGNATURE1 'PdiH'
 #define HIDP_PREPARSED_DATA_SIGNATURE2 'RDK '
@@ -213,6 +214,7 @@ VOID UnitTest(HIDCLASS_DEVICE_EXTENSION* hid_common_extension)
 		STACK_TRACE_DEBUG_INFO("*******************************************************\r\n");
 		reportDesc++;
 	}
+	
 }
 VOID DumpChannel(PHIDP_COLLECTION_DESC collectionDesc, HIDP_REPORT_TYPE type)
 {
@@ -511,12 +513,13 @@ BOOLEAN  IsKeyboardOrMouseDevice(
 		{
 			STACK_TRACE_DEBUG_INFO("---------------------------------------------------------------------------------------------------- \r\n");
 
-			//UnitTest(hid_common_extension);
-
-			//STACK_TRACE_DEBUG_INFO("DeviceObj: %I64X  DriverName: %ws DeviceName: %ws \r\n", device_object, device_object->DriverObject->DriverName.Buffer, DeviceName);
+			UnitTest(hid_common_extension);
+			STACK_TRACE_DEBUG_INFO("hid_common_extension: %I64x \r\n", hid_common_extension);
+			STACK_TRACE_DEBUG_INFO("DeviceObj: %I64X  DriverName: %ws DeviceName: %ws \r\n", device_object, device_object->DriverObject->DriverName.Buffer, DeviceName);
 
 			STACK_TRACE_DEBUG_INFO("---------------------------------------------------------------------------------------------------- \r\n"); 
 			*hid_mini_extension = mini_extension;
+			
 		}
 		return TRUE;
 	}

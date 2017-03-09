@@ -72,7 +72,7 @@ void HidP_AssignDataIndices(PHIDP_PREPARSED_DATA, PHIDP_GETCOLDESC_DBG);
 PHIDP_PARSE_LOCAL_RANGE_LIST HidP_FreeUsageList(PHIDP_PARSE_LOCAL_RANGE_LIST);
 PHIDP_PARSE_LOCAL_RANGE_LIST HidP_PushUsageList(PHIDP_PARSE_LOCAL_RANGE_LIST, POOL_TYPE, BOOLEAN);
 PHIDP_PARSE_LOCAL_RANGE_LIST HidP_PopUsageList(PHIDP_PARSE_LOCAL_RANGE_LIST);
-
+/*
 #ifdef ALLOC_PRAGMA
 #pragma alloc_text(PAGE, HidP_AllocateCollections)
 #pragma alloc_text(PAGE, HidP_ParseCollections)
@@ -82,7 +82,8 @@ PHIDP_PARSE_LOCAL_RANGE_LIST HidP_PopUsageList(PHIDP_PARSE_LOCAL_RANGE_LIST);
 #pragma alloc_text(PAGE, HidP_PushUsageList)
 #pragma alloc_text(PAGE, HidP_PopUsageList)
 #endif
-
+*/
+#pragma warning(disable: 4100)
 
 NTSTATUS
 MyGetCollectionDescription(
@@ -115,6 +116,7 @@ Not major opt. has been made.
 	RtlZeroMemory(DeviceDesc, sizeof(HIDP_DEVICE_DESC));
 
 	HidP_KdPrint(0, ("'Preparing to Allocate memory\n"));
+	
 	status = HidP_AllocateCollections(ReportDesc,
 		DescLength,
 		PoolType,
@@ -137,7 +139,7 @@ Not major opt. has been made.
 	}
 
 	// Second Pass fill in the data.
-
+	
 	HidP_KdPrint(0, ("'Starting Parsing Pass\n"));
 	status = HidP_ParseCollections(ReportDesc,
 		DescLength,
@@ -146,8 +148,7 @@ Not major opt. has been made.
 		numCols,
 		&DeviceDesc->Dbg,
 		DeviceDesc);
-
-
+	
 	if (NT_SUCCESS(status))
 	{
 		DeviceDesc->CollectionDesc =
@@ -180,10 +181,9 @@ Not major opt. has been made.
 			ExFreePool(collectDesc);
 			collectDesc = nextCollectDesc;
 		}
-
+		
 		return STATUS_SUCCESS;
 	}
-
 HIDP_GETCOLLECTIONS_REJECT:
 	while (collectDesc)
 	{
@@ -2167,7 +2167,6 @@ HidP_AssignDataIndices(
 	USHORT i;
 	USHORT dataIndex;
 
-	PAGED_CODE();
 	UNREFERENCED_PARAMETER(Dbg);
 
 	iof = &Ppd->Input;

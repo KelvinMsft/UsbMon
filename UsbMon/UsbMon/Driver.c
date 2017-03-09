@@ -251,25 +251,19 @@ NTSTATUS  MyCompletionCallback(
 	STACK_TRACE_DEBUG_INFO("\r\n");
 
 	}
-	//DumpUrb(pContext->urb); d
- 
-	if (pContext)
+	//DumpUrb(pContext->urb); d 
+	if (DeviceObject->DeviceExtension)
 	{
-		if (pContext->DeviceObject)
-		{
-			if (pContext->DeviceObject->DeviceExtension)
-			{
-				HIDCLASS_DEVICE_EXTENSION* hid_common_extension = (HIDCLASS_DEVICE_EXTENSION*)(DeviceObject->DeviceExtension);
-				//	UnitTest(hid_common_extension);
-				STACK_TRACE_DEBUG_INFO("hid_common_extension: %I64x \r\n", hid_common_extension);
-				GetDeviceName(DeviceObject, DeviceName);
-				STACK_TRACE_DEBUG_INFO("Mouse/Keyboard DeviceName: %ws DriverName: %ws \r\n", DeviceObject->DriverObject->DriverName.Buffer, DeviceName);
-
-			}
-		}
+		HIDCLASS_DEVICE_EXTENSION* hid_common_extension = (HIDCLASS_DEVICE_EXTENSION*)(pContext->DeviceObject->DeviceExtension);
+		//UnitTest(hid_common_extension);
+		STACK_TRACE_DEBUG_INFO("IsClientPdo: %x ", hid_common_extension->isClientPdo);
+		STACK_TRACE_DEBUG_INFO("hid_common_extension: %I64x \r\n", hid_common_extension);
+		GetDeviceName(DeviceObject, DeviceName);
+		STACK_TRACE_DEBUG_INFO("Mouse/Keyboard DeviceName: %ws DriverName: %ws \r\n", DeviceObject->DriverObject->DriverName.Buffer, DeviceName);
+	
 	}
-  
-	//Free it 
+	
+	 
 	if (pContext)
 	{
 		ExFreePool(pContext);
@@ -383,11 +377,14 @@ NTSTATUS DispatchInternalDeviceControl(
 				continue;
 			}
 
+			UnitTest(class_extension);
+
 			hijack = (HIJACK_CONTEXT*)ExAllocatePoolWithTag(NonPagedPool, sizeof(HIJACK_CONTEXT), 'kcaj');
 			if (!hijack)
 			{
 				continue;
 			}
+
 			new_entry = (PENDINGIRP*)ExAllocatePoolWithTag(NonPagedPool, sizeof(PENDINGIRP), 'kcaj');
 			if (!new_entry)
 			{
