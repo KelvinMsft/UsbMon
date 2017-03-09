@@ -124,7 +124,8 @@ HIDP_DEVICE_DESC* g_hid_collection = NULL;
 //// 
 #define HID_USB_DEVICE L"\\Driver\\hidusb"
 #define ARRAY_SIZE					  100
- 
+#define HIDP_PREPARSED_DATA_SIGNATURE1 'PdiH'
+#define HIDP_PREPARSED_DATA_SIGNATURE2 'RDK '
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////// 
@@ -134,16 +135,17 @@ HIDP_DEVICE_DESC* g_hid_collection = NULL;
 /////////////////////////////////////////////////////////////////////////////////////////////// 
 //// Implementation
 ////  
-VOID DumpChannel(PHIDP_COLLECTION_DESC collectionDesc, HIDP_REPORT_TYPE type);
 
-VOID UnitTest(HIDCLASS_DEVICE_EXTENSION* hid_common_extension)
+
+//----------------------------------------------------------------------------------------------------------//
+HIDP_DEVICE_DESC* GetReport(HIDCLASS_DEVICE_EXTENSION* hid_common_extension)
 {
 	PDO_EXTENSION* pdoExt = NULL;
 	FDO_EXTENSION* fdoExt = NULL; 
 
 	if (!hid_common_extension)
 	{
-		return;
+		return NULL;
 	}
  
 	pdoExt = &hid_common_extension->pdoExt;
@@ -166,17 +168,24 @@ VOID UnitTest(HIDCLASS_DEVICE_EXTENSION* hid_common_extension)
 	STACK_TRACE_DEBUG_INFO("Pdo->CollectionIndex: %I64x \r\n", pdoExt->collectionIndex);
 	STACK_TRACE_DEBUG_INFO("Pdo->CollectionNum: %I64x \r\n", pdoExt->collectionNum);
 	// = (HIDP_DEVICE_DESC*)((PUCHAR)fdoExt + 0x58);
-	HIDP_DEVICE_DESC tmp = { 0 }; // = (HIDP_DEVICE_DESC*)((PUCHAR)fdoExt + 0x58);
+	HIDP_DEVICE_DESC* tmp = ExAllocatePoolWithTag(NonPagedPool, sizeof(HIDP_DEVICE_DESC), 'pdih'); // = (HIDP_DEVICE_DESC*)((PUCHAR)fdoExt + 0x58);
+	if (!tmp)
+	{
+		return NULL;
+	}
+	RtlZeroMemory(tmp, sizeof(HIDP_DEVICE_DESC));
+
 	STACK_TRACE_DEBUG_INFO("[rawReportDescription] %I64x rawReportDescriptionLength: %xh \r\n", fdoExt->rawReportDescription, fdoExt->rawReportDescriptionLength);
 
-	MyGetCollectionDescription(fdoExt->rawReportDescription, fdoExt->rawReportDescriptionLength, NonPagedPool, &tmp);
-	
-	//UnitTest(fdoExt->rawReportDescription, fdoExt->rawReportDescriptionLength);
-#define HIDP_PREPARSED_DATA_SIGNATURE1 'PdiH'
-#define HIDP_PREPARSED_DATA_SIGNATURE2 'RDK '
-
-	PHIDP_COLLECTION_DESC collectionDesc = &tmp.CollectionDesc[0];
-	for (int i = 0; i < tmp.CollectionDescLength; i++)
+	MyGetCollectionDescription(fdoExt->rawReportDescription, fdoExt->rawReportDescriptionLength, NonPagedPool, tmp);	 
+	DumpReport(tmp);
+	return tmp;
+}
+//----------------------------------------------------------------------------------------------------------//
+VOID DumpReport(HIDP_DEVICE_DESC* report)
+{
+	PHIDP_COLLECTION_DESC collectionDesc = &report->CollectionDesc[0];
+	for (int i = 0; i < report->CollectionDescLength; i++)
 	{
 		ASSERT(collectionDesc->PreparsedData->Signature1 == HIDP_PREPARSED_DATA_SIGNATURE1);
 		ASSERT(collectionDesc->PreparsedData->Signature2 == HIDP_PREPARSED_DATA_SIGNATURE2);
@@ -194,6 +203,7 @@ VOID UnitTest(HIDCLASS_DEVICE_EXTENSION* hid_common_extension)
 		STACK_TRACE_DEBUG_INFO("[Collection] Output Offset: %x Index: %x \r\n", collectionDesc->PreparsedData->Output.Offset, collectionDesc->PreparsedData->Output.Index);
 		STACK_TRACE_DEBUG_INFO("[Collection] Feature Offset: %x Index: %x \r\n", collectionDesc->PreparsedData->Feature.Offset, collectionDesc->PreparsedData->Feature.Index);
 
+
 		DumpChannel(collectionDesc, HidP_Input);
 		DumpChannel(collectionDesc, HidP_Output);
 		DumpChannel(collectionDesc, HidP_Feature);
@@ -202,8 +212,8 @@ VOID UnitTest(HIDCLASS_DEVICE_EXTENSION* hid_common_extension)
 		collectionDesc++;
 	}
 
-	PHIDP_REPORT_IDS      reportDesc = &tmp.ReportIDs[0];
-	for (int i = 0; i < tmp.ReportIDsLength; i++)
+	PHIDP_REPORT_IDS      reportDesc = &report->ReportIDs[0];
+	for (int i = 0; i < report->ReportIDsLength; i++)
 	{
 		STACK_TRACE_DEBUG_INFO("*******************************************************\r\n");
 		STACK_TRACE_DEBUG_INFO("[Report] ReportID: %xh \r\n", reportDesc->ReportID);
@@ -214,8 +224,8 @@ VOID UnitTest(HIDCLASS_DEVICE_EXTENSION* hid_common_extension)
 		STACK_TRACE_DEBUG_INFO("*******************************************************\r\n");
 		reportDesc++;
 	}
-	
 }
+//----------------------------------------------------------------------------------------------------------//
 VOID DumpChannel(PHIDP_COLLECTION_DESC collectionDesc, HIDP_REPORT_TYPE type)
 {
 	if (!collectionDesc)
@@ -358,11 +368,12 @@ VOID DumpChannel(PHIDP_COLLECTION_DESC collectionDesc, HIDP_REPORT_TYPE type)
 }
 //-------------------------------------------------------------------------------------------//
 HID_DEVICE_NODE* CreateHidDeviceNode(
-	_In_ PDEVICE_OBJECT device_object, 
-	_In_ HID_USB_DEVICE_EXTENSION* mini_extension
+	_In_ PDEVICE_OBJECT device_object,
+	_In_ HID_USB_DEVICE_EXTENSION* mini_extension,
+	_In_ HIDP_DEVICE_DESC* parsedReport
 )
 {
-	if (!device_object || !mini_extension)
+	if (!device_object || !mini_extension || !parsedReport)
 	{
 		return NULL;
 	}
@@ -376,7 +387,7 @@ HID_DEVICE_NODE* CreateHidDeviceNode(
 	RtlZeroMemory(node, sizeof(HID_DEVICE_NODE));
 	node->device_object  = device_object;
 	node->mini_extension = mini_extension;
-
+	node->parsedReport = parsedReport;
 	return node;
 }
 
@@ -415,55 +426,8 @@ PHIDP_REPORT_IDS GetReportIdentifier(FDO_EXTENSION *fdoExtension, ULONG reportId
 	}
 
 	return result;
-}
+} 
 
-/*
-********************************************************************************
-*  GetHidclassCollection
-********************************************************************************
-*
-*/
-PHIDCLASS_COLLECTION GetHidclassCollection(FDO_EXTENSION *fdoExtension, ULONG collectionId)
-{
-	PHIDCLASS_COLLECTION result = NULL;
-	PHIDP_DEVICE_DESC deviceDesc = &fdoExtension->deviceDesc;
-	ULONG i;
-	 
-		for (i = 0; i < deviceDesc->CollectionDescLength; i++) {
-			if (fdoExtension->classCollectionArray[i].CollectionNumber == collectionId) {
-				result = &fdoExtension->classCollectionArray[i];
-				break;
-			}
-		} 
-	ASSERT(result);
-	return result;
-}
-
-/*
-********************************************************************************
-*  GetCollectionDesc
-********************************************************************************
-*
-*
-*/
-PHIDP_COLLECTION_DESC GetCollectionDesc(FDO_EXTENSION *fdoExtension, ULONG collectionId)
-{
-	PHIDP_COLLECTION_DESC result = NULL;
-	PHIDP_DEVICE_DESC deviceDesc = &fdoExtension->deviceDesc;
-	ULONG i;
-
-	if (deviceDesc->CollectionDesc) {
-		for (i = 0; i < fdoExtension->deviceDesc.CollectionDescLength; i++) {
-			if (deviceDesc->CollectionDesc[i].CollectionNumber == collectionId) {
-				result = &deviceDesc->CollectionDesc[i];
-				break;
-			}
-		}
-	}
-
-	ASSERT(result);
-	return result;
-}
 //---------------------------------------------------------------------------------------------------------//
 BOOLEAN  IsKeyboardOrMouseDevice(
 	_In_  PDEVICE_OBJECT				   device_object, 
@@ -490,9 +454,7 @@ BOOLEAN  IsKeyboardOrMouseDevice(
 	{
 		return FALSE;
 	} 	
-	
-
- 
+	 
 	//DumpHidMiniDriverExtension(hid_common_extension); 
 
 	if (!hid_common_extension->isClientPdo)
@@ -513,7 +475,6 @@ BOOLEAN  IsKeyboardOrMouseDevice(
 		{
 			STACK_TRACE_DEBUG_INFO("---------------------------------------------------------------------------------------------------- \r\n");
 
-			UnitTest(hid_common_extension);
 			STACK_TRACE_DEBUG_INFO("hid_common_extension: %I64x \r\n", hid_common_extension);
 			STACK_TRACE_DEBUG_INFO("DeviceObj: %I64X  DriverName: %ws DeviceName: %ws \r\n", device_object, device_object->DriverObject->DriverName.Buffer, DeviceName);
 
@@ -607,13 +568,17 @@ NTSTATUS InitHidRelation(
 		HID_USB_DEVICE_EXTENSION* mini_extension = NULL; 
 		if (IsKeyboardOrMouseDevice(device_object, &mini_extension))
 		{
+			HIDP_DEVICE_DESC* report = GetReport(device_object->DeviceExtension);
+		
 			if (mini_extension && g_hid_relation)
 			{
-				HID_DEVICE_NODE* node = CreateHidDeviceNode(device_object, mini_extension);
-				AddToChainListTail(g_hid_relation->head, node);
-				current_size++;
-				STACK_TRACE_DEBUG_INFO("Inserted one element: %I64x InferfaceDesc: %I64X device_object: %I64x \r\n", node->device_object, node->mini_extension, device_object);
-				STACK_TRACE_DEBUG_INFO("Added one element :%x \r\n", current_size);
+				HID_DEVICE_NODE* node = CreateHidDeviceNode(device_object, mini_extension, report);
+				if (node) {
+					AddToChainListTail(g_hid_relation->head, node);
+					current_size++;
+					STACK_TRACE_DEBUG_INFO("Inserted one element: %I64x InferfaceDesc: %I64X device_object: %I64x \r\n", node->device_object, node->mini_extension, device_object);
+					STACK_TRACE_DEBUG_INFO("Added one element :%x \r\n", current_size);
+				}
 			}
 		}
  		device_object = device_object->NextDevice;

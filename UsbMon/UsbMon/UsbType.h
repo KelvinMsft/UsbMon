@@ -38,6 +38,7 @@ typedef struct _HID_DEVICE_NODE
 { 
 	PDEVICE_OBJECT					device_object;
 	HID_USB_DEVICE_EXTENSION*		mini_extension;
+	PVOID				parsedReport;
 }HID_DEVICE_NODE, *PHID_DEVICE_NODE;
 
 //--------------------------------------//

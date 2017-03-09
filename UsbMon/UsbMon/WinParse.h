@@ -1,7 +1,5 @@
 /*++
 
-Copyright (c) 1996    Microsoft Corporation
-
 Module Name:
 
 HIDPARSE.H
@@ -16,8 +14,6 @@ Environment:
 Kernel & user mode
 
 Revision History:
-
-Aug-96 : created by Kenneth Ray
 
 --*/
 

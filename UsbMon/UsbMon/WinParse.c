@@ -1,7 +1,5 @@
 /*++
 
-Copyright (c) 1996    Microsoft Corporation
-
 Module Name:
 
 descript.c
@@ -12,10 +10,6 @@ This module contains the code for parsing HID descriptors.
 Environment:
 
 Kernel & user mode
-
-Revision History:
-
-Aug-96 : created by Kenneth Ray
 
 --*/
 #include <fltKernel.h> 

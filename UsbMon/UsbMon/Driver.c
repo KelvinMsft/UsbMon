@@ -255,7 +255,7 @@ NTSTATUS  MyCompletionCallback(
 	if (DeviceObject->DeviceExtension)
 	{
 		HIDCLASS_DEVICE_EXTENSION* hid_common_extension = (HIDCLASS_DEVICE_EXTENSION*)(pContext->DeviceObject->DeviceExtension);
-		//UnitTest(hid_common_extension);
+		DumpReport(pContext->node->parsedReport);
 		STACK_TRACE_DEBUG_INFO("IsClientPdo: %x ", hid_common_extension->isClientPdo);
 		STACK_TRACE_DEBUG_INFO("hid_common_extension: %I64x \r\n", hid_common_extension);
 		GetDeviceName(DeviceObject, DeviceName);
@@ -377,7 +377,7 @@ NTSTATUS DispatchInternalDeviceControl(
 				continue;
 			}
 
-			UnitTest(class_extension);
+			//UnitTest(class_extension);
 
 			hijack = (HIJACK_CONTEXT*)ExAllocatePoolWithTag(NonPagedPool, sizeof(HIJACK_CONTEXT), 'kcaj');
 			if (!hijack)
