@@ -45,6 +45,15 @@
     <ClInclude Include="Urb.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="DumpReport.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="WinParse.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="hidtoken.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Driver.c">
@@ -66,6 +75,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Urb.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="WinParse.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

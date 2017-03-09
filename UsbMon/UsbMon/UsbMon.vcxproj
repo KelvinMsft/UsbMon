@@ -139,6 +139,9 @@
       <CallingConvention>FastCall</CallingConvention>
       <WarningLevel>TurnOffAllWarnings</WarningLevel>
     </ClCompile>
+    <Link>
+      <AdditionalDependencies>%(AdditionalDependencies);$(KernelBufferOverflowLib);$(DDK_LIB_PATH)ntoskrnl.lib;$(DDK_LIB_PATH)hal.lib;$(DDK_LIB_PATH)wmilib.lib;hidparse.lib</AdditionalDependencies>
+    </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <Inf Include="UsbMon.inf" />
@@ -147,6 +150,8 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="DumpReport.h" />
+    <ClInclude Include="hidtoken.h" />
     <ClInclude Include="IrpHook.h" />
     <ClInclude Include="TList.h" />
     <ClInclude Include="Urb.h" />
@@ -154,9 +159,11 @@
     <ClInclude Include="UsbType.h" />
     <ClInclude Include="UsbUtil.h" />
     <ClInclude Include="CommonUtil.h" />
+    <ClInclude Include="WinParse.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Driver.c" />
+    <ClCompile Include="WinParse.c" />
     <ClCompile Include="IrpHook.c" />
     <ClCompile Include="TList.c" />
     <ClCompile Include="Urb.c" />

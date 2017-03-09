@@ -8,8 +8,7 @@
 #include "usbbusif.h" 
 #include "Usbioctl.h"
 #include "TList.h"
-
-
+ 
 
 //--------------------------------------//
 typedef struct _HID_DEVICE_LIST

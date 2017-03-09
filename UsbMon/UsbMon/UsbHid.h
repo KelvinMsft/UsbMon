@@ -10,3 +10,7 @@ InitHidRelation(
 NTSTATUS 
 FreeHidRelation();
  
+
+VOID UnitTest(
+	HIDCLASS_DEVICE_EXTENSION* hid_common_extension
+);

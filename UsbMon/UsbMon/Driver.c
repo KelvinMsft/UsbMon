@@ -251,12 +251,24 @@ NTSTATUS  MyCompletionCallback(
 	STACK_TRACE_DEBUG_INFO("\r\n");
 
 	}
-	//DumpUrb(pContext->urb); 
+	//DumpUrb(pContext->urb); d
+ 
+	if (pContext)
+	{
+		if (pContext->DeviceObject)
+		{
+			if (pContext->DeviceObject->DeviceExtension)
+			{
+				HIDCLASS_DEVICE_EXTENSION* hid_common_extension = (HIDCLASS_DEVICE_EXTENSION*)(DeviceObject->DeviceExtension);
+				//	UnitTest(hid_common_extension);
+				STACK_TRACE_DEBUG_INFO("hid_common_extension: %I64x \r\n", hid_common_extension);
+				GetDeviceName(DeviceObject, DeviceName);
+				STACK_TRACE_DEBUG_INFO("Mouse/Keyboard DeviceName: %ws DriverName: %ws \r\n", DeviceObject->DriverObject->DriverName.Buffer, DeviceName);
 
-
-	GetDeviceName(DeviceObject, DeviceName);
-	STACK_TRACE_DEBUG_INFO("Mouse/Keyboard DeviceName: %ws DriverName: %ws \r\n", DeviceObject->DriverObject->DriverName.Buffer, DeviceName);
-
+			}
+		}
+	}
+  
 	//Free it 
 	if (pContext)
 	{
@@ -356,6 +368,21 @@ NTSTATUS DispatchInternalDeviceControl(
 		//If Urb pipe handle is used by HID mouse / kbd device. 
 		if (CheckIfPipeHandleExist(urb->UrbBulkOrInterruptTransfer.PipeHandle,&node))
 		{
+			HIDCLASS_DEVICE_EXTENSION* class_extension = NULL;
+		
+			if(!node)
+			{ 
+				continue;
+			}
+		
+			class_extension = (HIDCLASS_DEVICE_EXTENSION*)node->device_object->DeviceExtension;
+			 
+
+			if(!class_extension->isClientPdo)
+			{ 
+				continue;
+			}
+
 			hijack = (HIJACK_CONTEXT*)ExAllocatePoolWithTag(NonPagedPool, sizeof(HIJACK_CONTEXT), 'kcaj');
 			if (!hijack)
 			{
@@ -381,7 +408,7 @@ NTSTATUS DispatchInternalDeviceControl(
 			AddToChainListTail(g_pending_irp_header->head, new_entry);
 
 			//Fake Context for Completion Routine
-			hijack->DeviceObject = DeviceObject;
+			hijack->DeviceObject = node->device_object;
 			hijack->urb			 = urb;
 			hijack->node		 = node;
 			hijack->pending_irp  = new_entry;
