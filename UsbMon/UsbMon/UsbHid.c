@@ -179,7 +179,7 @@ HIDP_DEVICE_DESC* GetReport(HIDCLASS_DEVICE_EXTENSION* hid_common_extension)
 	STACK_TRACE_DEBUG_INFO("[rawReportDescription] %I64x rawReportDescriptionLength: %xh \r\n", fdoExt->rawReportDescription, fdoExt->rawReportDescriptionLength);
 
 	MyGetCollectionDescription(fdoExt->rawReportDescription, fdoExt->rawReportDescriptionLength, NonPagedPool, tmp);	 
-	///DumpReport(tmp);
+	DumpReport(tmp);
 	return tmp;
 }
 //----------------------------------------------------------------------------------------------------------//
@@ -226,6 +226,60 @@ VOID DumpReport(HIDP_DEVICE_DESC* report)
 		reportDesc++;
 	}
 }
+NTSTATUS ExtractDataFromChannel(PHIDP_COLLECTION_DESC collectionDesc, HIDP_REPORT_TYPE type, EXTRACTDATA* ExtractedData)
+{
+	HIDP_CHANNEL_DESC*            channel = NULL;
+	ULONG start = 0;
+	ULONG end = 0;
+	CHAR* reportType = NULL;
+	switch (type)
+	{
+	case HidP_Input:
+		channel = &collectionDesc->PreparsedData->Data[collectionDesc->PreparsedData->Input.Offset];
+		start = collectionDesc->PreparsedData->Input.Offset;
+		end = collectionDesc->PreparsedData->Input.Index;
+		reportType = "Input Report";
+		break;
+	case HidP_Output:
+		channel = &collectionDesc->PreparsedData->Data[collectionDesc->PreparsedData->Output.Offset];
+		start = collectionDesc->PreparsedData->Output.Offset;
+		end = collectionDesc->PreparsedData->Output.Index;
+		reportType = "Output Report";
+
+		break;
+	case HidP_Feature:
+		channel = &collectionDesc->PreparsedData->Data[collectionDesc->PreparsedData->Feature.Offset];
+		start = collectionDesc->PreparsedData->Feature.Offset;
+		end = collectionDesc->PreparsedData->Feature.Index;
+		reportType = "Feature Report";
+		break;
+	default:
+		break;
+	}
+
+	for (int k = start; k < end; k++)
+	{
+		if (channel->IsButton)
+		{
+			ExtractedData->OffsetButton = channel->ByteOffset - 1;
+		}
+		if (!channel->IsRange)
+		{
+			switch (channel->NotRange.Usage)
+			{
+				case 0x30:
+					ExtractedData->OffsetX = channel->ByteOffset - 1;
+				break;
+				case 0x31:
+					ExtractedData->OffsetY = channel->ByteOffset - 1;
+					break;
+				case 0x38:
+					ExtractedData->OffsetZ = channel->ByteOffset - 1;
+					break;
+			}
+		}
+	}
+}
 //----------------------------------------------------------------------------------------------------------//
 VOID DumpChannel(PHIDP_COLLECTION_DESC collectionDesc, HIDP_REPORT_TYPE type, ULONG Flags )
 {
@@ -270,7 +324,10 @@ VOID DumpChannel(PHIDP_COLLECTION_DESC collectionDesc, HIDP_REPORT_TYPE type, UL
 			STACK_TRACE_DEBUG_INFO("channel UsagePage: %x		OFFSET_FIELD: %x \r\n", channel->UsagePage, FIELD_OFFSET(HIDP_CHANNEL_DESC, UsagePage));
 			STACK_TRACE_DEBUG_INFO("channel ReportID: %d		OFFSET_FIELD: %x \r\n", channel->ReportID, FIELD_OFFSET(HIDP_CHANNEL_DESC, ReportID));
 			STACK_TRACE_DEBUG_INFO("channel ReportSize: %d		OFFSET_FIELD: %x \r\n", channel->ReportSize, FIELD_OFFSET(HIDP_CHANNEL_DESC, ReportSize));
-			STACK_TRACE_DEBUG_INFO("channel ReportCount: %d		OFFSET_FIELD: %x \r\n", channel->ReportCount, FIELD_OFFSET(HIDP_CHANNEL_DESC, ReportCount));
+			STACK_TRACE_DEBUG_INFO("channel ReportCount: %d		OFFSET_FIELD: %x \r\n", channel->ReportCount, FIELD_OFFSET(HIDP_CHANNEL_DESC, ReportCount)); 
+		}
+		if (Flags & CHANNEL_DUMP_REPORT_BYTE_OFFSET_REALTED)
+		{
 			STACK_TRACE_DEBUG_INFO("channel BitLength: %d		OFFSET_FIELD: %x \r\n", channel->BitLength, FIELD_OFFSET(HIDP_CHANNEL_DESC, BitLength));
 			STACK_TRACE_DEBUG_INFO("channel ByteEnd: %d			OFFSET_FIELD: %x \r\n", channel->ByteEnd, FIELD_OFFSET(HIDP_CHANNEL_DESC, ByteEnd));
 			STACK_TRACE_DEBUG_INFO("channel BitOffset: %d		OFFSET_FIELD: %x \r\n", channel->BitOffset, FIELD_OFFSET(HIDP_CHANNEL_DESC, BitOffset));
@@ -473,9 +530,9 @@ BOOLEAN  IsKeyboardOrMouseDevice(
 	}
 	 
 	if ( mini_extension->InterfaceDesc->Class == 3 &&			//HidClass Device
-		(mini_extension->InterfaceDesc->Protocol == 1 ||		//Keyboard
-		 mini_extension->InterfaceDesc->Protocol == 2 ||
-		 mini_extension->InterfaceDesc->Protocol == 0) )			//Mouse
+		(//mini_extension->InterfaceDesc->Protocol == 1 ||		//Keyboard
+		 mini_extension->InterfaceDesc->Protocol == 2 ||		//Mouse
+		 mini_extension->InterfaceDesc->Protocol == 0) )			
 	{ 
 		FDO_EXTENSION       *fdoExt = NULL;
 		PDO_EXTENSION       *pdoExt = NULL;

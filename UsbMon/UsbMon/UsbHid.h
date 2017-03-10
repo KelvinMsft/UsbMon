@@ -10,6 +10,13 @@ InitHidRelation(
 NTSTATUS 
 FreeHidRelation();
  
+NTSTATUS
+ExtractDataFromChannel(
+	PHIDP_COLLECTION_DESC collectionDesc,
+	HIDP_REPORT_TYPE type,
+	EXTRACTDATA* ExtractedData
+);
+ 
 VOID 
 DumpChannel(
 	PHIDP_COLLECTION_DESC collectionDesc, 
@@ -21,3 +28,5 @@ VOID
 DumpReport(
 	HIDP_DEVICE_DESC* report
 );
+
+
