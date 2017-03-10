@@ -126,6 +126,7 @@ HIDP_DEVICE_DESC* g_hid_collection = NULL;
 #define ARRAY_SIZE					  100
 #define HIDP_PREPARSED_DATA_SIGNATURE1 'PdiH'
 #define HIDP_PREPARSED_DATA_SIGNATURE2 'RDK '
+ 
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////// 
@@ -204,9 +205,9 @@ VOID DumpReport(HIDP_DEVICE_DESC* report)
 		STACK_TRACE_DEBUG_INFO("[Collection] Feature Offset: %x Index: %x \r\n", collectionDesc->PreparsedData->Feature.Offset, collectionDesc->PreparsedData->Feature.Index);
 
 
-		DumpChannel(collectionDesc, HidP_Input);
-		DumpChannel(collectionDesc, HidP_Output);
-		DumpChannel(collectionDesc, HidP_Feature);
+		DumpChannel(collectionDesc, HidP_Input, CHANNEL_DUMP_ALL);
+		DumpChannel(collectionDesc, HidP_Output, CHANNEL_DUMP_ALL);
+		DumpChannel(collectionDesc, HidP_Feature, CHANNEL_DUMP_ALL);
 
 		STACK_TRACE_DEBUG_INFO("+++++++++++++++++++++++++++++++++++++++++++++++++++++++\r\n");
 		collectionDesc++;
@@ -226,7 +227,7 @@ VOID DumpReport(HIDP_DEVICE_DESC* report)
 	}
 }
 //----------------------------------------------------------------------------------------------------------//
-VOID DumpChannel(PHIDP_COLLECTION_DESC collectionDesc, HIDP_REPORT_TYPE type)
+VOID DumpChannel(PHIDP_COLLECTION_DESC collectionDesc, HIDP_REPORT_TYPE type, ULONG Flags )
 {
 	if (!collectionDesc)
 	{
@@ -264,64 +265,104 @@ VOID DumpChannel(PHIDP_COLLECTION_DESC collectionDesc, HIDP_REPORT_TYPE type)
 	for (int k = start  ; k < end ; k++)
 	{
 		STACK_TRACE_DEBUG_INFO("+++++++++++++++++++++++ %s +++++++++++++++++++++\r\n" , reportType );
-		STACK_TRACE_DEBUG_INFO("channel UsagePage: %x		OFFSET_FIELD: %x \r\n", channel->UsagePage, FIELD_OFFSET(HIDP_CHANNEL_DESC, UsagePage));
-		STACK_TRACE_DEBUG_INFO("channel ReportID: %d		OFFSET_FIELD: %x \r\n", channel->ReportID, FIELD_OFFSET(HIDP_CHANNEL_DESC, ReportID));
-		STACK_TRACE_DEBUG_INFO("channel ReportSize: %d		OFFSET_FIELD: %x \r\n", channel->ReportSize, FIELD_OFFSET(HIDP_CHANNEL_DESC, ReportSize));
-		STACK_TRACE_DEBUG_INFO("channel ReportCount: %d		OFFSET_FIELD: %x \r\n", channel->ReportCount, FIELD_OFFSET(HIDP_CHANNEL_DESC, ReportCount));
-
-		STACK_TRACE_DEBUG_INFO("channel BitLength: %d		OFFSET_FIELD: %x \r\n", channel->BitLength, FIELD_OFFSET(HIDP_CHANNEL_DESC, BitLength));
-		STACK_TRACE_DEBUG_INFO("channel ByteEnd: %d			OFFSET_FIELD: %x \r\n", channel->ByteEnd,   FIELD_OFFSET(HIDP_CHANNEL_DESC, ByteEnd));
-		STACK_TRACE_DEBUG_INFO("channel BitOffset: %d		OFFSET_FIELD: %x \r\n", channel->BitOffset, FIELD_OFFSET(HIDP_CHANNEL_DESC, BitOffset));
-		STACK_TRACE_DEBUG_INFO("channel ByteOffset: %d		OFFSET_FIELD: %x \r\n", channel->ByteOffset, FIELD_OFFSET(HIDP_CHANNEL_DESC, ByteOffset));
-
-		STACK_TRACE_DEBUG_INFO("channel LinkCollection: %x  OFFSET_FIELD: %x \r\n", channel->LinkCollection, FIELD_OFFSET(HIDP_CHANNEL_DESC, LinkCollection));
-		STACK_TRACE_DEBUG_INFO("channel LinkUsage: %x		OFFSET_FIELD: %x \r\n", channel->LinkUsage, FIELD_OFFSET(HIDP_CHANNEL_DESC, LinkUsage));
-		STACK_TRACE_DEBUG_INFO("channel LinkUsagePage: %x	OFFSET_FIELD: %x \r\n", channel->LinkUsagePage, FIELD_OFFSET(HIDP_CHANNEL_DESC, LinkUsagePage));
-
-//		STACK_TRACE_DEBUG_INFO("channel IsRange: %x \r\n", channel->IsRange, FIELD_OFFSET(HIDP_CHANNEL_DESC, all));
-		STACK_TRACE_DEBUG_INFO("channel IsButton: %x   \r\n", channel->IsButton);
-		STACK_TRACE_DEBUG_INFO("channel IsAbsolute: %x \r\n", channel->IsAbsolute);
-		STACK_TRACE_DEBUG_INFO("channel IsConst: %x \r\n", channel->IsConst);
-		STACK_TRACE_DEBUG_INFO("channel IsAlias: %x \r\n", channel->IsAlias);
-		STACK_TRACE_DEBUG_INFO("channel IsDesignatorRange: %x \r\n", channel->IsDesignatorRange);
-		STACK_TRACE_DEBUG_INFO("channel IsStringRange: %x \r\n", channel->IsStringRange);
-
-
-		if (channel->IsRange)
+		if (Flags & CHANNEL_DUMP_REPORT_REALTED)
 		{
-			STACK_TRACE_DEBUG_INFO("channel Range.UsageMin:  %d		   OFFSET_FIELD: %X  \r\n", channel->Range.UsageMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.UsageMin));
-			STACK_TRACE_DEBUG_INFO("channel Range.UsageMax:  %d		   OFFSET_FIELD: %X  \r\n", channel->Range.UsageMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.UsageMax));
-			STACK_TRACE_DEBUG_INFO("channel Range.DataIndexMax:  %d	   OFFSET_FIELD: %X  \r\n", channel->Range.DataIndexMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.DataIndexMax));
-			STACK_TRACE_DEBUG_INFO("channel Range.DataIndexMin: %d	   OFFSET_FIELD: %X  \r\n", channel->Range.DataIndexMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.DataIndexMin));
-			
-		}else
-		{
-			STACK_TRACE_DEBUG_INFO("channel NotRange.Usage:  %x		     OFFSET_FIELD: %X  \r\n", channel->NotRange.Usage, FIELD_OFFSET(HIDP_CHANNEL_DESC, NotRange.Usage));
-			STACK_TRACE_DEBUG_INFO("channel NotRange.DataIndex:  %x		 OFFSET_FIELD: %X  \r\n", channel->NotRange.DataIndex, FIELD_OFFSET(HIDP_CHANNEL_DESC, NotRange.DataIndex));
-  		}
-		
-		if (channel->IsDesignatorRange)
-		{
-			STACK_TRACE_DEBUG_INFO("channel Range.DesignatorMax: %d OFFSET_FIELD: %X  \r\n", channel->Range.DesignatorMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.DesignatorMax));
-			STACK_TRACE_DEBUG_INFO("channel Range.DesignatorMin: %d OFFSET_FIELD: %X  \r\n", channel->Range.DesignatorMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.DesignatorMin));
+			STACK_TRACE_DEBUG_INFO("channel UsagePage: %x		OFFSET_FIELD: %x \r\n", channel->UsagePage, FIELD_OFFSET(HIDP_CHANNEL_DESC, UsagePage));
+			STACK_TRACE_DEBUG_INFO("channel ReportID: %d		OFFSET_FIELD: %x \r\n", channel->ReportID, FIELD_OFFSET(HIDP_CHANNEL_DESC, ReportID));
+			STACK_TRACE_DEBUG_INFO("channel ReportSize: %d		OFFSET_FIELD: %x \r\n", channel->ReportSize, FIELD_OFFSET(HIDP_CHANNEL_DESC, ReportSize));
+			STACK_TRACE_DEBUG_INFO("channel ReportCount: %d		OFFSET_FIELD: %x \r\n", channel->ReportCount, FIELD_OFFSET(HIDP_CHANNEL_DESC, ReportCount));
+			STACK_TRACE_DEBUG_INFO("channel BitLength: %d		OFFSET_FIELD: %x \r\n", channel->BitLength, FIELD_OFFSET(HIDP_CHANNEL_DESC, BitLength));
+			STACK_TRACE_DEBUG_INFO("channel ByteEnd: %d			OFFSET_FIELD: %x \r\n", channel->ByteEnd, FIELD_OFFSET(HIDP_CHANNEL_DESC, ByteEnd));
+			STACK_TRACE_DEBUG_INFO("channel BitOffset: %d		OFFSET_FIELD: %x \r\n", channel->BitOffset, FIELD_OFFSET(HIDP_CHANNEL_DESC, BitOffset));
+			STACK_TRACE_DEBUG_INFO("channel ByteOffset: %d		OFFSET_FIELD: %x \r\n", channel->ByteOffset, FIELD_OFFSET(HIDP_CHANNEL_DESC, ByteOffset));
 		}
-		else
+		if (Flags & CHANNEL_DUMP_LINK_COL_RELATED)
 		{
-			STACK_TRACE_DEBUG_INFO("channel Range.DesignatorMax: %d OFFSET_FIELD: %X  \r\n", channel->NotRange.DesignatorIndex, FIELD_OFFSET(HIDP_CHANNEL_DESC, NotRange.DesignatorIndex));
+			STACK_TRACE_DEBUG_INFO("channel LinkCollection: %x  OFFSET_FIELD: %x \r\n", channel->LinkCollection, FIELD_OFFSET(HIDP_CHANNEL_DESC, LinkCollection));
+			STACK_TRACE_DEBUG_INFO("channel LinkUsage: %x		OFFSET_FIELD: %x \r\n", channel->LinkUsage, FIELD_OFFSET(HIDP_CHANNEL_DESC, LinkUsage));
+			STACK_TRACE_DEBUG_INFO("channel LinkUsagePage: %x	OFFSET_FIELD: %x \r\n", channel->LinkUsagePage, FIELD_OFFSET(HIDP_CHANNEL_DESC, LinkUsagePage));
 		}
 
-		if (channel->IsStringRange)
+ 		if (Flags & CHANNEL_DUMP_ATTRIBUTE_RELATED)
 		{
-			STACK_TRACE_DEBUG_INFO("channel Range.StringMax: %d	   OFFSET_FIELD: %X  \r\n", channel->Range.StringMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.StringMax));
-			STACK_TRACE_DEBUG_INFO("channel Range.StringMin: %d	   OFFSET_FIELD: %X  \r\n", channel->Range.StringMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.StringMin));
+			STACK_TRACE_DEBUG_INFO("channel IsButton: %x   \r\n", channel->IsButton);
+			STACK_TRACE_DEBUG_INFO("channel IsAbsolute: %x \r\n", channel->IsAbsolute);
+			STACK_TRACE_DEBUG_INFO("channel IsConst: %x \r\n", channel->IsConst);
+			STACK_TRACE_DEBUG_INFO("channel IsAlias: %x \r\n", channel->IsAlias);
+			STACK_TRACE_DEBUG_INFO("channel IsDesignatorRange: %x \r\n", channel->IsDesignatorRange);
+			STACK_TRACE_DEBUG_INFO("channel IsStringRange: %x \r\n", channel->IsStringRange);
+
+
+			if (!channel->IsButton)
+			{
+				STACK_TRACE_DEBUG_INFO("channel Data.LogicalMin: %d	 OFFSET_FIELD: %X \r\n", channel->Data.HasNull, FIELD_OFFSET(HIDP_CHANNEL_DESC, Data.HasNull));
+				STACK_TRACE_DEBUG_INFO("channel Data.LogicalMin: %d	 OFFSET_FIELD: %X \r\n", channel->Data.LogicalMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Data.LogicalMin));
+				STACK_TRACE_DEBUG_INFO("channel Data.LogicalMax: %d	 OFFSET_FIELD: %X \r\n", channel->Data.LogicalMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Data.LogicalMax));
+				STACK_TRACE_DEBUG_INFO("channel Data.PhysicalMax: %d OFFSET_FIELD: %X  \r\n", channel->Data.PhysicalMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Data.PhysicalMin));
+				STACK_TRACE_DEBUG_INFO("channel Data.PhysicalMax: %d OFFSET_FIELD: %X  \r\n", channel->Data.PhysicalMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Data.PhysicalMax));
+			}
+			if (channel->IsButton)
+			{
+				STACK_TRACE_DEBUG_INFO("channel button.LogicalMin %d OFFSET_FIELD: %X  \r\n", channel->button.LogicalMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, button.LogicalMin));
+				STACK_TRACE_DEBUG_INFO("channel button.LogicalMax %d OFFSET_FIELD: %X  \r\n", channel->button.LogicalMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, button.LogicalMax));
+			}
+
+			if (channel->MoreChannels) {
+				STACK_TRACE_DEBUG_INFO("MoreChannels ");
+			}
+			if (channel->IsConst) {
+				STACK_TRACE_DEBUG_INFO("Const ");
+			}
+			if (channel->IsButton) {
+				STACK_TRACE_DEBUG_INFO("Button ");
+			}
+			else {
+				STACK_TRACE_DEBUG_INFO("Value ");
+			}
+			if (channel->IsAbsolute) {
+				STACK_TRACE_DEBUG_INFO("Absolute ");
+			}
+			if (channel->IsAlias) {
+				STACK_TRACE_DEBUG_INFO("ALIAS! ");
+			}
 		}
-		else
+		if (Flags & CHANNEL_DUMP_RANGE_RELATED)
 		{
-			STACK_TRACE_DEBUG_INFO("channel NotRange.StringIndex:  %d	 OFFSET_FIELD: %X  \r\n", channel->NotRange.StringIndex, FIELD_OFFSET(HIDP_CHANNEL_DESC, NotRange.StringIndex)); 
+			if (channel->IsRange)
+			{
+				STACK_TRACE_DEBUG_INFO("channel Range.UsageMin:  %d		   OFFSET_FIELD: %X  \r\n", channel->Range.UsageMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.UsageMin));
+				STACK_TRACE_DEBUG_INFO("channel Range.UsageMax:  %d		   OFFSET_FIELD: %X  \r\n", channel->Range.UsageMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.UsageMax));
+				STACK_TRACE_DEBUG_INFO("channel Range.DataIndexMax:  %d	   OFFSET_FIELD: %X  \r\n", channel->Range.DataIndexMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.DataIndexMax));
+				STACK_TRACE_DEBUG_INFO("channel Range.DataIndexMin: %d	   OFFSET_FIELD: %X  \r\n", channel->Range.DataIndexMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.DataIndexMin));
+
+			}
+			else
+			{
+				STACK_TRACE_DEBUG_INFO("channel NotRange.Usage:  %x		     OFFSET_FIELD: %X  \r\n", channel->NotRange.Usage, FIELD_OFFSET(HIDP_CHANNEL_DESC, NotRange.Usage));
+				STACK_TRACE_DEBUG_INFO("channel NotRange.DataIndex:  %x		 OFFSET_FIELD: %X  \r\n", channel->NotRange.DataIndex, FIELD_OFFSET(HIDP_CHANNEL_DESC, NotRange.DataIndex));
+			}
+
+			if (channel->IsDesignatorRange)
+			{
+				STACK_TRACE_DEBUG_INFO("channel Range.DesignatorMax: %d OFFSET_FIELD: %X  \r\n", channel->Range.DesignatorMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.DesignatorMax));
+				STACK_TRACE_DEBUG_INFO("channel Range.DesignatorMin: %d OFFSET_FIELD: %X  \r\n", channel->Range.DesignatorMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.DesignatorMin));
+			}
+			else
+			{
+				STACK_TRACE_DEBUG_INFO("channel Range.DesignatorMax: %d OFFSET_FIELD: %X  \r\n", channel->NotRange.DesignatorIndex, FIELD_OFFSET(HIDP_CHANNEL_DESC, NotRange.DesignatorIndex));
+			}
+
+			if (channel->IsStringRange)
+			{
+				STACK_TRACE_DEBUG_INFO("channel Range.StringMax: %d	   OFFSET_FIELD: %X  \r\n", channel->Range.StringMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.StringMax));
+				STACK_TRACE_DEBUG_INFO("channel Range.StringMin: %d	   OFFSET_FIELD: %X  \r\n", channel->Range.StringMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.StringMin));
+			}
+			else
+			{
+				STACK_TRACE_DEBUG_INFO("channel NotRange.StringIndex:  %d	 OFFSET_FIELD: %X  \r\n", channel->NotRange.StringIndex, FIELD_OFFSET(HIDP_CHANNEL_DESC, NotRange.StringIndex));
+			}
 		}
-
-		//STACK_TRACE_DEBUG_INFO("channel NumberOfUnknown:  %d	 OFFSET_FIELD: %X  \r\n", channel->NumGlobalUnknowns, FIELD_OFFSET(HIDP_CHANNEL_DESC, all));
-
+	 
 		if (channel->NumGlobalUnknowns)
 		{
 			for (int z = 0; z < channel->NumGlobalUnknowns; z++)
@@ -329,39 +370,7 @@ VOID DumpChannel(PHIDP_COLLECTION_DESC collectionDesc, HIDP_REPORT_TYPE type)
 				STACK_TRACE_DEBUG_INFO("channel UnknownsToken:  %d	 OFFSET_FIELD: %X  \r\n", channel->GlobalUnknowns[z].Token, FIELD_OFFSET(HIDP_CHANNEL_DESC, GlobalUnknowns));
 			}
 		}
-
-		if (!channel->IsButton)
-		{
-			STACK_TRACE_DEBUG_INFO("channel Data.LogicalMin: %d	 OFFSET_FIELD: %X \r\n", channel->Data.HasNull, FIELD_OFFSET(HIDP_CHANNEL_DESC, Data.HasNull));
-			STACK_TRACE_DEBUG_INFO("channel Data.LogicalMin: %d	 OFFSET_FIELD: %X \r\n", channel->Data.LogicalMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Data.LogicalMin));
-			STACK_TRACE_DEBUG_INFO("channel Data.LogicalMax: %d	 OFFSET_FIELD: %X \r\n", channel->Data.LogicalMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Data.LogicalMax));
-			STACK_TRACE_DEBUG_INFO("channel Data.PhysicalMax: %d OFFSET_FIELD: %X  \r\n", channel->Data.PhysicalMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Data.PhysicalMin));
-			STACK_TRACE_DEBUG_INFO("channel Data.PhysicalMax: %d OFFSET_FIELD: %X  \r\n", channel->Data.PhysicalMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Data.PhysicalMax));
-		}
-		if (channel->IsButton)
-		{
-			STACK_TRACE_DEBUG_INFO("channel button.LogicalMin %d OFFSET_FIELD: %X  \r\n", channel->button.LogicalMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, button.LogicalMin));
-			STACK_TRACE_DEBUG_INFO("channel button.LogicalMax %d OFFSET_FIELD: %X  \r\n", channel->button.LogicalMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, button.LogicalMax));
-		}
-
-		if (channel->MoreChannels) {
-			STACK_TRACE_DEBUG_INFO("MoreChannels ");
-		}
-		if (channel->IsConst) {
-			STACK_TRACE_DEBUG_INFO("Const ");
-		}
-		if (channel->IsButton) {
-			STACK_TRACE_DEBUG_INFO("Button ");
-		}
-		else {
-			STACK_TRACE_DEBUG_INFO("Value ");
-		}
-		if (channel->IsAbsolute) {
-			STACK_TRACE_DEBUG_INFO("Absolute ");
-		}
-		if (channel->IsAlias) {
-			STACK_TRACE_DEBUG_INFO("ALIAS! ");
-		}
+		 
 		STACK_TRACE_DEBUG_INFO("\r\n"); 
 		channel++; 
 	}

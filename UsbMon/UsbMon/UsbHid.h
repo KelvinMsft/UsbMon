@@ -13,7 +13,8 @@ FreeHidRelation();
 VOID 
 DumpChannel(
 	PHIDP_COLLECTION_DESC collectionDesc, 
-	HIDP_REPORT_TYPE type
+	HIDP_REPORT_TYPE type,
+	ULONG Flags
 );
 
 VOID 
