@@ -37,19 +37,19 @@ extern NTSTATUS ObReferenceObjectByName(
 VOID PrintAllHidDriverName()
 {
 	WCHAR* Usbhub = GetUsbHubDriverNameByVersion(USB);
-	STACK_TRACE_DEBUG_INFO("Usb Hub: %ws \r\n", Usbhub);
+	USB_MON_DEBUG_INFO("Usb Hub: %ws \r\n", Usbhub);
 
 	WCHAR* Usbhub2 = GetUsbHubDriverNameByVersion(USB2);
-	STACK_TRACE_DEBUG_INFO("Usb Hub2: %ws \r\n", Usbhub2);
+	USB_MON_DEBUG_INFO("Usb Hub2: %ws \r\n", Usbhub2);
 
 	WCHAR* Usbhub3 = GetUsbHubDriverNameByVersion(USB3);
-	STACK_TRACE_DEBUG_INFO("Usb Hub3: %ws \r\n", Usbhub3);
+	USB_MON_DEBUG_INFO("Usb Hub3: %ws \r\n", Usbhub3);
 
 	WCHAR* Usbhub_new = GetUsbHubDriverNameByVersion(USB3_NEW);
-	STACK_TRACE_DEBUG_INFO("Usb Hub3_w8 above: %ws \r\n", Usbhub_new);
+	USB_MON_DEBUG_INFO("Usb Hub3_w8 above: %ws \r\n", Usbhub_new);
 
 	WCHAR* Usb_ccgp = GetUsbHubDriverNameByVersion(USB_COMPOSITE);
-	STACK_TRACE_DEBUG_INFO("Usb CCGP: %ws \r\n", Usb_ccgp);
+	USB_MON_DEBUG_INFO("Usb CCGP: %ws \r\n", Usb_ccgp);
 
 }
 
@@ -112,55 +112,55 @@ void DumpHidExtension(
 )
 {
 	ULONG i = 0; 
-	STACK_TRACE_DEBUG_INFO("-----------------------------------------------------------------------------\r\n");
+	USB_MON_DEBUG_INFO("-----------------------------------------------------------------------------\r\n");
 
-	STACK_TRACE_DEBUG_INFO(" --->PhysicalDeviceObject: %I64X \r\n", hid_common_extension->PhysicalDeviceObject);
-	STACK_TRACE_DEBUG_INFO(" --->DriverObject: %I64X \r\n", hid_common_extension->PhysicalDeviceObject->DriverObject);
-	STACK_TRACE_DEBUG_INFO(" --->NextDeviceObject: %I64X \r\n", hid_common_extension->NextDeviceObject);
+	USB_MON_DEBUG_INFO(" --->PhysicalDeviceObject: %I64X \r\n", hid_common_extension->PhysicalDeviceObject);
+	USB_MON_DEBUG_INFO(" --->DriverObject: %I64X \r\n", hid_common_extension->PhysicalDeviceObject->DriverObject);
+	USB_MON_DEBUG_INFO(" --->NextDeviceObject: %I64X \r\n", hid_common_extension->NextDeviceObject);
 
-	STACK_TRACE_DEBUG_INFO("  --->Status: %I64X \r\n", mini_extension->status);
-	STACK_TRACE_DEBUG_INFO("  --->DeviceDesc: %I64X \r\n", mini_extension->DeviceDesc);
-	STACK_TRACE_DEBUG_INFO("		--->bDeviceClass: %I64X \r\n", mini_extension->DeviceDesc->bDeviceClass);
-	STACK_TRACE_DEBUG_INFO("		--->bDeviceSubClass: %I64X \r\n", mini_extension->DeviceDesc->bDeviceSubClass);
-	STACK_TRACE_DEBUG_INFO("		--->bDeviceProtocol: %I64X \r\n", mini_extension->DeviceDesc->bDeviceProtocol);
-	STACK_TRACE_DEBUG_INFO("		--->bDescriptorType: %I64X \r\n", mini_extension->DeviceDesc->bDescriptorType);
-	STACK_TRACE_DEBUG_INFO("		--->bLength: %I64X \r\n", mini_extension->DeviceDesc->bLength);
-	STACK_TRACE_DEBUG_INFO("		--->bMaxPacketSize0: %I64X \r\n", mini_extension->DeviceDesc->bMaxPacketSize0);
-	STACK_TRACE_DEBUG_INFO("		--->bcdUSB: %I64X \r\n", mini_extension->DeviceDesc->bcdUSB);
-	STACK_TRACE_DEBUG_INFO("		--->idProduct: %I64X \r\n", mini_extension->DeviceDesc->idProduct);
-	STACK_TRACE_DEBUG_INFO("		--->idVendor: %I64X \r\n", mini_extension->DeviceDesc->idVendor);
-	STACK_TRACE_DEBUG_INFO("  --->InterfaceDescDesc: %I64X \r\n", mini_extension->InterfaceDesc);
-	STACK_TRACE_DEBUG_INFO("		--->Class: %I64X \r\n", mini_extension->InterfaceDesc->Class);
-	STACK_TRACE_DEBUG_INFO("		--->SubClass: %I64X \r\n", mini_extension->InterfaceDesc->SubClass);
-	STACK_TRACE_DEBUG_INFO("		--->Protocol: %I64X \r\n", mini_extension->InterfaceDesc->Protocol);
-	STACK_TRACE_DEBUG_INFO("		--->NumOfPipes: %I64X \r\n", mini_extension->InterfaceDesc->NumberOfPipes);
-	STACK_TRACE_DEBUG_INFO("		--->Length: %I64X \r\n", mini_extension->InterfaceDesc->Length);
-	STACK_TRACE_DEBUG_INFO("		--->AlternateSetting: %I64X \r\n\r\n", mini_extension->InterfaceDesc->AlternateSetting);
+	USB_MON_DEBUG_INFO("  --->Status: %I64X \r\n", mini_extension->status);
+	USB_MON_DEBUG_INFO("  --->DeviceDesc: %I64X \r\n", mini_extension->DeviceDesc);
+	USB_MON_DEBUG_INFO("		--->bDeviceClass: %I64X \r\n", mini_extension->DeviceDesc->bDeviceClass);
+	USB_MON_DEBUG_INFO("		--->bDeviceSubClass: %I64X \r\n", mini_extension->DeviceDesc->bDeviceSubClass);
+	USB_MON_DEBUG_INFO("		--->bDeviceProtocol: %I64X \r\n", mini_extension->DeviceDesc->bDeviceProtocol);
+	USB_MON_DEBUG_INFO("		--->bDescriptorType: %I64X \r\n", mini_extension->DeviceDesc->bDescriptorType);
+	USB_MON_DEBUG_INFO("		--->bLength: %I64X \r\n", mini_extension->DeviceDesc->bLength);
+	USB_MON_DEBUG_INFO("		--->bMaxPacketSize0: %I64X \r\n", mini_extension->DeviceDesc->bMaxPacketSize0);
+	USB_MON_DEBUG_INFO("		--->bcdUSB: %I64X \r\n", mini_extension->DeviceDesc->bcdUSB);
+	USB_MON_DEBUG_INFO("		--->idProduct: %I64X \r\n", mini_extension->DeviceDesc->idProduct);
+	USB_MON_DEBUG_INFO("		--->idVendor: %I64X \r\n", mini_extension->DeviceDesc->idVendor);
+	USB_MON_DEBUG_INFO("  --->InterfaceDescDesc: %I64X \r\n", mini_extension->InterfaceDesc);
+	USB_MON_DEBUG_INFO("		--->Class: %I64X \r\n", mini_extension->InterfaceDesc->Class);
+	USB_MON_DEBUG_INFO("		--->SubClass: %I64X \r\n", mini_extension->InterfaceDesc->SubClass);
+	USB_MON_DEBUG_INFO("		--->Protocol: %I64X \r\n", mini_extension->InterfaceDesc->Protocol);
+	USB_MON_DEBUG_INFO("		--->NumOfPipes: %I64X \r\n", mini_extension->InterfaceDesc->NumberOfPipes);
+	USB_MON_DEBUG_INFO("		--->Length: %I64X \r\n", mini_extension->InterfaceDesc->Length);
+	USB_MON_DEBUG_INFO("		--->AlternateSetting: %I64X \r\n\r\n", mini_extension->InterfaceDesc->AlternateSetting);
 
  	for (i = 0; i < mini_extension->InterfaceDesc->NumberOfPipes; i++)
 	{
 		USBD_PIPE_INFORMATION* Pipe_Information = &mini_extension->InterfaceDesc->Pipes[i];
-		STACK_TRACE_DEBUG_INFO("  --->Pipe id: %x Information: %I64X \r\n",i, Pipe_Information);
-		STACK_TRACE_DEBUG_INFO("		--->PipeHandle: %I64X \r\n", Pipe_Information->PipeHandle); 
-		STACK_TRACE_DEBUG_INFO("		--->PipeAddress: %I64X \r\n", Pipe_Information->EndpointAddress); 
-		STACK_TRACE_DEBUG_INFO("		--->PipeInterval: %I64X \r\n", Pipe_Information->Interval);
-		STACK_TRACE_DEBUG_INFO("		--->PipeInterval: %I64X \r\n", Pipe_Information->MaximumPacketSize);
-		STACK_TRACE_DEBUG_INFO("		--->PipeInterval: %I64X \r\n", Pipe_Information->MaximumTransferSize);
+		USB_MON_DEBUG_INFO("  --->Pipe id: %x Information: %I64X \r\n",i, Pipe_Information);
+		USB_MON_DEBUG_INFO("		--->PipeHandle: %I64X \r\n", Pipe_Information->PipeHandle); 
+		USB_MON_DEBUG_INFO("		--->PipeAddress: %I64X \r\n", Pipe_Information->EndpointAddress); 
+		USB_MON_DEBUG_INFO("		--->PipeInterval: %I64X \r\n", Pipe_Information->Interval);
+		USB_MON_DEBUG_INFO("		--->PipeInterval: %I64X \r\n", Pipe_Information->MaximumPacketSize);
+		USB_MON_DEBUG_INFO("		--->PipeInterval: %I64X \r\n", Pipe_Information->MaximumTransferSize);
 	}
 
 
 	HID_DESCRIPTOR* hid_desc = &(mini_extension)->HidDescriptor; 
 	 
-	STACK_TRACE_DEBUG_INFO("  --->HidDescriptor: %IX \r\n", &hid_desc);
-	STACK_TRACE_DEBUG_INFO("		--->bcdHID: %X \r\n", hid_desc->bcdHID);
-	STACK_TRACE_DEBUG_INFO("		--->bCountry: %X \r\n", hid_desc->bCountry);
-	STACK_TRACE_DEBUG_INFO("		--->bDescriptorType: %X \r\n", hid_desc->bDescriptorType);
-	STACK_TRACE_DEBUG_INFO("		--->bLength: %X \r\n", hid_desc->bLength);
-	STACK_TRACE_DEBUG_INFO("		--->bNumDescriptors: %X \r\n", hid_desc->bNumDescriptors);
-	STACK_TRACE_DEBUG_INFO("		--->bReportType: %X \r\n", hid_desc->DescriptorList->bReportType);
-	STACK_TRACE_DEBUG_INFO("		--->wReportLength: %X \r\n", hid_desc->DescriptorList->wReportLength);
+	USB_MON_DEBUG_INFO("  --->HidDescriptor: %IX \r\n", &hid_desc);
+	USB_MON_DEBUG_INFO("		--->bcdHID: %X \r\n", hid_desc->bcdHID);
+	USB_MON_DEBUG_INFO("		--->bCountry: %X \r\n", hid_desc->bCountry);
+	USB_MON_DEBUG_INFO("		--->bDescriptorType: %X \r\n", hid_desc->bDescriptorType);
+	USB_MON_DEBUG_INFO("		--->bLength: %X \r\n", hid_desc->bLength);
+	USB_MON_DEBUG_INFO("		--->bNumDescriptors: %X \r\n", hid_desc->bNumDescriptors);
+	USB_MON_DEBUG_INFO("		--->bReportType: %X \r\n", hid_desc->DescriptorList->bReportType);
+	USB_MON_DEBUG_INFO("		--->wReportLength: %X \r\n", hid_desc->DescriptorList->wReportLength);
 
-	STACK_TRACE_DEBUG_INFO("-----------------------------------------------------------------------------\r\n");
+	USB_MON_DEBUG_INFO("-----------------------------------------------------------------------------\r\n");
 
 }
 
@@ -188,13 +188,13 @@ VOID DumpUrb(
 {
 	struct _URB_HEADER urb_header = urb->UrbHeader;;
 
-	STACK_TRACE_DEBUG_INFO("---------------URB HEADER------------- \r\n");
-	STACK_TRACE_DEBUG_INFO("- Length: %x \r\n", urb_header.Length);
-	STACK_TRACE_DEBUG_INFO("- Function: %x \r\n", urb_header.Function);
-	STACK_TRACE_DEBUG_INFO("- Status: %x \r\n", urb_header.Status);
-	STACK_TRACE_DEBUG_INFO("- UsbdDeviceHandle: %x \r\n", urb_header.UsbdDeviceHandle);
-	STACK_TRACE_DEBUG_INFO("- UsbdFlags: %x \r\n", urb_header.UsbdFlags);
-	STACK_TRACE_DEBUG_INFO("---------------URB Function------------- \r\n");
+	USB_MON_DEBUG_INFO("---------------URB HEADER------------- \r\n");
+	USB_MON_DEBUG_INFO("- Length: %x \r\n", urb_header.Length);
+	USB_MON_DEBUG_INFO("- Function: %x \r\n", urb_header.Function);
+	USB_MON_DEBUG_INFO("- Status: %x \r\n", urb_header.Status);
+	USB_MON_DEBUG_INFO("- UsbdDeviceHandle: %x \r\n", urb_header.UsbdDeviceHandle);
+	USB_MON_DEBUG_INFO("- UsbdFlags: %x \r\n", urb_header.UsbdFlags);
+	USB_MON_DEBUG_INFO("---------------URB Function------------- \r\n");
 
 	switch (urb_header.Function)
 	{
@@ -230,19 +230,19 @@ VOID DumpUrb(
 	{
 		//			struct _URB_BULK_OR_INTERRUPT_TRANSFER* data  = (struct _URB_BULK_OR_INTERRUPT_TRANSFER*) &urb->UrbHeader;
 
-		//			STACK_TRACE_COMMON_DBG_BREAK("_URB_BULK_OR_INTERRUPT_TRANSFER \r\n"); 
+		//			USB_MON_COMMON_DBG_BREAK("_URB_BULK_OR_INTERRUPT_TRANSFER \r\n"); 
 		/*			if (data->TransferFlags & USBD_TRANSFER_DIRECTION_IN)
 		{
-		STACK_TRACE_COMMON_DBG_BREAK("USBD_TRANSFER_DIRECTION_IN \r\n");
+		USB_MON_COMMON_DBG_BREAK("USBD_TRANSFER_DIRECTION_IN \r\n");
 		}
 		if (data->TransferFlags & USBD_TRANSFER_DIRECTION_OUT)
 		{
-		STACK_TRACE_COMMON_DBG_BREAK("USBD_TRANSFER_DIRECTION_OUT \r\n");
+		USB_MON_COMMON_DBG_BREAK("USBD_TRANSFER_DIRECTION_OUT \r\n");
 
 		}
 		if (data->TransferFlags & USBD_SHORT_TRANSFER_OK)
 		{
-		STACK_TRACE_COMMON_DBG_BREAK("USBD_SHORT_TRANSFER_OK \r\n");
+		USB_MON_COMMON_DBG_BREAK("USBD_SHORT_TRANSFER_OK \r\n");
 		}*/
 
 	}

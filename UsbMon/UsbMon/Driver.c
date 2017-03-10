@@ -82,7 +82,7 @@ NTSTATUS InitPendingIrpLinkedList()
 
 	if (g_pending_irp_header)
 	{
-		//STACK_TRACE_DEBUG_INFO("Allocation Error \r\n");
+		//USB_MON_DEBUG_INFO("Allocation Error \r\n");
 		RtlZeroMemory(g_pending_irp_header, sizeof(PENDINGIRPLIST));
 		g_pending_irp_header->head = NewChainListHeaderEx(LISTFLAG_SPINLOCK | LISTFLAG_AUTOFREE, NULL, 0);
 	}
@@ -122,7 +122,7 @@ ULONG RemovePendingIrpCallback(
 	{ 
 		InterlockedExchange64(&pending_irp->IrpStack->Context, pending_irp->oldContext);
 		InterlockedExchange64(&pending_irp->IrpStack->CompletionRoutine, pending_irp->oldRoutine);
-		STACK_TRACE_DEBUG_INFO("RemovePendingIrpCallback Once %I64x \r\n", pending_irp_node);
+		USB_MON_DEBUG_INFO("RemovePendingIrpCallback Once %I64x \r\n", pending_irp_node);
 	} 
 	return CLIST_FINDCB_CTN;
 }
@@ -197,13 +197,13 @@ NTSTATUS  MyCompletionCallback(
 
 	if (!pContext)
 	{
-		STACK_TRACE_DEBUG_INFO("EmptyContext");
+		USB_MON_DEBUG_INFO("EmptyContext");
 		return STATUS_UNSUCCESSFUL;
 	}
 
 	if (!pContext->pending_irp)
 	{
-		STACK_TRACE_DEBUG_INFO("Empty pending_irp"); 
+		USB_MON_DEBUG_INFO("Empty pending_irp"); 
 		return STATUS_UNSUCCESSFUL;
 	}
 
@@ -221,7 +221,7 @@ NTSTATUS  MyCompletionCallback(
 		PENDINGIRP* entry = GetRealPendingIrpByIrp(Irp);
 		context			  = entry->oldContext;
 		callback		  = entry->oldRoutine; 		
-		STACK_TRACE_DEBUG_INFO("Safety Call old Routine: %I64x Context: %I64x\r\n", callback, context); 
+		USB_MON_DEBUG_INFO("Safety Call old Routine: %I64x Context: %I64x\r\n", callback, context); 
 	}
 
 	//Rarely call here when driver unloading, Safely call because driver_unload 
@@ -235,32 +235,88 @@ NTSTATUS  MyCompletionCallback(
 	//If Driver is not unloading , delete it 
 	if (!DelFromChainListByPointer(g_pending_irp_header->head, pContext->pending_irp))
 	{
-		STACK_TRACE_DEBUG_INFO("FATAL: Delete element FAILED \r\n");
+		USB_MON_DEBUG_INFO("FATAL: Delete element FAILED \r\n");
 	}
 
-	STACK_TRACE_DEBUG_INFO("Class: %x Protocol: %x \r\n" , pContext->node->mini_extension->InterfaceDesc->Class, pContext->node->mini_extension->InterfaceDesc->Protocol);
+	USB_MON_DEBUG_INFO("Class: %x Protocol: %x \r\n" , pContext->node->mini_extension->InterfaceDesc->Class, pContext->node->mini_extension->InterfaceDesc->Protocol);
+	
+	HIDP_REPORT_TYPE reportType = 0;
 	if (pContext->urb->UrbBulkOrInterruptTransfer.TransferFlags & (USBD_TRANSFER_DIRECTION_IN | USBD_SHORT_TRANSFER_OK))
 	{
-		STACK_TRACE_DEBUG_INFO("Data: ");
+		reportType = HidP_Input;
+		USB_MON_DEBUG_INFO("Input Data: ");
 		PUCHAR ptr = (PUCHAR)pContext->urb->UrbBulkOrInterruptTransfer.TransferBuffer;
 		for (int i = 0; i < pContext->urb->UrbBulkOrInterruptTransfer.TransferBufferLength; i++)
 		{
-			STACK_TRACE_DEBUG_INFO("%x ", *ptr++);
+			USB_MON_DEBUG_INFO("%x ", *ptr++);
 
-		} 
-	STACK_TRACE_DEBUG_INFO("\r\n");
-
+		}
+		USB_MON_DEBUG_INFO("\r\n"); 
 	}
-	//DumpUrb(pContext->urb); d 
+	else if (pContext->urb->UrbBulkOrInterruptTransfer.TransferFlags & USBD_TRANSFER_DIRECTION_OUT)
+	{
+		USB_MON_DEBUG_INFO("Output Data: "); 
+		USB_MON_DEBUG_INFO("\r\n");
+		reportType = HidP_Output;
+	}
+  
 	if (DeviceObject->DeviceExtension)
 	{
 		HIDCLASS_DEVICE_EXTENSION* hid_common_extension = (HIDCLASS_DEVICE_EXTENSION*)(pContext->DeviceObject->DeviceExtension);
-		DumpReport(pContext->node->parsedReport);
-		STACK_TRACE_DEBUG_INFO("IsClientPdo: %x ", hid_common_extension->isClientPdo);
-		STACK_TRACE_DEBUG_INFO("hid_common_extension: %I64x \r\n", hid_common_extension);
+		PDO_EXTENSION* pdoExt = &hid_common_extension->pdoExt;
+
+		//DumpReport(pContext->node->parsedReport);
+		USB_MON_DEBUG_INFO("IsClientPdo: %x \r\n", hid_common_extension->isClientPdo);
+		USB_MON_DEBUG_INFO("collectionIndex: %x collectionNum: %x \r\n", pdoExt->collectionIndex, pdoExt->collectionNum);
+		USB_MON_DEBUG_INFO("CollectionDescLength: %x \r\n", pContext->node->parsedReport->CollectionDescLength);
+
+	 	EXTRACTDATA data = { 0 };
+		  
+		ExtractDataFromChannel(&pContext->node->parsedReport->CollectionDesc[pdoExt->collectionIndex - 1], reportType,&data);
+		
+		USB_MON_DEBUG_INFO("OffsetX: %X \r\n", data.MOUDATA.OffsetX);
+		USB_MON_DEBUG_INFO("OffsetY: %X \r\n", data.MOUDATA.OffsetY);
+		USB_MON_DEBUG_INFO("OffsetZ: %X \r\n", data.MOUDATA.OffsetZ);
+		USB_MON_DEBUG_INFO("OffsetButton: %X \r\n", data.MOUDATA.OffsetButton);
+
+		USB_MON_DEBUG_INFO("XOffsetSize: %X \r\n", data.MOUDATA.XOffsetSize);
+		USB_MON_DEBUG_INFO("YOffsetSize: %X \r\n", data.MOUDATA.YOffsetSize);
+		USB_MON_DEBUG_INFO("ZOffsetSize: %X \r\n", data.MOUDATA.ZOffsetSize);
+		USB_MON_DEBUG_INFO("BtnOffsetSize: %X \r\n", data.MOUDATA.BtnOffsetSize);
+
+		char* x		= ExAllocatePool(NonPagedPool, data.MOUDATA.XOffsetSize); 
+		char* y		= ExAllocatePool(NonPagedPool, data.MOUDATA.YOffsetSize); 
+		char* z		= ExAllocatePool(NonPagedPool, data.MOUDATA.ZOffsetSize);
+		char* btn	= ExAllocatePool(NonPagedPool, data.MOUDATA.BtnOffsetSize);
+
+		if (x && y && z && btn)
+		{
+			RtlZeroMemory(x, data.MOUDATA.XOffsetSize);
+			RtlZeroMemory(x, data.MOUDATA.YOffsetSize);
+			RtlZeroMemory(x, data.MOUDATA.ZOffsetSize);
+			RtlZeroMemory(x, data.MOUDATA.BtnOffsetSize);
+
+			RtlMoveMemory(x, (PUCHAR)pContext->urb->UrbBulkOrInterruptTransfer.TransferBuffer + data.MOUDATA.OffsetX, data.MOUDATA.XOffsetSize);
+			RtlMoveMemory(y, (PUCHAR)pContext->urb->UrbBulkOrInterruptTransfer.TransferBuffer + data.MOUDATA.OffsetY, data.MOUDATA.YOffsetSize);
+			RtlMoveMemory(z, (PUCHAR)pContext->urb->UrbBulkOrInterruptTransfer.TransferBuffer + data.MOUDATA.OffsetZ, data.MOUDATA.ZOffsetSize);
+			RtlMoveMemory(btn, (PUCHAR)pContext->urb->UrbBulkOrInterruptTransfer.TransferBuffer + data.MOUDATA.OffsetButton, data.MOUDATA.BtnOffsetSize);
+		
+			USB_MON_DEBUG_INFO("X : %d \r\n", *x);
+			USB_MON_DEBUG_INFO("Y : %d \r\n", *y);
+			USB_MON_DEBUG_INFO("Z : %d \r\n", *z);
+			USB_MON_DEBUG_INFO("btn: %d \r\n", *btn);
+
+			ExFreePool(x);
+			x = NULL;
+			ExFreePool(y);
+			y = NULL;
+			ExFreePool(z);
+			z = NULL;
+			ExFreePool(btn);
+			btn = NULL;
+		}
 		GetDeviceName(DeviceObject, DeviceName);
-		STACK_TRACE_DEBUG_INFO("Mouse/Keyboard DeviceName: %ws DriverName: %ws \r\n", DeviceObject->DriverObject->DriverName.Buffer, DeviceName);
-	
+		USB_MON_DEBUG_INFO("Mouse/Keyboard DeviceName: %ws DriverName: %ws \r\n", DeviceObject->DriverObject->DriverName.Buffer, DeviceName); 
 	}
 	
 	 
@@ -351,7 +407,7 @@ NTSTATUS DispatchInternalDeviceControl(
 		urb = (PURB)irpStack->Parameters.Others.Argument1;
 		if (urb->UrbHeader.Function == URB_FUNCTION_GET_DESCRIPTOR_FROM_INTERFACE) 
 		{
-			STACK_TRACE_DEBUG_INFO("URB_FUNCTION_GET_DESCRIPTOR_FROM_INTERFACE \r\n");
+			USB_MON_DEBUG_INFO("URB_FUNCTION_GET_DESCRIPTOR_FROM_INTERFACE \r\n");
 		}
 		if (urb->UrbHeader.Function != URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER)
 		{
@@ -442,17 +498,17 @@ NTSTATUS DriverEntry(
 	status = InitHidRelation(&g_HidPipeList, &(ULONG)g_current_index);
 	if (!NT_SUCCESS(status) || (!g_HidPipeList && !g_current_index))
 	{
-		STACK_TRACE_DEBUG_INFO("No keyboard Or Mouse \r\n");  
+		USB_MON_DEBUG_INFO("No keyboard Or Mouse \r\n");  
 		return status;
 	}
 
-	STACK_TRACE_DEBUG_INFO("Done Init --- Device_object_list: %I64X Size: %x \r\n", g_HidPipeList, g_current_index);
+	USB_MON_DEBUG_INFO("Done Init --- Device_object_list: %I64X Size: %x \r\n", g_HidPipeList, g_current_index);
 
-	status = GetUsbHub(USB2, &pDriverObj);	// iusbhub
+	status = GetUsbHub(USB3, &pDriverObj);	// iusbhub
 	if (!NT_SUCCESS(status) || !pDriverObj)
 	{
 		FreeHidRelation();
-		STACK_TRACE_DEBUG_INFO("GetUsbHub Error \r\n");
+		USB_MON_DEBUG_INFO("GetUsbHub Error \r\n");
 		return status;
 	}
 	
@@ -460,7 +516,7 @@ NTSTATUS DriverEntry(
 	status = InitPendingIrpLinkedList();
 	if (!NT_SUCCESS(status))
 	{
-		STACK_TRACE_DEBUG_INFO("InitPendingIrpLinkedList Error \r\n"); 
+		USB_MON_DEBUG_INFO("InitPendingIrpLinkedList Error \r\n"); 
 		FreeHidRelation();
 		return status;
 	}
@@ -470,7 +526,7 @@ NTSTATUS DriverEntry(
 	{
 		FreeHidRelation();
 		FreePendingIrpList();
-		STACK_TRACE_DEBUG_INFO("InitIrpHook Error \r\n");
+		USB_MON_DEBUG_INFO("InitIrpHook Error \r\n");
 		return status;
 	}
 
@@ -480,7 +536,7 @@ NTSTATUS DriverEntry(
 	{
 		FreeHidRelation();
 		FreePendingIrpList();
-		STACK_TRACE_DEBUG_INFO("DoIrpHook Error \r\n"); 
+		USB_MON_DEBUG_INFO("DoIrpHook Error \r\n"); 
 		status = STATUS_UNSUCCESSFUL;
 		return status;
 	}

@@ -31,13 +31,13 @@ STATUS_UNSUCCESSFUL otherwise
 	IO_STATUS_BLOCK ioStatus;
 	PIO_STACK_LOCATION NextStack;
 	
-	STACK_TRACE_DEBUG_INFO("HumCallUSB Entry");
+	USB_MON_DEBUG_INFO("HumCallUSB Entry");
 
-	STACK_TRACE_DEBUG_INFO("DeviceObject = %x", DeviceObject);
+	USB_MON_DEBUG_INFO("DeviceObject = %x", DeviceObject);
 
 	DeviceExtension = GET_MINIDRIVER_DEVICE_EXTENSION(DeviceObject);
 
-	STACK_TRACE_DEBUG_INFO("DeviceExtension = %x", DeviceExtension);
+	USB_MON_DEBUG_INFO("DeviceExtension = %x", DeviceExtension);
 
 	//
 	// issue a synchronous request to read the UTB
@@ -58,7 +58,7 @@ STATUS_UNSUCCESSFUL otherwise
 	if (Irp) {
 		(2, ("Irp = %x", Irp));
 
-		STACK_TRACE_DEBUG_INFO(2, ("PDO = %x", GET_NEXT_DEVICE_OBJECT(DeviceObject)));
+		USB_MON_DEBUG_INFO(2, ("PDO = %x", GET_NEXT_DEVICE_OBJECT(DeviceObject)));
 
 		//
 		// pass the URB to the USB 'class driver'
@@ -67,15 +67,15 @@ STATUS_UNSUCCESSFUL otherwise
 		NextStack = IoGetNextIrpStackLocation(Irp);
 		ASSERT(NextStack != NULL);
 
-		STACK_TRACE_DEBUG_INFO("NextStack = %x", NextStack);
+		USB_MON_DEBUG_INFO("NextStack = %x", NextStack);
 
 		NextStack->Parameters.Others.Argument1 = Urb;
 
-		STACK_TRACE_DEBUG_INFO("Calling USBD");
+		USB_MON_DEBUG_INFO("Calling USBD");
 
 		ntStatus = IoCallDriver(GET_NEXT_DEVICE_OBJECT(DeviceObject), Irp);
 
-		STACK_TRACE_DEBUG_INFO("IoCallDriver(USBD) = %x", ntStatus);
+		USB_MON_DEBUG_INFO("IoCallDriver(USBD) = %x", ntStatus);
 
 		if (ntStatus == STATUS_PENDING) {
 			NTSTATUS waitStatus;
@@ -90,12 +90,12 @@ STATUS_UNSUCCESSFUL otherwise
 			*/
 			static LARGE_INTEGER timeout = { (ULONG)-50000000, 0xFFFFFFFF };
 
-			STACK_TRACE_DEBUG_INFO("Wait for single object");
+			USB_MON_DEBUG_INFO("Wait for single object");
 
 			waitStatus = KeWaitForSingleObject(&event, Suspended, KernelMode, FALSE, &timeout);
 			if (waitStatus == STATUS_TIMEOUT) {
 
-				STACK_TRACE_DEBUG_INFO("URB timed out after 5 seconds in HumCallUSB() !!");
+				USB_MON_DEBUG_INFO("URB timed out after 5 seconds in HumCallUSB() !!");
 
 
 				// BUGBUG - test timeout with faulty nack-ing device from glens
@@ -118,7 +118,7 @@ STATUS_UNSUCCESSFUL otherwise
 				ioStatus.Status = STATUS_IO_TIMEOUT;
 			}
 
-			STACK_TRACE_DEBUG_INFO("Wait for single object returned %x", waitStatus);
+			USB_MON_DEBUG_INFO("Wait for single object returned %x", waitStatus);
 
 			//
 			// USBD maps the error code for us
@@ -126,13 +126,13 @@ STATUS_UNSUCCESSFUL otherwise
 			ntStatus = ioStatus.Status;
 		}
 
-		STACK_TRACE_DEBUG_INFO("URB status = %x status = %x", Urb->UrbHeader.Status, ntStatus);
+		USB_MON_DEBUG_INFO("URB status = %x status = %x", Urb->UrbHeader.Status, ntStatus);
 	}
 	else {
 		ntStatus = STATUS_INSUFFICIENT_RESOURCES;
 	}
 
-	STACK_TRACE_DEBUG_INFO("HumCallUSB Exit = %x", ntStatus);
+	USB_MON_DEBUG_INFO("HumCallUSB Exit = %x", ntStatus);
 
 	return ntStatus;
 }
@@ -444,7 +444,7 @@ HidUsb_GetReportDescriptor(
 	// get current stack location
 	//
 	IoStack = IoGetCurrentIrpStackLocation(Irp);
-	STACK_TRACE_DEBUG_INFO("[HIDUSB] GetReportDescriptor: Status %x ReportLength %lu OutputBufferLength %lu TransferredLength %lu\n", Status, HidDeviceExtension->HidDescriptor.DescriptorList[0].wReportLength, IoStack->Parameters.DeviceIoControl.OutputBufferLength, BufferLength);
+	USB_MON_DEBUG_INFO("[HIDUSB] GetReportDescriptor: Status %x ReportLength %lu OutputBufferLength %lu TransferredLength %lu\n", Status, HidDeviceExtension->HidDescriptor.DescriptorList[0].wReportLength, IoStack->Parameters.DeviceIoControl.OutputBufferLength, BufferLength);
 
 	//
 	// get length to copy

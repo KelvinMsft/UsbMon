@@ -83,7 +83,7 @@ ULONG RemoveIrpHookCallback(
 	if (hook_obj)
 	{ 
 		DoIrpHook(hook_obj->driver_object, hook_obj->IrpCode, hook_obj->oldFunction, Stop);
-		STACK_TRACE_DEBUG_INFO("RemoveIrpHookCallback Once \r\n");
+		USB_MON_DEBUG_INFO("RemoveIrpHookCallback Once \r\n");
 		hook_obj = NULL;  
 	}  
 	return CLIST_FINDCB_CTN | CLIST_FINDCB_DEL;

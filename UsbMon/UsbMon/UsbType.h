@@ -45,10 +45,22 @@ typedef struct _HID_DEVICE_NODE
 
 typedef struct _EXTRACT_DATA
 {
-	ULONG OffsetX;
-	ULONG OffsetY;
-	ULONG OffsetZ;
-	ULONG OffsetButton;
+	union
+	{
+		struct 
+		{
+			UCHAR OffsetX;
+			UCHAR XOffsetSize;
+			UCHAR OffsetY;
+			UCHAR YOffsetSize;
+			UCHAR OffsetZ;
+			UCHAR ZOffsetSize;
+			UCHAR OffsetButton;
+			UCHAR BtnOffsetSize;
+			BOOLEAN IsAbsolute;
+		}MOUDATA;
+	};
+ 
 }EXTRACTDATA, *PEXTRACTDATA;
 
 #define CHANNEL_DUMP_ATTRIBUTE_RELATED					1
