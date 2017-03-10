@@ -178,7 +178,7 @@ HIDP_DEVICE_DESC* GetReport(HIDCLASS_DEVICE_EXTENSION* hid_common_extension)
 	STACK_TRACE_DEBUG_INFO("[rawReportDescription] %I64x rawReportDescriptionLength: %xh \r\n", fdoExt->rawReportDescription, fdoExt->rawReportDescriptionLength);
 
 	MyGetCollectionDescription(fdoExt->rawReportDescription, fdoExt->rawReportDescriptionLength, NonPagedPool, tmp);	 
-	DumpReport(tmp);
+	///DumpReport(tmp);
 	return tmp;
 }
 //----------------------------------------------------------------------------------------------------------//
@@ -477,6 +477,7 @@ BOOLEAN  IsKeyboardOrMouseDevice(
 
 			STACK_TRACE_DEBUG_INFO("hid_common_extension: %I64x \r\n", hid_common_extension);
 			STACK_TRACE_DEBUG_INFO("DeviceObj: %I64X  DriverName: %ws DeviceName: %ws \r\n", device_object, device_object->DriverObject->DriverName.Buffer, DeviceName);
+			STACK_TRACE_DEBUG_INFO("collectionIndex: %x collectionNum: %x \r\n", hid_common_extension->pdoExt.collectionIndex, hid_common_extension->pdoExt.collectionNum);
 
 			STACK_TRACE_DEBUG_INFO("---------------------------------------------------------------------------------------------------- \r\n"); 
 			*hid_mini_extension = mini_extension;

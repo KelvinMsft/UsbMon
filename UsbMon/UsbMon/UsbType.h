@@ -8,6 +8,7 @@
 #include "usbbusif.h" 
 #include "Usbioctl.h"
 #include "TList.h"
+#include "hidpddi.h"
  
 
 //--------------------------------------//
@@ -38,7 +39,7 @@ typedef struct _HID_DEVICE_NODE
 { 
 	PDEVICE_OBJECT					device_object;
 	HID_USB_DEVICE_EXTENSION*		mini_extension;
-	PVOID				parsedReport;
+	HIDP_DEVICE_DESC*				parsedReport;
 }HID_DEVICE_NODE, *PHID_DEVICE_NODE;
 
 //--------------------------------------//
