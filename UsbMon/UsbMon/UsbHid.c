@@ -126,13 +126,35 @@ HIDP_DEVICE_DESC* g_hid_collection = NULL;
 #define ARRAY_SIZE					  100
 #define HIDP_PREPARSED_DATA_SIGNATURE1 'PdiH'
 #define HIDP_PREPARSED_DATA_SIGNATURE2 'RDK '
-#define HID_MOU_USAGE 0x2
-#define HID_KBD_USAGE 0x6
-#define HID_LED_USAGE 0x8
+ 
+//usage page-id
+#define HID_GENERIC_DESKTOP_PAGE 0x1
 
-#define HID_NOT_RANGE_USAGE_X 0x30
-#define HID_NOT_RANGE_USAGE_Y 0x31
-#define HID_NOT_RANGE_USAGE_Z 0x38
+//There is a sub-usage id
+#define HID_POINTER_USAGE	       0x1
+#define HID_MOU_USAGE		       0x2
+#define HID_RESERVED_USAGE	       0x3
+#define HID_JOYSTICK_USAGE	       0x4
+#define HID_GAMEPAD_USAGE	       0x5  
+#define HID_KBD_USAGE		       0x6
+#define HID_KBYPAD_USAGE	       0x7
+#define HID_LED_USAGE		       0x8
+#define HID_MULTI_AXIS_USAGE	   0x9 
+
+//0xA-0x2f reserved
+
+#define HID_NOT_RANGE_USAGE_X	  0x30
+#define HID_NOT_RANGE_USAGE_Y	  0x31
+#define HID_NOT_RANGE_USAGE_Z	  0x32 
+
+#define HID_NOT_RANGE_USAGE_RX	  0x33
+#define HID_NOT_RANGE_USAGE_RY	  0x34
+#define HID_NOT_RANGE_USAGE_RZ	  0x35 
+
+#define HID_USAGE_SLIDER		  0x36 
+#define HID_USAGE_DIAL			  0x37 
+#define HID_NOT_RANGE_USAGE_WHELL 0x38
+
 /////////////////////////////////////////////////////////////////////////////////////////////// 
 //// Prototype
 //// 
@@ -263,6 +285,7 @@ NTSTATUS ExtractDataFromChannel(PHIDP_COLLECTION_DESC collectionDesc, HIDP_REPOR
 	for (int k = start; k < end; k++)
 	{
 		//Root Collection
+		if(channel->LinkUsagePage == 0x1)
 		switch(channel->LinkUsage)
 		{
 		case 0x2:
@@ -285,7 +308,7 @@ NTSTATUS ExtractDataFromChannel(PHIDP_COLLECTION_DESC collectionDesc, HIDP_REPOR
 					ExtractedData->MOUDATA.OffsetY = channel->ByteOffset - 1;
 					ExtractedData->MOUDATA.YOffsetSize = channel->ByteEnd - channel->ByteOffset;
 					break;
-				case HID_NOT_RANGE_USAGE_Z:  //coordinate - Z
+				case HID_NOT_RANGE_USAGE_WHELL:  //coordinate - Z
 					ExtractedData->MOUDATA.OffsetZ = channel->ByteOffset - 1;
 					ExtractedData->MOUDATA.ZOffsetSize = channel->ByteEnd - channel->ByteOffset;
 					break;
