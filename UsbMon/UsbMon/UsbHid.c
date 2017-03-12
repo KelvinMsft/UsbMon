@@ -323,16 +323,19 @@ NTSTATUS InitHidList(
 
 	while (device_object)
 	{
-		HID_DEVICE_NODE* node = NULL;
-		HIDP_DEVICE_DESC* report = NULL;
+		HID_DEVICE_NODE*					node = NULL;
+		HIDP_DEVICE_DESC*				  report = NULL;
 		HID_USB_DEVICE_EXTENSION* mini_extension = NULL;
+
 		if (!IsKeyboardOrMouseDevice(device_object, &mini_extension))
 		{
+			device_object = device_object->NextDevice;
 			continue;
 		}
 
 		if (!mini_extension)
 		{
+			device_object = device_object->NextDevice;
 			continue;
 		}
 
@@ -342,9 +345,9 @@ NTSTATUS InitHidList(
 		if (node && report)
 		{
 			AddToChainListTail(g_hid_client_pdo_list->head, node);
-			*current_size++;
+			(*current_size)++;
 			USB_MON_DEBUG_INFO("Inserted one element: %I64x InferfaceDesc: %I64X device_object: %I64x \r\n",node->device_object, node->mini_extension, device_object);
-			USB_MON_DEBUG_INFO("Added one element :%x \r\n",current_size);
+			USB_MON_DEBUG_INFO("Added one element :%x \r\n", *current_size);
 		}
 		device_object = device_object->NextDevice;
 	}
@@ -357,29 +360,29 @@ NTSTATUS InitHidList(
 	return status;
 }
 //----------------------------------------------------------------------------------------------------------//
-NTSTATUS CreateHidList(HID_DEVICE_LIST* list)
+NTSTATUS CreateHidList()
 {
 	NTSTATUS status = STATUS_UNSUCCESSFUL;
 	do
 	{
-		if (!list)
+		if (!g_hid_client_pdo_list)
 		{
-			list = (HID_DEVICE_LIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(HID_DEVICE_LIST), 'ldih');
+			g_hid_client_pdo_list = (HID_DEVICE_LIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(HID_DEVICE_LIST), 'ldih');
 		}
 
-		if (!list)
+		if (!g_hid_client_pdo_list)
 		{
  			status = STATUS_UNSUCCESSFUL;
 			break;
 		}
 
-		RtlZeroMemory(list, sizeof(HID_DEVICE_LIST));
+		RtlZeroMemory(g_hid_client_pdo_list, sizeof(HID_DEVICE_LIST));
 
-		list->head = NewChainListHeaderEx(LISTFLAG_SPINLOCK | LISTFLAG_AUTOFREE, NULL, 0);
-		if (!list->head)
+		g_hid_client_pdo_list->head = NewChainListHeaderEx(LISTFLAG_SPINLOCK | LISTFLAG_AUTOFREE, NULL, 0);
+		if (!g_hid_client_pdo_list->head)
 		{
-			ExFreePool(list);
-			list = NULL;
+			ExFreePool(g_hid_client_pdo_list);
+			g_hid_client_pdo_list = NULL;
 			status = STATUS_UNSUCCESSFUL;
 			break;
 		}
@@ -400,29 +403,32 @@ NTSTATUS InitHidClientPdoList(
 	do { 
 		if(!NT_SUCCESS(GetDriverObjectByName(HID_USB_DEVICE, &pDriverObj)))
 		{
+			USB_MON_DEBUG_INFO("Get Drv Obj Error \r\n");
  			status = STATUS_UNSUCCESSFUL;
 			break;
 		}
 
 		if (!NT_SUCCESS(CreateHidList(g_hid_client_pdo_list)))
 		{
+			USB_MON_DEBUG_INFO("Create List Error \r\n");
 			status = STATUS_UNSUCCESSFUL;
 			break;
 		}
 
 		if (!NT_SUCCESS(InitHidList(pDriverObj, &current_size)))
 		{
+			USB_MON_DEBUG_INFO("Init List Error \r\n");
 			FreeHidClientPdoList();
 			status = STATUS_UNSUCCESSFUL;
 			break;
 		}
-
+		 
 		if (current_size > 0 && g_hid_client_pdo_list)
 		{
 			*device_object_list = g_hid_client_pdo_list;
 			*size = current_size;
 			g_hid_client_pdo_list->RefCount = 1;
-
+			USB_MON_DEBUG_INFO("Create Success\r\n");
 			status = STATUS_SUCCESS;
 			break;
 		}
