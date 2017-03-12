@@ -1,6 +1,7 @@
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     #include "UsbHid.h"
 #include "UsbUtil.h" 
 #include "WinParse.h"
+#include "ReportUtil.h"
 #define HIDP_MAX_UNKNOWN_ITEMS 4
 /*
 struct _CHANNEL_REPORT_HEADER
@@ -115,7 +116,7 @@ typedef struct _HIDP_PREPARSED_DATA
 /////////////////////////////////////////////////////////////////////////////////////////////// 
 //// Global/Extern Variable 
 //// 
-HID_DEVICE_LIST* g_hid_relation = NULL;
+HID_DEVICE_LIST* g_hid_client_pdo_list = NULL;
 
 HIDP_DEVICE_DESC* g_hid_collection = NULL;
 
@@ -127,33 +128,7 @@ HIDP_DEVICE_DESC* g_hid_collection = NULL;
 #define HIDP_PREPARSED_DATA_SIGNATURE1 'PdiH'
 #define HIDP_PREPARSED_DATA_SIGNATURE2 'RDK '
  
-//usage page-id
-#define HID_GENERIC_DESKTOP_PAGE 0x1
-
-//There is a sub-usage id
-#define HID_POINTER_USAGE	       0x1
-#define HID_MOU_USAGE		       0x2
-#define HID_RESERVED_USAGE	       0x3
-#define HID_JOYSTICK_USAGE	       0x4
-#define HID_GAMEPAD_USAGE	       0x5  
-#define HID_KBD_USAGE		       0x6
-#define HID_KBYPAD_USAGE	       0x7
-#define HID_LED_USAGE		       0x8
-#define HID_MULTI_AXIS_USAGE	   0x9 
-
-//0xA-0x2f reserved
-
-#define HID_NOT_RANGE_USAGE_X	  0x30
-#define HID_NOT_RANGE_USAGE_Y	  0x31
-#define HID_NOT_RANGE_USAGE_Z	  0x32 
-
-#define HID_NOT_RANGE_USAGE_RX	  0x33
-#define HID_NOT_RANGE_USAGE_RY	  0x34
-#define HID_NOT_RANGE_USAGE_RZ	  0x35 
-
-#define HID_USAGE_SLIDER		  0x36 
-#define HID_USAGE_DIAL			  0x37 
-#define HID_NOT_RANGE_USAGE_WHELL 0x38
+ 
 
 /////////////////////////////////////////////////////////////////////////////////////////////// 
 //// Prototype
@@ -207,280 +182,7 @@ HIDP_DEVICE_DESC* GetReport(HIDCLASS_DEVICE_EXTENSION* hid_common_extension)
 	MyGetCollectionDescription(fdoExt->rawReportDescription, fdoExt->rawReportDescriptionLength, NonPagedPool, tmp);	 
 	DumpReport(tmp);
 	return tmp;
-}
-//----------------------------------------------------------------------------------------------------------//
-VOID DumpReport(HIDP_DEVICE_DESC* report)
-{
-	PHIDP_COLLECTION_DESC collectionDesc = &report->CollectionDesc[0];
-	for (int i = 0; i < report->CollectionDescLength; i++)
-	{
-		ASSERT(collectionDesc->PreparsedData->Signature1 == HIDP_PREPARSED_DATA_SIGNATURE1);
-		ASSERT(collectionDesc->PreparsedData->Signature2 == HIDP_PREPARSED_DATA_SIGNATURE2);
-
-		USB_MON_DEBUG_INFO("+++++++++++++++++++++++++++++++++++++++++++++++++++++++\r\n");
-		USB_MON_DEBUG_INFO("[Collection] Usage: %xh \r\n", collectionDesc->Usage);
-		USB_MON_DEBUG_INFO("[Collection] UsagePage: %xh \r\n", collectionDesc->UsagePage);
-		USB_MON_DEBUG_INFO("[Collection] InputLength: %xh \r\n", collectionDesc->InputLength);
-		USB_MON_DEBUG_INFO("[Collection] OutputLength: %xh \r\n", collectionDesc->OutputLength);
-		USB_MON_DEBUG_INFO("[Collection] FeatureLength: %xh \r\n", collectionDesc->FeatureLength);
-		USB_MON_DEBUG_INFO("[Collection] CollectionNumber: %x \r\n", collectionDesc->CollectionNumber);
-		USB_MON_DEBUG_INFO("[Collection] PreparsedData: %I64x \r\n", collectionDesc->PreparsedData);
-
-		USB_MON_DEBUG_INFO("[Collection] Input Offset: %x  Index: %x \r\n", collectionDesc->PreparsedData->Input.Offset, collectionDesc->PreparsedData->Input.Index);
-		USB_MON_DEBUG_INFO("[Collection] Output Offset: %x Index: %x \r\n", collectionDesc->PreparsedData->Output.Offset, collectionDesc->PreparsedData->Output.Index);
-		USB_MON_DEBUG_INFO("[Collection] Feature Offset: %x Index: %x \r\n", collectionDesc->PreparsedData->Feature.Offset, collectionDesc->PreparsedData->Feature.Index);
-
-
-		DumpChannel(collectionDesc, HidP_Input, CHANNEL_DUMP_ALL);
-		DumpChannel(collectionDesc, HidP_Output, CHANNEL_DUMP_ALL);
-		DumpChannel(collectionDesc, HidP_Feature, CHANNEL_DUMP_ALL);
-
-		USB_MON_DEBUG_INFO("+++++++++++++++++++++++++++++++++++++++++++++++++++++++\r\n");
-		collectionDesc++;
-	}
-
-	PHIDP_REPORT_IDS      reportDesc = &report->ReportIDs[0];
-	for (int i = 0; i < report->ReportIDsLength; i++)
-	{
-		USB_MON_DEBUG_INFO("*******************************************************\r\n");
-		USB_MON_DEBUG_INFO("[Report] ReportID: %xh \r\n", reportDesc->ReportID);
-		USB_MON_DEBUG_INFO("[Report] InputLength: %xh \r\n", reportDesc->InputLength);
-		USB_MON_DEBUG_INFO("[Report] OutputLength: %xh \r\n", reportDesc->OutputLength);
-		USB_MON_DEBUG_INFO("[Report] FeatureLength: %xh \r\n", reportDesc->FeatureLength);
-		USB_MON_DEBUG_INFO("[Report] CollectionNumber: %x \r\n", reportDesc->CollectionNumber);
-		USB_MON_DEBUG_INFO("*******************************************************\r\n");
-		reportDesc++;
-	}
-}
-NTSTATUS ExtractDataFromChannel(PHIDP_COLLECTION_DESC collectionDesc, HIDP_REPORT_TYPE type, EXTRACTDATA* ExtractedData)
-{
-	HIDP_CHANNEL_DESC*            channel = NULL;
-	ULONG start = 0;
-	ULONG end = 0;
-	CHAR* reportType = NULL;
-	switch (type)
-	{
-	case HidP_Input:
-		channel = &collectionDesc->PreparsedData->Data[collectionDesc->PreparsedData->Input.Offset];
-		start = collectionDesc->PreparsedData->Input.Offset;
-		end = collectionDesc->PreparsedData->Input.Index;
-		reportType = "Input Report";
-		break;
-	case HidP_Output:
-		channel = &collectionDesc->PreparsedData->Data[collectionDesc->PreparsedData->Output.Offset];
-		start = collectionDesc->PreparsedData->Output.Offset;
-		end = collectionDesc->PreparsedData->Output.Index;
-		reportType = "Output Report";
-		break;
-	case HidP_Feature:
-		channel = &collectionDesc->PreparsedData->Data[collectionDesc->PreparsedData->Feature.Offset];
-		start = collectionDesc->PreparsedData->Feature.Offset;
-		end = collectionDesc->PreparsedData->Feature.Index;
-		reportType = "Feature Report";
-		break;
-	default:
-		break;
-	}
-	USB_MON_DEBUG_INFO("Start: %x End: %x ReportType: %s \r\n", start, end, reportType);
-	for (int k = start; k < end; k++)
-	{
-		//Root Collection
-		if(channel->LinkUsagePage == 0x1)
-		switch(channel->LinkUsage)
-		{
-		case 0x2:
-		 	if (channel->IsButton)
-			{
-				ExtractedData->MOUDATA.OffsetButton = channel->ByteOffset - 1;
-				ExtractedData->MOUDATA.BtnOffsetSize = channel->ByteEnd - channel->ByteOffset;
-			}
-
-			if (!channel->IsRange)
-			{
-				//Meaning X , Y, Z
-				switch (channel->NotRange.Usage)
-				{
-				case HID_NOT_RANGE_USAGE_X:	//coordinate - X
-					ExtractedData->MOUDATA.OffsetX = channel->ByteOffset - 1;
-					ExtractedData->MOUDATA.XOffsetSize = channel->ByteEnd - channel->ByteOffset;
-					break;
-				case HID_NOT_RANGE_USAGE_Y:	//coordinate - Y
-					ExtractedData->MOUDATA.OffsetY = channel->ByteOffset - 1;
-					ExtractedData->MOUDATA.YOffsetSize = channel->ByteEnd - channel->ByteOffset;
-					break;
-				case HID_NOT_RANGE_USAGE_WHELL:  //coordinate - Z
-					ExtractedData->MOUDATA.OffsetZ = channel->ByteOffset - 1;
-					ExtractedData->MOUDATA.ZOffsetSize = channel->ByteEnd - channel->ByteOffset;
-					break;
-				default:
-					USB_MON_COMMON_DBG_BREAK();	//FATLA ERROR!!
-					break;
-				}
-			} 
-			break;
-		
-		case 0x6:
-			break;
-		default:
-			break;
-		}
-		ExtractedData->MOUDATA.IsAbsolute = channel->IsAbsolute; 
-		channel++;
-	}
-}
-//----------------------------------------------------------------------------------------------------------//
-VOID DumpChannel(PHIDP_COLLECTION_DESC collectionDesc, HIDP_REPORT_TYPE type, ULONG Flags )
-{
-	if (!collectionDesc)
-	{
-		return;
-	}
-	HIDP_CHANNEL_DESC*            channel = NULL;
-	ULONG start = 0;
-	ULONG end = 0;
-	CHAR* reportType = NULL;
-	switch (type)
-	{
-	case HidP_Input:
-		channel = &collectionDesc->PreparsedData->Data[collectionDesc->PreparsedData->Input.Offset];
-		start = collectionDesc->PreparsedData->Input.Offset;
-		end = collectionDesc->PreparsedData->Input.Index;
-		reportType = "Input Report";
-		break;
-	case HidP_Output:
-		channel = &collectionDesc->PreparsedData->Data[collectionDesc->PreparsedData->Output.Offset]; 
-		start = collectionDesc->PreparsedData->Output.Offset;
-		end = collectionDesc->PreparsedData->Output.Index;
-		reportType = "Output Report";
-
-		break;
-	case HidP_Feature:
-		channel = &collectionDesc->PreparsedData->Data[collectionDesc->PreparsedData->Feature.Offset]; 
-		start = collectionDesc->PreparsedData->Feature.Offset;
-		end = collectionDesc->PreparsedData->Feature.Index;
-		reportType = "Feature Report"; 
-		break;
-	default:
-			break;
-	}
-
-	for (int k = start  ; k < end ; k++)
-	{
-		USB_MON_DEBUG_INFO("+++++++++++++++++++++++ %s +++++++++++++++++++++\r\n" , reportType );
-		if (Flags & CHANNEL_DUMP_REPORT_REALTED)
-		{
-			USB_MON_DEBUG_INFO("channel UsagePage: %x		OFFSET_FIELD: %x \r\n", channel->UsagePage, FIELD_OFFSET(HIDP_CHANNEL_DESC, UsagePage));
-			USB_MON_DEBUG_INFO("channel ReportID: %d		OFFSET_FIELD: %x \r\n", channel->ReportID, FIELD_OFFSET(HIDP_CHANNEL_DESC, ReportID));
-			USB_MON_DEBUG_INFO("channel ReportSize: %d		OFFSET_FIELD: %x \r\n", channel->ReportSize, FIELD_OFFSET(HIDP_CHANNEL_DESC, ReportSize));
-			USB_MON_DEBUG_INFO("channel ReportCount: %d		OFFSET_FIELD: %x \r\n", channel->ReportCount, FIELD_OFFSET(HIDP_CHANNEL_DESC, ReportCount)); 
-		}
-		if (Flags & CHANNEL_DUMP_REPORT_BYTE_OFFSET_REALTED)
-		{
-			USB_MON_DEBUG_INFO("channel BitLength: %d		OFFSET_FIELD: %x \r\n", channel->BitLength, FIELD_OFFSET(HIDP_CHANNEL_DESC, BitLength));
-			USB_MON_DEBUG_INFO("channel ByteEnd: %d			OFFSET_FIELD: %x \r\n", channel->ByteEnd, FIELD_OFFSET(HIDP_CHANNEL_DESC, ByteEnd));
-			USB_MON_DEBUG_INFO("channel BitOffset: %d		OFFSET_FIELD: %x \r\n", channel->BitOffset, FIELD_OFFSET(HIDP_CHANNEL_DESC, BitOffset));
-			USB_MON_DEBUG_INFO("channel ByteOffset: %d		OFFSET_FIELD: %x \r\n", channel->ByteOffset, FIELD_OFFSET(HIDP_CHANNEL_DESC, ByteOffset));
-		}
-		if (Flags & CHANNEL_DUMP_LINK_COL_RELATED)
-		{
-			USB_MON_DEBUG_INFO("channel LinkCollection: %x  OFFSET_FIELD: %x \r\n", channel->LinkCollection, FIELD_OFFSET(HIDP_CHANNEL_DESC, LinkCollection));
-			USB_MON_DEBUG_INFO("channel LinkUsage: %x		OFFSET_FIELD: %x \r\n", channel->LinkUsage, FIELD_OFFSET(HIDP_CHANNEL_DESC, LinkUsage));
-			USB_MON_DEBUG_INFO("channel LinkUsagePage: %x	OFFSET_FIELD: %x \r\n", channel->LinkUsagePage, FIELD_OFFSET(HIDP_CHANNEL_DESC, LinkUsagePage));
-		}
-
- 		if (Flags & CHANNEL_DUMP_ATTRIBUTE_RELATED)
-		{
-			USB_MON_DEBUG_INFO("channel IsRange: %x \r\n",			 channel->IsRange); 
-			USB_MON_DEBUG_INFO("channel IsButton: %x   \r\n",		 channel->IsButton);
-			USB_MON_DEBUG_INFO("channel IsAbsolute: %x \r\n",		 channel->IsAbsolute);
-			USB_MON_DEBUG_INFO("channel IsConst: %x \r\n",			 channel->IsConst);
-			USB_MON_DEBUG_INFO("channel IsAlias: %x \r\n",			 channel->IsAlias);
-			USB_MON_DEBUG_INFO("channel IsDesignatorRange: %x \r\n", channel->IsDesignatorRange);
-			USB_MON_DEBUG_INFO("channel IsStringRange: %x \r\n",	 channel->IsStringRange);
- 
-
-			if (!channel->IsButton)
-			{
-				USB_MON_DEBUG_INFO("channel Data.LogicalMin: %d	 OFFSET_FIELD: %X \r\n", channel->Data.HasNull, FIELD_OFFSET(HIDP_CHANNEL_DESC, Data.HasNull));
-				USB_MON_DEBUG_INFO("channel Data.LogicalMin: %d	 OFFSET_FIELD: %X \r\n", channel->Data.LogicalMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Data.LogicalMin));
-				USB_MON_DEBUG_INFO("channel Data.LogicalMax: %d	 OFFSET_FIELD: %X \r\n", channel->Data.LogicalMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Data.LogicalMax));
-				USB_MON_DEBUG_INFO("channel Data.PhysicalMax: %d OFFSET_FIELD: %X  \r\n", channel->Data.PhysicalMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Data.PhysicalMin));
-				USB_MON_DEBUG_INFO("channel Data.PhysicalMax: %d OFFSET_FIELD: %X  \r\n", channel->Data.PhysicalMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Data.PhysicalMax));
-			}
-			if (channel->IsButton)
-			{
-				USB_MON_DEBUG_INFO("channel button.LogicalMin %d OFFSET_FIELD: %X  \r\n", channel->button.LogicalMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, button.LogicalMin));
-				USB_MON_DEBUG_INFO("channel button.LogicalMax %d OFFSET_FIELD: %X  \r\n", channel->button.LogicalMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, button.LogicalMax));
-			}
-
-			if (channel->MoreChannels) {
-				USB_MON_DEBUG_INFO("MoreChannels ");
-			}
-			if (channel->IsConst) {
-				USB_MON_DEBUG_INFO("Const ");
-			}
-			if (channel->IsButton) {
-				USB_MON_DEBUG_INFO("Button ");
-			}
-			else {
-				USB_MON_DEBUG_INFO("Value ");
-			}
-			if (channel->IsAbsolute) {
-				USB_MON_DEBUG_INFO("Absolute ");
-			}
-			if (channel->IsAlias) {
-				USB_MON_DEBUG_INFO("ALIAS! ");
-			}
-		}
-		if (Flags & CHANNEL_DUMP_RANGE_RELATED)
-		{
-			if (channel->IsRange)
-			{
-				USB_MON_DEBUG_INFO("channel Range.UsageMin:  %d		   OFFSET_FIELD: %X  \r\n", channel->Range.UsageMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.UsageMin));
-				USB_MON_DEBUG_INFO("channel Range.UsageMax:  %d		   OFFSET_FIELD: %X  \r\n", channel->Range.UsageMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.UsageMax));
-				USB_MON_DEBUG_INFO("channel Range.DataIndexMax:  %d	   OFFSET_FIELD: %X  \r\n", channel->Range.DataIndexMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.DataIndexMax));
-				USB_MON_DEBUG_INFO("channel Range.DataIndexMin: %d	   OFFSET_FIELD: %X  \r\n", channel->Range.DataIndexMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.DataIndexMin));
-
-			}
-			else
-			{
-				USB_MON_DEBUG_INFO("channel NotRange.Usage:  %x		     OFFSET_FIELD: %X  \r\n", channel->NotRange.Usage, FIELD_OFFSET(HIDP_CHANNEL_DESC, NotRange.Usage));
-				USB_MON_DEBUG_INFO("channel NotRange.DataIndex:  %x		 OFFSET_FIELD: %X  \r\n", channel->NotRange.DataIndex, FIELD_OFFSET(HIDP_CHANNEL_DESC, NotRange.DataIndex));
-			}
-
-			if (channel->IsDesignatorRange)
-			{
-				USB_MON_DEBUG_INFO("channel Range.DesignatorMax: %d OFFSET_FIELD: %X  \r\n", channel->Range.DesignatorMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.DesignatorMax));
-				USB_MON_DEBUG_INFO("channel Range.DesignatorMin: %d OFFSET_FIELD: %X  \r\n", channel->Range.DesignatorMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.DesignatorMin));
-			}
-			else
-			{
-				USB_MON_DEBUG_INFO("channel Range.DesignatorMax: %d OFFSET_FIELD: %X  \r\n", channel->NotRange.DesignatorIndex, FIELD_OFFSET(HIDP_CHANNEL_DESC, NotRange.DesignatorIndex));
-			}
-
-			if (channel->IsStringRange)
-			{
-				USB_MON_DEBUG_INFO("channel Range.StringMax: %d	   OFFSET_FIELD: %X  \r\n", channel->Range.StringMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.StringMax));
-				USB_MON_DEBUG_INFO("channel Range.StringMin: %d	   OFFSET_FIELD: %X  \r\n", channel->Range.StringMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.StringMin));
-			}
-			else
-			{
-				USB_MON_DEBUG_INFO("channel NotRange.StringIndex:  %d	 OFFSET_FIELD: %X  \r\n", channel->NotRange.StringIndex, FIELD_OFFSET(HIDP_CHANNEL_DESC, NotRange.StringIndex));
-			}
-		}
-	 
-		if (channel->NumGlobalUnknowns)
-		{
-			for (int z = 0; z < channel->NumGlobalUnknowns; z++)
-			{
-				USB_MON_DEBUG_INFO("channel UnknownsToken:  %d	 OFFSET_FIELD: %X  \r\n", channel->GlobalUnknowns[z].Token, FIELD_OFFSET(HIDP_CHANNEL_DESC, GlobalUnknowns));
-			}
-		}
-		 
-		USB_MON_DEBUG_INFO("\r\n"); 
-		channel++; 
-	}
-}
+} 
 //-------------------------------------------------------------------------------------------//
 HID_DEVICE_NODE* CreateHidDeviceNode(
 	_In_ PDEVICE_OBJECT device_object,
@@ -505,44 +207,7 @@ HID_DEVICE_NODE* CreateHidDeviceNode(
 	node->parsedReport = parsedReport;
 	return node;
 }
-
-/*
-********************************************************************************
-*  GetReportIdentifier
-********************************************************************************
-*
-*
-*/
-PHIDP_REPORT_IDS GetReportIdentifier(FDO_EXTENSION *fdoExtension, ULONG reportId)
-{
-	PHIDP_REPORT_IDS result = NULL;
-	PHIDP_DEVICE_DESC deviceDesc = &fdoExtension->deviceDesc;
-	ULONG i;
-
-	if (deviceDesc->ReportIDs) {
-		for (i = 0; i < deviceDesc->ReportIDsLength; i++) {
-			if (deviceDesc->ReportIDs[i].ReportID == reportId) {
-				result = &deviceDesc->ReportIDs[i];
-				break;
-			}
-		}
-	}
-
-	if (fdoExtension->deviceSpecificFlags & DEVICE_FLAG_ALLOW_FEATURE_ON_NON_FEATURE_COLLECTION) {
-		/*
-		*  This call from HidpGetSetFeature can fail because we allow
-		*  feature access on non-feature collections.
-		*/
-	}
-	else {
-		if (!result) {
-			USB_MON_DEBUG_INFO("Bad harware, returning NULL report ID");
-		}
-	}
-
-	return result;
-} 
-
+ 
 //---------------------------------------------------------------------------------------------------------//
 BOOLEAN  IsKeyboardOrMouseDevice(
 	_In_  PDEVICE_OBJECT				   device_object, 
@@ -604,29 +269,31 @@ BOOLEAN  IsKeyboardOrMouseDevice(
 	return FALSE;
 }
 //---------------------------------------------------------------------------------------------------------//
-NTSTATUS FreeHidRelation()
+NTSTATUS FreeHidClientPdoList()
 {
+	NTSTATUS status = STATUS_SUCCESS;
 	//Free White List
-	if (g_hid_relation)
+	if (g_hid_client_pdo_list)
 	{
-		if (g_hid_relation->head)
+		if (g_hid_client_pdo_list->head)
 		{
-			CHAINLIST_SAFE_FREE(g_hid_relation->head);
+			CHAINLIST_SAFE_FREE(g_hid_client_pdo_list->head);
 		}
-		ExFreePool(g_hid_relation);
-		g_hid_relation = NULL;
+		ExFreePool(g_hid_client_pdo_list);
+		g_hid_client_pdo_list = NULL;
 	}
+	return status;
 }
 //----------------------------------------------------------------------------------------------------------//
 NTSTATUS ReleaseHidRelation()
 {
 	NTSTATUS status = STATUS_SUCCESS;
-	if (!g_hid_relation)
+	if (!g_hid_client_pdo_list)
 	{
 		status = STATUS_UNSUCCESSFUL;
 		return status;
 	}
-	InterlockedIncrement64(&g_hid_relation->RefCount);
+	InterlockedIncrement64(&g_hid_client_pdo_list->RefCount);
 	return status;
 }
 //----------------------------------------------------------------------------------------------------------//
@@ -635,80 +302,131 @@ NTSTATUS AcquireHidRelation(
 	_Out_ PULONG size
 )
 {
-	*device_object_list = g_hid_relation;
-	*size = g_hid_relation->currentSize;
-	InterlockedIncrement64(&g_hid_relation->RefCount);
+	*device_object_list = g_hid_client_pdo_list;
+	*size = g_hid_client_pdo_list->currentSize;
+	InterlockedIncrement64(&g_hid_client_pdo_list->RefCount);
+}
+
+//----------------------------------------------------------------------------------------------------------//
+NTSTATUS InitHidList(
+	_In_  PDRIVER_OBJECT pDriverObj, 
+	_Out_ PULONG current_size)
+{
+	NTSTATUS status = STATUS_UNSUCCESSFUL;
+	PDEVICE_OBJECT device_object = NULL;
+	if (!pDriverObj || !current_size || !g_hid_client_pdo_list)
+	{
+		return status;
+	}
+
+	device_object = pDriverObj->DeviceObject;
+
+	while (device_object)
+	{
+		HID_DEVICE_NODE* node = NULL;
+		HIDP_DEVICE_DESC* report = NULL;
+		HID_USB_DEVICE_EXTENSION* mini_extension = NULL;
+		if (!IsKeyboardOrMouseDevice(device_object, &mini_extension))
+		{
+			continue;
+		}
+
+		if (!mini_extension)
+		{
+			continue;
+		}
+
+		report =  GetReport(device_object->DeviceExtension); 
+		node   =  CreateHidDeviceNode(device_object, mini_extension, report);
+
+		if (node && report)
+		{
+			AddToChainListTail(g_hid_client_pdo_list->head, node);
+			*current_size++;
+			USB_MON_DEBUG_INFO("Inserted one element: %I64x InferfaceDesc: %I64X device_object: %I64x \r\n",node->device_object, node->mini_extension, device_object);
+			USB_MON_DEBUG_INFO("Added one element :%x \r\n",current_size);
+		}
+		device_object = device_object->NextDevice;
+	}
+
+	if (*current_size > 0)
+	{
+		status = STATUS_SUCCESS;
+	}
+	
+	return status;
 }
 //----------------------------------------------------------------------------------------------------------//
-NTSTATUS InitHidRelation(
+NTSTATUS CreateHidList(HID_DEVICE_LIST* list)
+{
+	NTSTATUS status = STATUS_UNSUCCESSFUL;
+	do
+	{
+		if (!list)
+		{
+			list = (HID_DEVICE_LIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(HID_DEVICE_LIST), 'ldih');
+		}
+
+		if (!list)
+		{
+ 			status = STATUS_UNSUCCESSFUL;
+			break;
+		}
+
+		RtlZeroMemory(list, sizeof(HID_DEVICE_LIST));
+
+		list->head = NewChainListHeaderEx(LISTFLAG_SPINLOCK | LISTFLAG_AUTOFREE, NULL, 0);
+		if (!list->head)
+		{
+			ExFreePool(list);
+			list = NULL;
+			status = STATUS_UNSUCCESSFUL;
+			break;
+		}
+		status = STATUS_SUCCESS;
+	} while (0);
+	return status;
+}
+//----------------------------------------------------------------------------------------------------------//
+NTSTATUS InitHidClientPdoList(
 	_Out_ PHID_DEVICE_LIST* device_object_list,
 	_Out_ PULONG size
 )
 {
-	PDEVICE_OBJECT	 device_object = NULL;
-	PDRIVER_OBJECT	    pDriverObj = NULL;
+ 	PDRIVER_OBJECT	    pDriverObj = NULL;
 	ULONG			  current_size = 0;
-	
-	
-	if (!g_hid_relation)
-	{
-		g_hid_relation = (HID_DEVICE_LIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(HID_DEVICE_LIST), 'ldih');
-	}
+	NTSTATUS			status = STATUS_UNSUCCESSFUL;
 
-	if (!g_hid_relation)
-	{
-		return STATUS_UNSUCCESSFUL;
-	} 
-
-	RtlZeroMemory(g_hid_relation, sizeof(HID_DEVICE_LIST));
-
-	g_hid_relation->head = NewChainListHeaderEx(LISTFLAG_SPINLOCK | LISTFLAG_AUTOFREE, NULL, 0);
-
-	if (!g_hid_relation->head)
-	{
-		return STATUS_UNSUCCESSFUL;
-	}
-
-	GetDriverObjectByName(HID_USB_DEVICE, &pDriverObj);
-	if (!pDriverObj)
-	{
-		FreeHidRelation();
-		return STATUS_UNSUCCESSFUL;
-	}
-
-	USB_MON_DEBUG_INFO("DriverObj: %I64X \r\n", pDriverObj);
-
-	device_object = pDriverObj->DeviceObject;
-	while (device_object)
-	{
-		HID_USB_DEVICE_EXTENSION* mini_extension = NULL; 
-		if (IsKeyboardOrMouseDevice(device_object, &mini_extension))
+	do { 
+		if(!NT_SUCCESS(GetDriverObjectByName(HID_USB_DEVICE, &pDriverObj)))
 		{
-			HIDP_DEVICE_DESC* report = GetReport(device_object->DeviceExtension);
-		
-			if (mini_extension && g_hid_relation)
-			{
-				HID_DEVICE_NODE* node = CreateHidDeviceNode(device_object, mini_extension, report);
-				if (node) {
-					AddToChainListTail(g_hid_relation->head, node);
-					current_size++;
-					USB_MON_DEBUG_INFO("Inserted one element: %I64x InferfaceDesc: %I64X device_object: %I64x \r\n", node->device_object, node->mini_extension, device_object);
-					USB_MON_DEBUG_INFO("Added one element :%x \r\n", current_size);
-				}
-			}
+ 			status = STATUS_UNSUCCESSFUL;
+			break;
 		}
- 		device_object = device_object->NextDevice;
-	}
 
-	if (current_size > 0 && g_hid_relation)
-	{
-		*device_object_list = g_hid_relation;
-		*size = current_size;
-		g_hid_relation->RefCount = 1;
-		return STATUS_SUCCESS;
-	}  
+		if (!NT_SUCCESS(CreateHidList(g_hid_client_pdo_list)))
+		{
+			status = STATUS_UNSUCCESSFUL;
+			break;
+		}
 
-	FreeHidRelation();
-	return STATUS_UNSUCCESSFUL;
+		if (!NT_SUCCESS(InitHidList(pDriverObj, &current_size)))
+		{
+			FreeHidClientPdoList();
+			status = STATUS_UNSUCCESSFUL;
+			break;
+		}
+
+		if (current_size > 0 && g_hid_client_pdo_list)
+		{
+			*device_object_list = g_hid_client_pdo_list;
+			*size = current_size;
+			g_hid_client_pdo_list->RefCount = 1;
+
+			status = STATUS_SUCCESS;
+			break;
+		}
+	} while (FALSE);
+	return status;
 }
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            

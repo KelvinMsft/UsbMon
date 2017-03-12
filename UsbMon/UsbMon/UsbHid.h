@@ -1,14 +1,14 @@
 #include <fltKernel.h> 
 #include "local.h"
 
-NTSTATUS
-InitHidRelation(
+NTSTATUS 
+InitHidClientPdoList(
 	PHID_DEVICE_LIST* device_object_list,
 	PULONG size
 );
 
 NTSTATUS 
-FreeHidRelation();
+FreeHidClientPdoList();
  
 NTSTATUS
 ExtractDataFromChannel(

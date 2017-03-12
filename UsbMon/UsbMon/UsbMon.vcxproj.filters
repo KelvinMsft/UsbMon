@@ -42,16 +42,13 @@
     <ClInclude Include="UsbHid.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Urb.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="DumpReport.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="WinParse.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="hidtoken.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ReportUtil.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -74,10 +71,10 @@
     <ClCompile Include="TList.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Urb.c">
+    <ClCompile Include="WinParse.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="WinParse.c">
+    <ClCompile Include="ReportUtil.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

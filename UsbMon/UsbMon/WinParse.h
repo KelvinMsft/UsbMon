@@ -66,16 +66,16 @@ typedef struct _HIDP_CHANNEL_DESC
 {
 	USHORT   UsagePage;
 	UCHAR    ReportID;
-	UCHAR    BitOffset;    // 0 to 8 value describing bit alignment
-
-	ULONG    BitField;   // The 8 (plus extra) bits associated with a main item
-
-	USHORT   ReportSize;   // HID defined report size
-	USHORT   ReportCount;  // HID defined report count
-	USHORT   ByteOffset;   // byte position of start of field in report packet
-	USHORT   BitLength;    // total bit length of this channel
-
-	USHORT   ByteEnd;      // First byte not containing bits of this channel.
+	UCHAR    BitOffset;       // 0 to 8 value describing bit alignment
+						      
+	ULONG    BitField;	      // The 8 (plus extra) bits associated with a main item
+						      
+	USHORT   ReportSize;      // HID defined report size
+	USHORT   ReportCount;     // HID defined report count
+	USHORT   ByteOffset;      // byte position of start of field in report packet
+	USHORT   BitLength;       // total bit length of this channel
+						      
+	USHORT   ByteEnd;         // First byte not containing bits of this channel.
 	USHORT   LinkCollection;  // A unique internal index pointer
 	USHORT   LinkUsagePage;
 	USHORT   LinkUsage;
@@ -98,13 +98,17 @@ typedef struct _HIDP_CHANNEL_DESC
 
 	struct _HIDP_UNKNOWN_TOKEN GlobalUnknowns[HIDP_MAX_UNKNOWN_ITEMS];
 
+
+	//Describing a Local Usage for a Usage Page :
+	//E.g. Usage Page: 0x9 Usage Min : 0x1 ,  Max : 0x5 
+	//mean: This report for Button ( btn1~btn5 )
 	union {
 		struct {
 			USHORT   UsageMin, UsageMax;
 			USHORT   StringMin, StringMax;
 			USHORT   DesignatorMin, DesignatorMax;
 			USHORT   DataIndexMin, DataIndexMax;
-		} Range;
+		} Range;							
 		struct {
 			USHORT   Usage, Reserved1;
 			USHORT   StringIndex, Reserved2;
@@ -141,7 +145,6 @@ struct _CHANNEL_REPORT_HEADER
 
 typedef struct _HIDP_SYS_POWER_INFO {
 	ULONG   PowerButtonMask;
-
 } HIDP_SYS_POWER_INFO, *PHIDP_SYS_POWER_INFO;
 
 typedef struct _HIDP_PREPARSED_DATA

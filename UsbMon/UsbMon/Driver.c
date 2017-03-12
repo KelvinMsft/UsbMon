@@ -4,7 +4,7 @@
 #include "UsbUtil.h" 
 #include "UsbHid.h"
 #include "IrpHook.h"
-#include "Urb.h"
+//#include "Urb.h"
 #pragma warning (disable : 4100)
 
 
@@ -154,7 +154,7 @@ VOID DriverUnload(
 	RemoveAllPendingIrpFromList();
 	 
 	FreePendingIrpList();
-	FreeHidRelation();
+	FreeHidClientPdoList();
 
 	return;
 } 
@@ -495,7 +495,7 @@ NTSTATUS DriverEntry(
 	  
 	object->DriverUnload = DriverUnload;
 
-	status = InitHidRelation(&g_HidPipeList, &(ULONG)g_current_index);
+	status = InitHidClientPdoList(&g_HidPipeList, &(ULONG)g_current_index);
 	if (!NT_SUCCESS(status) || (!g_HidPipeList && !g_current_index))
 	{
 		USB_MON_DEBUG_INFO("No keyboard Or Mouse \r\n");  
@@ -504,10 +504,10 @@ NTSTATUS DriverEntry(
 
 	USB_MON_DEBUG_INFO("Done Init --- Device_object_list: %I64X Size: %x \r\n", g_HidPipeList, g_current_index);
 
-	status = GetUsbHub(USB3, &pDriverObj);	// iusbhub
+	status = GetUsbHub(USB2, &pDriverObj);	// iusbhub
 	if (!NT_SUCCESS(status) || !pDriverObj)
 	{
-		FreeHidRelation();
+		FreeHidClientPdoList();
 		USB_MON_DEBUG_INFO("GetUsbHub Error \r\n");
 		return status;
 	}
@@ -517,14 +517,14 @@ NTSTATUS DriverEntry(
 	if (!NT_SUCCESS(status))
 	{
 		USB_MON_DEBUG_INFO("InitPendingIrpLinkedList Error \r\n"); 
-		FreeHidRelation();
+		FreeHidClientPdoList();
 		return status;
 	}
 	//Init Irp Hook for URB transmit
 	status = InitIrpHookLinkedList();
 	if (!NT_SUCCESS(status))
 	{
-		FreeHidRelation();
+		FreeHidClientPdoList();
 		FreePendingIrpList();
 		USB_MON_DEBUG_INFO("InitIrpHook Error \r\n");
 		return status;
@@ -534,7 +534,7 @@ NTSTATUS DriverEntry(
 	g_pDispatchInternalDeviceControl = (PDRIVER_DISPATCH)DoIrpHook(pDriverObj,IRP_MJ_INTERNAL_DEVICE_CONTROL,DispatchInternalDeviceControl, Start);	
 	if (!g_pDispatchInternalDeviceControl)
 	{
-		FreeHidRelation();
+		FreeHidClientPdoList();
 		FreePendingIrpList();
 		USB_MON_DEBUG_INFO("DoIrpHook Error \r\n"); 
 		status = STATUS_UNSUCCESSFUL;

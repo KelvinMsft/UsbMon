@@ -150,11 +150,10 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="DumpReport.h" />
+    <ClInclude Include="ReportUtil.h" />
     <ClInclude Include="hidtoken.h" />
     <ClInclude Include="IrpHook.h" />
     <ClInclude Include="TList.h" />
-    <ClInclude Include="Urb.h" />
     <ClInclude Include="UsbHid.h" />
     <ClInclude Include="UsbType.h" />
     <ClInclude Include="UsbUtil.h" />
@@ -163,10 +162,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Driver.c" />
+    <ClCompile Include="ReportUtil.c" />
     <ClCompile Include="WinParse.c" />
     <ClCompile Include="IrpHook.c" />
     <ClCompile Include="TList.c" />
-    <ClCompile Include="Urb.c" />
     <ClCompile Include="UsbHid.c" />
     <ClCompile Include="UsbUtil.c" />
     <ClCompile Include="CommonUtil.c" />
