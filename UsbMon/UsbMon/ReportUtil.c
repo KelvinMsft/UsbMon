@@ -216,12 +216,17 @@ VOID DumpChannel(
 	}
 }
 //------------------------------------------------------------------------------------------------------------------------------//
-VOID SelectChannel(
+NTSTATUS SelectChannel(
 	_In_ HIDP_REPORT_TYPE				type,	
 	_In_ PHIDP_COLLECTION_DESC	collectionDesc,
 	_Out_ SELETEDCHANNEL*       selectedChannel
 )
 {
+	NTSTATUS status = STATUS_UNSUCCESSFUL;
+	if (!collectionDesc || !selectedChannel)
+	{
+		return status;
+	}
 	switch (type)
 	{
 	case HidP_Input:
@@ -245,6 +250,8 @@ VOID SelectChannel(
 	default:
 		break;
 	}
+	status = STATUS_SUCCESS;
+	return status;
 }
 //------------------------------------------------------------------------------------------------------------------------------//
 NTSTATUS ExtractKeyboardData(

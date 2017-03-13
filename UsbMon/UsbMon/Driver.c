@@ -59,8 +59,8 @@ typedef struct _PENDINGIRP_LIST
 #define UrbGetTransferFlags(urb)		 (urb->UrbBulkOrInterruptTransfer.TransferFlags)
 #define UrbGetTransferLength(urb)		 (urb->UrbBulkOrInterruptTransfer.TransferBufferLength) 
 #define UrbGetTransferPipeHandle(urb)	 (urb->UrbBulkOrInterruptTransfer.PipeHandle)
-#define UrbIsInputTransfer(urb)			 (UrbGetTransferFlags(urb) & (USBD_TRANSFER_DIRECTION_IN | USBD_SHORT_TRANSFER_OK))
-#define UrbIsOutputTransfer(urb)		 (UrbGetTransferFlags(urb) & (USBD_TRANSFER_DIRECTION_OUT ))
+#define UrbIsInputTransfer(urb)			 (UrbGetTransferFlags(urb) & (USBD_TRANSFER_DIRECTION_IN ))
+#define UrbIsOutputTransfer(urb)		 (UrbGetTransferFlags(urb) & (USBD_TRANSFER_DIRECTION_OUT | USBD_DEFAULT_PIPE_TRANSFER))
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -395,7 +395,7 @@ NTSTATUS  MyCompletionCallback(
 	}
 
   	GetDeviceName(DeviceObject, DeviceName);
-	USB_MON_DEBUG_INFO("DriverName: %ws \r\nDeviceName: %ws \r\n", DeviceObject->DriverObject->DriverName.Buffer, DeviceName); 
+	USB_MON_DEBUG_INFO("DriverName: %ws \r\nDeviceName: %ws Flags: %x \r\n", DeviceObject->DriverObject->DriverName.Buffer, DeviceName, UrbGetTransferFlags(pContext->urb));
 	//USB_MON_DEBUG_INFO("Class: %x Protocol: %x \r\n" , pContext->node->mini_extension->InterfaceDesc->Class, pContext->node->mini_extension->InterfaceDesc->Protocol);
 	
 	if (UrbIsInputTransfer(pContext->urb))
@@ -425,16 +425,6 @@ NTSTATUS  MyCompletionCallback(
 		HandleMouseData(pContext, HidP_Output);
 		HandleKeyboardData(pContext, HidP_Output);
 	}
-
-	if (DeviceObject->DeviceExtension)
-	{
-		HIDCLASS_DEVICE_EXTENSION* hid_common_extension = (HIDCLASS_DEVICE_EXTENSION*)(pContext->DeviceObject->DeviceExtension);
-		PDO_EXTENSION* pdoExt = &hid_common_extension->pdoExt;
-
-		//DumpReport(pContext->node->parsedReport);
-	}
-
-	//Extract Mouse
 
 	if (pContext)
 	{
@@ -523,14 +513,18 @@ NTSTATUS DispatchInternalDeviceControl(
 		}	
 		urb = (PURB)irpStack->Parameters.Others.Argument1; 
 
-		if (UrbGetFunction(urb) != URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER)
+		if (UrbGetFunction(urb) != URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER &&
+			UrbGetFunction(urb) != URB_FUNCTION_CONTROL_TRANSFER)
 		{
 			break;
 		}
 
+
 		//If Urb pipe handle is used by HID mouse / kbd device. 
 		if (CheckIfPipeHandleExist(UrbGetTransferPipeHandle(urb),&node))
-		{
+		{	
+			USB_MON_DEBUG_INFO("$$$ Flags: %x \r\n", UrbGetTransferFlags(urb));
+
 			HIDCLASS_DEVICE_EXTENSION* class_extension = NULL;
 		
 			if(!node)
@@ -580,6 +574,7 @@ NTSTATUS DispatchInternalDeviceControl(
 			//Completion Routine hook
 			irpStack->Context = hijack;
 			irpStack->CompletionRoutine = MyCompletionCallback;
+			 
 		}
 	} while (0);
 
@@ -601,7 +596,7 @@ NTSTATUS InitUsbBypass()
 	PDRIVER_OBJECT			  pDriverObj = NULL;
 	NTSTATUS status = STATUS_UNSUCCESSFUL;	
 	
-	status = GetUsbHub(USB2, &pDriverObj);	// iusbhub
+	status = GetUsbHub(USB3, &pDriverObj);	// iusbhub
 	if (!NT_SUCCESS(status) || !pDriverObj)
 	{
 		USB_MON_DEBUG_INFO("GetUsbHub Error \r\n");
