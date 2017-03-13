@@ -5,7 +5,8 @@
 #include "UsbType.h"
 
 //------------------------------------------------------------------------------------------------------------------------------//
-VOID DumpReport(HIDP_DEVICE_DESC* report)
+VOID DumpReport(
+	_In_ HIDP_DEVICE_DESC* report)
 {
 	PHIDP_COLLECTION_DESC collectionDesc = &report->CollectionDesc[0];
 	for (int i = 0; i < report->CollectionDescLength; i++)
@@ -49,7 +50,10 @@ VOID DumpReport(HIDP_DEVICE_DESC* report)
 	}
 }
 //------------------------------------------------------------------------------------------------------------------------------//
-VOID DumpChannel(PHIDP_COLLECTION_DESC collectionDesc, HIDP_REPORT_TYPE type, ULONG Flags)
+VOID DumpChannel(
+	_In_ PHIDP_COLLECTION_DESC collectionDesc, 
+	_In_ HIDP_REPORT_TYPE type, 
+	_In_ ULONG Flags)
 {
 	if (!collectionDesc)
 	{
@@ -203,12 +207,23 @@ VOID DumpChannel(PHIDP_COLLECTION_DESC collectionDesc, HIDP_REPORT_TYPE type, UL
 }
 
 //------------------------------------------------------------------------------------------------------------------------------//
-NTSTATUS ExtractDataFromChannel(PHIDP_COLLECTION_DESC collectionDesc, HIDP_REPORT_TYPE type, EXTRACTDATA* ExtractedData)
+NTSTATUS ExtractKeyboardData(
+	_In_	 PHIDP_COLLECTION_DESC collectionDesc,
+	_In_	 HIDP_REPORT_TYPE type,
+	_Inout_  EXTRACTDATA* ExtractedData)
 {
 	HIDP_CHANNEL_DESC*            channel = NULL;
 	ULONG start = 0;
 	ULONG end = 0;
 	CHAR* reportType = NULL;
+	NTSTATUS status = STATUS_SUCCESS;
+
+	if (!collectionDesc || !ExtractedData)
+	{
+		status = STATUS_UNSUCCESSFUL;
+		return status;
+	}
+
 	switch (type)
 	{
 	case HidP_Input:
@@ -237,49 +252,115 @@ NTSTATUS ExtractDataFromChannel(PHIDP_COLLECTION_DESC collectionDesc, HIDP_REPOR
 
 	for (int k = start; k < end; k++)
 	{
-		//Root Collection
-		if (channel->LinkUsagePage == 0x1)
+		switch (channel->UsagePage)
 		{
-			switch (channel->LinkUsage)
+			case HID_LEDS:
 			{
-			case 0x2:
-				if (channel->IsButton)
-				{
-					ExtractedData->MOUDATA.OffsetButton = channel->ByteOffset - 1;
-					ExtractedData->MOUDATA.BtnOffsetSize = channel->ByteEnd - channel->ByteOffset;
-				}
-
-				if (!channel->IsRange)
-				{
-					//Meaning X , Y, Z
-					switch (channel->NotRange.Usage)
-					{
-					case HID_NOT_RANGE_USAGE_X:	//coordinate - X
-						ExtractedData->MOUDATA.OffsetX = channel->ByteOffset - 1;
-						ExtractedData->MOUDATA.XOffsetSize = channel->ByteEnd - channel->ByteOffset;
-						break;
-					case HID_NOT_RANGE_USAGE_Y:	//coordinate - Y
-						ExtractedData->MOUDATA.OffsetY = channel->ByteOffset - 1;
-						ExtractedData->MOUDATA.YOffsetSize = channel->ByteEnd - channel->ByteOffset;
-						break;
-					case HID_NOT_RANGE_USAGE_WHELL:  //coordinate - Z
-						ExtractedData->MOUDATA.OffsetZ = channel->ByteOffset - 1;
-						ExtractedData->MOUDATA.ZOffsetSize = channel->ByteEnd - channel->ByteOffset;
-						break;
-					default:
-						USB_MON_COMMON_DBG_BREAK();	//FATLA ERROR!!
-						break;
-					}
-				}
+				ExtractedData->KBDDATA.LedKeyOffset = channel->ByteOffset - 1;
+				ExtractedData->KBDDATA.LedKeySize = channel->ByteEnd - channel->ByteOffset;
+			}
 				break;
-
-			case 0x6:
+			case HID_KEYBOARD_OR_KEYPAD:
+			{
+				if (channel->Range.UsageMax == 0xFF)
+				{
+					ExtractedData->KBDDATA.NormalKeyOffset = channel->ByteOffset - 1;
+					ExtractedData->KBDDATA.NormalKeySize = channel->ByteEnd - channel->ByteOffset;
+				}
+				else
+				{
+					ExtractedData->KBDDATA.SpecialKeyOffset = channel->ByteOffset - 1;
+					ExtractedData->KBDDATA.SpecialKeySize = channel->ByteEnd - channel->ByteOffset;
+				}
+			} 
 				break;
 			default:
+				USB_MON_COMMON_DBG_BREAK();
 				break;
-			}
-			ExtractedData->MOUDATA.IsAbsolute = channel->IsAbsolute;
 		}
+		ExtractedData->MOUDATA.IsAbsolute = channel->IsAbsolute;
 		channel++;
 	}
+
+	return status;
+}
+//------------------------------------------------------------------------------------------------------------------------------//
+NTSTATUS ExtractMouseData(
+	_In_	 PHIDP_COLLECTION_DESC collectionDesc, 
+	_In_	 HIDP_REPORT_TYPE type, 
+	_Inout_  EXTRACTDATA* ExtractedData)
+{
+	HIDP_CHANNEL_DESC*            channel = NULL;
+	ULONG start = 0;
+	ULONG end = 0;
+	CHAR* reportType = NULL;
+	NTSTATUS status = STATUS_SUCCESS;
+
+	if (!collectionDesc || !ExtractedData)
+	{
+		status = STATUS_UNSUCCESSFUL;
+		return status; 
+	}
+
+	switch (type)
+	{
+	case HidP_Input:
+		channel = &collectionDesc->PreparsedData->Data[collectionDesc->PreparsedData->Input.Offset];
+		start = collectionDesc->PreparsedData->Input.Offset;
+		end = collectionDesc->PreparsedData->Input.Index;
+		reportType = "Input Report";
+		break;
+	case HidP_Output:
+		channel = &collectionDesc->PreparsedData->Data[collectionDesc->PreparsedData->Output.Offset];
+		start = collectionDesc->PreparsedData->Output.Offset;
+		end = collectionDesc->PreparsedData->Output.Index;
+		reportType = "Output Report";
+		break;
+	case HidP_Feature:
+		channel = &collectionDesc->PreparsedData->Data[collectionDesc->PreparsedData->Feature.Offset];
+		start = collectionDesc->PreparsedData->Feature.Offset;
+		end = collectionDesc->PreparsedData->Feature.Index;
+		reportType = "Feature Report";
+		break;
+	default:
+		break;
+	}
+
+	USB_MON_DEBUG_INFO("Start: %x End: %x ReportType: %s \r\n", start, end, reportType);
+
+	for (int k = start; k < end; k++)
+	{
+		//Root Collection 
+		if (channel->IsButton)
+		{ 
+			ExtractedData->MOUDATA.OffsetButton = channel->ByteOffset - 1;
+			ExtractedData->MOUDATA.BtnOffsetSize = channel->ByteEnd - channel->ByteOffset; 
+		} 
+		 if (!channel->IsRange)
+		 {
+		 	//Meaning X , Y, Z
+		 	switch (channel->NotRange.Usage)
+		 	{
+		 	case HID_NOT_RANGE_USAGE_X:		 //coordinate - X
+		 		ExtractedData->MOUDATA.OffsetX = channel->ByteOffset - 1;
+		 		ExtractedData->MOUDATA.XOffsetSize = channel->ByteEnd - channel->ByteOffset;
+		 		break;
+		 	case HID_NOT_RANGE_USAGE_Y:		 //coordinate - Y
+		 		ExtractedData->MOUDATA.OffsetY = channel->ByteOffset - 1;
+		 		ExtractedData->MOUDATA.YOffsetSize = channel->ByteEnd - channel->ByteOffset;
+		 		break;
+		 	case HID_NOT_RANGE_USAGE_WHELL:  //coordinate - Z
+		 		ExtractedData->MOUDATA.OffsetZ = channel->ByteOffset - 1;
+		 		ExtractedData->MOUDATA.ZOffsetSize = channel->ByteEnd - channel->ByteOffset;
+		 		break;
+		 	default:
+		 		USB_MON_COMMON_DBG_BREAK();	//FATAL ! Ignore it
+		 		break;
+		 	}
+		 }
+		ExtractedData->MOUDATA.IsAbsolute = channel->IsAbsolute;
+		channel++;
+	}
+
+	return status;
 }

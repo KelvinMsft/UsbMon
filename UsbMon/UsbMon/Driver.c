@@ -3,8 +3,11 @@
 
 #include "UsbUtil.h" 
 #include "UsbHid.h"
+#include "UsbType.h"
 #include "IrpHook.h"
+#include "ReportUtil.h"
 //#include "Urb.h"
+
 #pragma warning (disable : 4100)
 
 
@@ -40,11 +43,15 @@ typedef struct _PENDINGIRP_LIST
  
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
-////	Marco
+////	Marco Utilities
 ////  
-////
+//// 
 
-
+//Hijack Context Marco
+#define GetCollectionDesc(x, y)		  &x->node->parsedReport.CollectionDesc[y]
+#define IsMouseUsage(x, y)			  (x->node->parsedReport.CollectionDesc[y].Usage==HID_MOU_USAGE)
+#define IsKeyboardUsage(x, y)		  (x->node->parsedReport.CollectionDesc[y].Usage==HID_KBD_USAGE)
+#define IsDesktopUsagePage(x, y)	  (x->node->parsedReport.CollectionDesc[y].UsagePage==HID_GENERIC_DESKTOP_PAGE)
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -183,6 +190,134 @@ ULONG FindInterefaceCallback(
 	return CLIST_FINDCB_CTN;
 }
 //----------------------------------------------------------------------------------------//
+NTSTATUS HandleKeyboardData(HIJACK_CONTEXT* pContext, HIDP_REPORT_TYPE reportType)
+{
+	HIDCLASS_DEVICE_EXTENSION* hid_common_extension = (HIDCLASS_DEVICE_EXTENSION*)(pContext->DeviceObject->DeviceExtension);
+	PDO_EXTENSION*							 pdoExt = &hid_common_extension->pdoExt;
+	EXTRACTDATA								   data = { 0 };
+	NTSTATUS								 status = STATUS_UNSUCCESSFUL;
+	ULONG								   colIndex = pdoExt->collectionIndex - 1;
+	//Top-Collection == Mouse && Usage Page == Desktop
+	if (!IsKeyboardUsage(pContext, colIndex) ||
+		!IsDesktopUsagePage(pContext, colIndex))
+	{
+		status = STATUS_SUCCESS;
+		return status;
+	}
+
+	USB_MON_DEBUG_INFO("IsClientPdo: %x \r\n", hid_common_extension->isClientPdo);
+	USB_MON_DEBUG_INFO("collectionIndex: %x collectionNum: %x \r\n", pdoExt->collectionIndex, pdoExt->collectionNum);
+
+	status = ExtractKeyboardData(GetCollectionDesc(pContext, colIndex), reportType, &data);
+
+	USB_MON_DEBUG_INFO("OffsetX: %X		 Size: %x \r\n", data.KBDDATA.NormalKeyOffset, data.KBDDATA.NormalKeySize);
+	USB_MON_DEBUG_INFO("OffsetY: %X		 Size: %x  \r\n", data.KBDDATA.SpecialKeyOffset, data.KBDDATA.SpecialKeySize);
+	USB_MON_DEBUG_INFO("OffsetZ: %X		 Size: %x  \r\n", data.KBDDATA.LedKeyOffset, data.KBDDATA.LedKeySize);
+
+	ULONG totalSize = data.KBDDATA.NormalKeySize + data.KBDDATA.SpecialKeySize + data.KBDDATA.LedKeySize;
+	if (!totalSize)
+	{
+		status = STATUS_SUCCESS;
+		return status;
+	}
+
+	char* extractor = ExAllocatePool(NonPagedPool, totalSize);
+	if (extractor)
+	{
+		char* normalKey  = extractor;
+		char* LedKey	 = extractor + data.KBDDATA.NormalKeySize;
+		char* SpecialKey = extractor + data.KBDDATA.NormalKeySize + data.KBDDATA.SpecialKeySize;
+
+		RtlZeroMemory(extractor, totalSize);
+
+		RtlMoveMemory(normalKey, (PUCHAR)pContext->urb->UrbBulkOrInterruptTransfer.TransferBuffer + data.KBDDATA.NormalKeyOffset, data.KBDDATA.NormalKeySize);
+		RtlMoveMemory(SpecialKey, (PUCHAR)pContext->urb->UrbBulkOrInterruptTransfer.TransferBuffer + data.KBDDATA.SpecialKeyOffset, data.KBDDATA.SpecialKeySize);
+		RtlMoveMemory(LedKey, (PUCHAR)pContext->urb->UrbBulkOrInterruptTransfer.TransferBuffer + data.KBDDATA.LedKeyOffset, data.KBDDATA.LedKeySize);
+		USB_MON_DEBUG_INFO("Enter: ");
+ 		for (int i = 0; i < data.KBDDATA.NormalKeySize; i++)
+		{
+			USB_MON_DEBUG_INFO("%x ", *normalKey);
+			normalKey++;
+		}
+
+		for (int i = 0; i < data.KBDDATA.SpecialKeySize; i++)
+		{
+			USB_MON_DEBUG_INFO("%x ", *SpecialKey);
+			SpecialKey++;
+		}
+
+		for (int i = 0; i < data.KBDDATA.LedKeySize; i++)
+		{
+			USB_MON_DEBUG_INFO("%x ", *LedKey);
+			LedKey++;
+		} 
+		USB_MON_DEBUG_INFO("\r\n");
+		ExFreePool(extractor);
+		extractor = NULL;
+	}
+
+	return status;
+}
+//----------------------------------------------------------------------------------------//
+NTSTATUS HandleMouseData(HIJACK_CONTEXT* pContext, HIDP_REPORT_TYPE reportType)
+{
+	HIDCLASS_DEVICE_EXTENSION* hid_common_extension = (HIDCLASS_DEVICE_EXTENSION*)(pContext->DeviceObject->DeviceExtension);
+	PDO_EXTENSION*							 pdoExt = &hid_common_extension->pdoExt;
+	EXTRACTDATA								   data = { 0 };
+	NTSTATUS								 status = STATUS_UNSUCCESSFUL;
+	ULONG								   colIndex = pdoExt->collectionIndex - 1;
+	//Top-Collection == Mouse && Usage Page == Desktop
+	if (!IsMouseUsage(pContext, colIndex) ||
+		!IsDesktopUsagePage(pContext, colIndex))
+	{
+		status = STATUS_SUCCESS;
+		return status;
+	}
+
+	USB_MON_DEBUG_INFO("IsClientPdo: %x \r\n", hid_common_extension->isClientPdo);
+	USB_MON_DEBUG_INFO("collectionIndex: %x collectionNum: %x \r\n", pdoExt->collectionIndex, pdoExt->collectionNum); 
+	status = ExtractMouseData(GetCollectionDesc(pContext, colIndex),  reportType, &data);
+
+	USB_MON_DEBUG_INFO("OffsetX: %X		 Size: %x \r\n", data.MOUDATA.OffsetX, data.MOUDATA.XOffsetSize);
+	USB_MON_DEBUG_INFO("OffsetY: %X		 Size: %x  \r\n", data.MOUDATA.OffsetY,  data.MOUDATA.YOffsetSize);
+	USB_MON_DEBUG_INFO("OffsetZ: %X		 Size: %x  \r\n", data.MOUDATA.OffsetZ, data.MOUDATA.ZOffsetSize);
+	USB_MON_DEBUG_INFO("OffsetButton: %X Size: %x  \r\n", data.MOUDATA.OffsetButton, data.MOUDATA.BtnOffsetSize);
+	   
+	ULONG totalSize = data.MOUDATA.XOffsetSize + data.MOUDATA.YOffsetSize + data.MOUDATA.ZOffsetSize + data.MOUDATA.BtnOffsetSize;
+	if (!totalSize)
+	{
+		status = STATUS_SUCCESS;
+		return status;
+	}
+
+	char* extractor = ExAllocatePool(NonPagedPool, totalSize);
+	if (extractor)
+	{
+		char* x		= extractor;
+		char* y		= extractor + data.MOUDATA.XOffsetSize;
+		char* wheel = extractor + data.MOUDATA.XOffsetSize + data.MOUDATA.YOffsetSize;
+		char* btn   = extractor + data.MOUDATA.XOffsetSize + data.MOUDATA.YOffsetSize + data.MOUDATA.ZOffsetSize;
+
+		RtlZeroMemory(extractor, totalSize);
+
+		RtlMoveMemory(x, (PUCHAR)pContext->urb->UrbBulkOrInterruptTransfer.TransferBuffer + data.MOUDATA.OffsetX, data.MOUDATA.XOffsetSize); 
+		RtlMoveMemory(y, (PUCHAR)pContext->urb->UrbBulkOrInterruptTransfer.TransferBuffer + data.MOUDATA.OffsetY, data.MOUDATA.YOffsetSize);
+ 		RtlMoveMemory(wheel, (PUCHAR)pContext->urb->UrbBulkOrInterruptTransfer.TransferBuffer + data.MOUDATA.OffsetZ, data.MOUDATA.ZOffsetSize); 
+ 		RtlMoveMemory(btn, (PUCHAR)pContext->urb->UrbBulkOrInterruptTransfer.TransferBuffer + data.MOUDATA.OffsetButton, data.MOUDATA.BtnOffsetSize);
+  
+		//TODO: loop the size
+		USB_MON_DEBUG_INFO("X : %d \r\n", *x);
+		USB_MON_DEBUG_INFO("Y : %d \r\n", *y);
+		USB_MON_DEBUG_INFO("Z : %d \r\n", *wheel);
+		USB_MON_DEBUG_INFO("btn: %d \r\n", *btn);
+ 
+		ExFreePool(extractor);
+		extractor = NULL;
+	}
+	
+	return status;
+}
+//----------------------------------------------------------------------------------------//
 NTSTATUS  MyCompletionCallback(
 	_In_     PDEVICE_OBJECT DeviceObject,			//Class Driver-Created Device Object by MiniDriver DriverObject
 	_In_     PIRP           Irp,
@@ -259,67 +394,23 @@ NTSTATUS  MyCompletionCallback(
 		USB_MON_DEBUG_INFO("\r\n");
 		reportType = HidP_Output;
 	}
-  
+  	GetDeviceName(DeviceObject, DeviceName);
+	USB_MON_DEBUG_INFO("Mouse/Keyboard DeviceName: %ws DriverName: %ws \r\n", DeviceObject->DriverObject->DriverName.Buffer, DeviceName); 
+	
 	if (DeviceObject->DeviceExtension)
 	{
 		HIDCLASS_DEVICE_EXTENSION* hid_common_extension = (HIDCLASS_DEVICE_EXTENSION*)(pContext->DeviceObject->DeviceExtension);
 		PDO_EXTENSION* pdoExt = &hid_common_extension->pdoExt;
 
 		//DumpReport(pContext->node->parsedReport);
-		USB_MON_DEBUG_INFO("IsClientPdo: %x \r\n", hid_common_extension->isClientPdo);
-		USB_MON_DEBUG_INFO("collectionIndex: %x collectionNum: %x \r\n", pdoExt->collectionIndex, pdoExt->collectionNum);
-		USB_MON_DEBUG_INFO("CollectionDescLength: %x \r\n", pContext->node->parsedReport->CollectionDescLength);
 
-	 	EXTRACTDATA data = { 0 };
-		  
-		ExtractDataFromChannel(&pContext->node->parsedReport->CollectionDesc[pdoExt->collectionIndex - 1], reportType,&data);
-		
-		USB_MON_DEBUG_INFO("OffsetX: %X \r\n", data.MOUDATA.OffsetX);
-		USB_MON_DEBUG_INFO("OffsetY: %X \r\n", data.MOUDATA.OffsetY);
-		USB_MON_DEBUG_INFO("OffsetZ: %X \r\n", data.MOUDATA.OffsetZ);
-		USB_MON_DEBUG_INFO("OffsetButton: %X \r\n", data.MOUDATA.OffsetButton);
-
-		USB_MON_DEBUG_INFO("XOffsetSize: %X \r\n", data.MOUDATA.XOffsetSize);
-		USB_MON_DEBUG_INFO("YOffsetSize: %X \r\n", data.MOUDATA.YOffsetSize);
-		USB_MON_DEBUG_INFO("ZOffsetSize: %X \r\n", data.MOUDATA.ZOffsetSize);
-		USB_MON_DEBUG_INFO("BtnOffsetSize: %X \r\n", data.MOUDATA.BtnOffsetSize);
-
-		char* x		= ExAllocatePool(NonPagedPool, data.MOUDATA.XOffsetSize); 
-		char* y		= ExAllocatePool(NonPagedPool, data.MOUDATA.YOffsetSize); 
-		char* z		= ExAllocatePool(NonPagedPool, data.MOUDATA.ZOffsetSize);
-		char* btn	= ExAllocatePool(NonPagedPool, data.MOUDATA.BtnOffsetSize);
-
-		if (x && y && z && btn)
-		{
-			RtlZeroMemory(x, data.MOUDATA.XOffsetSize);
-			RtlZeroMemory(x, data.MOUDATA.YOffsetSize);
-			RtlZeroMemory(x, data.MOUDATA.ZOffsetSize);
-			RtlZeroMemory(x, data.MOUDATA.BtnOffsetSize);
-
-			RtlMoveMemory(x, (PUCHAR)pContext->urb->UrbBulkOrInterruptTransfer.TransferBuffer + data.MOUDATA.OffsetX, data.MOUDATA.XOffsetSize);
-			RtlMoveMemory(y, (PUCHAR)pContext->urb->UrbBulkOrInterruptTransfer.TransferBuffer + data.MOUDATA.OffsetY, data.MOUDATA.YOffsetSize);
-			RtlMoveMemory(z, (PUCHAR)pContext->urb->UrbBulkOrInterruptTransfer.TransferBuffer + data.MOUDATA.OffsetZ, data.MOUDATA.ZOffsetSize);
-			RtlMoveMemory(btn, (PUCHAR)pContext->urb->UrbBulkOrInterruptTransfer.TransferBuffer + data.MOUDATA.OffsetButton, data.MOUDATA.BtnOffsetSize);
-		
-			USB_MON_DEBUG_INFO("X : %d \r\n", *x);
-			USB_MON_DEBUG_INFO("Y : %d \r\n", *y);
-			USB_MON_DEBUG_INFO("Z : %d \r\n", *z);
-			USB_MON_DEBUG_INFO("btn: %d \r\n", *btn);
-
-			ExFreePool(x);
-			x = NULL;
-			ExFreePool(y);
-			y = NULL;
-			ExFreePool(z);
-			z = NULL;
-			ExFreePool(btn);
-			btn = NULL;
-		}
-		GetDeviceName(DeviceObject, DeviceName);
-		USB_MON_DEBUG_INFO("Mouse/Keyboard DeviceName: %ws DriverName: %ws \r\n", DeviceObject->DriverObject->DriverName.Buffer, DeviceName); 
+		USB_MON_DEBUG_INFO("CollectionDescLength: %x \r\n", pContext->node->parsedReport.CollectionDescLength);
+		HandleMouseData(pContext, reportType); 
+		HandleKeyboardData(pContext, reportType);
 	}
-	
-	 
+
+	//Extract Mouse
+
 	if (pContext)
 	{
 		ExFreePool(pContext);
@@ -484,39 +575,33 @@ NTSTATUS DispatchInternalDeviceControl(
 	
 	return g_pDispatchInternalDeviceControl(DeviceObject, Irp);
 }
-
 //----------------------------------------------------------------------------------------//
-NTSTATUS DriverEntry(
-	_In_ PDRIVER_OBJECT object, 
-	_In_ PUNICODE_STRING String)
+NTSTATUS InitUsbBypass()
 {
 	PDRIVER_OBJECT			  pDriverObj = NULL;
-	NTSTATUS					  status = STATUS_UNSUCCESSFUL;
-	  
-	object->DriverUnload = DriverUnload;
+	NTSTATUS status = STATUS_UNSUCCESSFUL;	
+	
+	status = GetUsbHub(USB3, &pDriverObj);	// iusbhub
+	if (!NT_SUCCESS(status) || !pDriverObj)
+	{
+		USB_MON_DEBUG_INFO("GetUsbHub Error \r\n");
+		return status;
+	}
 
 	status = InitHidClientPdoList(&g_HidPipeList, &(ULONG)g_current_index);
 	if (!NT_SUCCESS(status) || (!g_HidPipeList && !g_current_index))
 	{
-		USB_MON_DEBUG_INFO("No keyboard Or Mouse \r\n");  
+		USB_MON_DEBUG_INFO("No keyboard Or Mouse \r\n");
 		return status;
 	}
 
 	USB_MON_DEBUG_INFO("Done Init --- Device_object_list: %I64X Size: %x \r\n", g_HidPipeList, g_current_index);
 
-	status = GetUsbHub(USB2, &pDriverObj);	// iusbhub
-	if (!NT_SUCCESS(status) || !pDriverObj)
-	{
-		FreeHidClientPdoList();
-		USB_MON_DEBUG_INFO("GetUsbHub Error \r\n");
-		return status;
-	}
-	
 	//Init Irp Linked-List
 	status = InitPendingIrpLinkedList();
 	if (!NT_SUCCESS(status))
 	{
-		USB_MON_DEBUG_INFO("InitPendingIrpLinkedList Error \r\n"); 
+		USB_MON_DEBUG_INFO("InitPendingIrpLinkedList Error \r\n");
 		FreeHidClientPdoList();
 		return status;
 	}
@@ -531,14 +616,23 @@ NTSTATUS DriverEntry(
 	}
 
 	//Do Irp Hook for URB transmit
-	g_pDispatchInternalDeviceControl = (PDRIVER_DISPATCH)DoIrpHook(pDriverObj,IRP_MJ_INTERNAL_DEVICE_CONTROL,DispatchInternalDeviceControl, Start);	
+	g_pDispatchInternalDeviceControl = (PDRIVER_DISPATCH)DoIrpHook(pDriverObj, IRP_MJ_INTERNAL_DEVICE_CONTROL, DispatchInternalDeviceControl, Start);
 	if (!g_pDispatchInternalDeviceControl)
 	{
 		FreeHidClientPdoList();
 		FreePendingIrpList();
-		USB_MON_DEBUG_INFO("DoIrpHook Error \r\n"); 
+		USB_MON_DEBUG_INFO("DoIrpHook Error \r\n");
 		status = STATUS_UNSUCCESSFUL;
 		return status;
 	}
-	return status;
+}
+
+//----------------------------------------------------------------------------------------//
+NTSTATUS DriverEntry(
+	_In_ PDRIVER_OBJECT object, 
+	_In_ PUNICODE_STRING String)
+{ 
+	NTSTATUS					  status = STATUS_UNSUCCESSFUL; 
+	object->DriverUnload = DriverUnload;
+	return InitUsbBypass(); 
 }

@@ -123,10 +123,10 @@ HIDP_DEVICE_DESC* g_hid_collection = NULL;
 /////////////////////////////////////////////////////////////////////////////////////////////// 
 //// Marco
 //// 
-#define HID_USB_DEVICE L"\\Driver\\hidusb"
-#define ARRAY_SIZE					  100
-#define HIDP_PREPARSED_DATA_SIGNATURE1 'PdiH'
-#define HIDP_PREPARSED_DATA_SIGNATURE2 'RDK '
+#define HID_USB_DEVICE				 	 L"\\Driver\\hidusb"
+#define ARRAY_SIZE						 100
+#define HIDP_PREPARSED_DATA_SIGNATURE1	 'PdiH'
+#define HIDP_PREPARSED_DATA_SIGNATURE2   'RDK '
  
  
 
@@ -138,50 +138,91 @@ HIDP_DEVICE_DESC* g_hid_collection = NULL;
 //// Implementation
 ////  
 
+//----------------------------------------------------------------------------------------------------------//
+NTSTATUS ReleaseHidRelation()
+{
+	NTSTATUS status = STATUS_SUCCESS;
+	if (!g_hid_client_pdo_list)
+	{
+		status = STATUS_UNSUCCESSFUL;
+		return status;
+	}
+	InterlockedIncrement64(&g_hid_client_pdo_list->RefCount);
+	return status;
+}
+//----------------------------------------------------------------------------------------------------------//
+NTSTATUS AcquireHidRelation(
+	_Out_ PHID_DEVICE_LIST* device_object_list,
+	_Out_ PULONG size
+)
+{
+	*device_object_list = g_hid_client_pdo_list;
+	*size = g_hid_client_pdo_list->currentSize;
+	InterlockedIncrement64(&g_hid_client_pdo_list->RefCount);
+}
 
 //----------------------------------------------------------------------------------------------------------//
-HIDP_DEVICE_DESC* GetReport(HIDCLASS_DEVICE_EXTENSION* hid_common_extension)
+NTSTATUS GetReportByDeviceExtension(
+	_In_  HIDCLASS_DEVICE_EXTENSION* hid_common_extension, 
+	_Out_ HIDP_DEVICE_DESC* ret)
 {
 	PDO_EXTENSION* pdoExt = NULL;
 	FDO_EXTENSION* fdoExt = NULL; 
-
-	if (!hid_common_extension)
-	{
-		return NULL;
-	}
- 
-	pdoExt = &hid_common_extension->pdoExt;
-
-	USB_MON_DEBUG_INFO("sizeof FDO_EXTENSION : %X  \r\n", sizeof(FDO_EXTENSION));
-	USB_MON_DEBUG_INFO("hid_common_extension: %I64x \r\n", hid_common_extension);
-	USB_MON_DEBUG_INFO("pdoExt: %I64x \r\n", pdoExt);
-	USB_MON_DEBUG_INFO("OFFSET %x \r\n", FIELD_OFFSET(PDO_EXTENSION, deviceFdoExt));
-	USB_MON_DEBUG_INFO("pdoExt Offset: %I64x \r\n", &hid_common_extension->pdoExt.deviceFdoExt);
-	USB_MON_DEBUG_INFO("pdoExt Offset: %I64x \r\n", ((ULONG64)hid_common_extension) + 0x60);		//For Win7 deviceFdoExt offset by HIDCLASS_DEVICE_EXTENSION->PDO_EXTENSION.backptr
-	
+	HIDCLASS_DEVICE_EXTENSION* addr = NULL;
 	WCHAR name[256] = { 0 };
-	HIDCLASS_DEVICE_EXTENSION* addr = (HIDCLASS_DEVICE_EXTENSION*)pdoExt->deviceFdoExt;
-	fdoExt = &addr->fdoExt;
-	GetDeviceName(fdoExt->fdo, name);
-	USB_MON_DEBUG_INFO("Pdo->fdoExt: %I64x \r\n", fdoExt);
-	USB_MON_DEBUG_INFO("Pdo->fdo: %I64x \r\n", fdoExt->fdo);
-	USB_MON_DEBUG_INFO("Pdo->fdo DriverName: %ws \r\n", fdoExt->fdo->DriverObject->DriverName.Buffer);
-	USB_MON_DEBUG_INFO("Pdo->fdo DeviceName: %ws \r\n", name);
-	USB_MON_DEBUG_INFO("Pdo->CollectionIndex: %I64x \r\n", pdoExt->collectionIndex);
-	USB_MON_DEBUG_INFO("Pdo->CollectionNum: %I64x \r\n", pdoExt->collectionNum);
-	// = (HIDP_DEVICE_DESC*)((PUCHAR)fdoExt + 0x58);
-	HIDP_DEVICE_DESC* tmp = ExAllocatePoolWithTag(NonPagedPool, sizeof(HIDP_DEVICE_DESC), 'pdih'); // = (HIDP_DEVICE_DESC*)((PUCHAR)fdoExt + 0x58);
-	if (!tmp)
+	HIDP_DEVICE_DESC hid_device_desc = { 0 };
+	NTSTATUS status = STATUS_SUCCESS;
+	do
 	{
-		return NULL;
-	}
-	RtlZeroMemory(tmp, sizeof(HIDP_DEVICE_DESC));
+		if (!hid_common_extension || !ret)
+		{
+			status = STATUS_UNSUCCESSFUL;
+			break;
+		}
 
-	USB_MON_DEBUG_INFO("[rawReportDescription] %I64x rawReportDescriptionLength: %xh \r\n", fdoExt->rawReportDescription, fdoExt->rawReportDescriptionLength);
+		pdoExt = &hid_common_extension->pdoExt;
 
-	MyGetCollectionDescription(fdoExt->rawReportDescription, fdoExt->rawReportDescriptionLength, NonPagedPool, tmp);	 
-	DumpReport(tmp);
-	return tmp;
+		if (!pdoExt)
+		{
+			status = STATUS_UNSUCCESSFUL;
+			break;
+		}
+
+		addr = (HIDCLASS_DEVICE_EXTENSION*)pdoExt->deviceFdoExt;
+		if (!addr)
+		{
+			status = STATUS_UNSUCCESSFUL;
+			break;
+		}
+
+		fdoExt = &addr->fdoExt;
+		if (!fdoExt)
+		{
+			status = STATUS_UNSUCCESSFUL;
+			break;
+		}
+
+		GetDeviceName(fdoExt->fdo, name);
+		USB_MON_DEBUG_INFO("Pdo->fdoExt: %I64x \r\n", fdoExt);
+		USB_MON_DEBUG_INFO("Pdo->fdo: %I64x \r\n", fdoExt->fdo);
+		USB_MON_DEBUG_INFO("Pdo->fdo DriverName: %ws \r\n", fdoExt->fdo->DriverObject->DriverName.Buffer);
+		USB_MON_DEBUG_INFO("Pdo->CollectionIndex: %I64x \r\n", pdoExt->collectionIndex);
+		USB_MON_DEBUG_INFO("Pdo->CollectionNum: %I64x \r\n", pdoExt->collectionNum);
+
+		// = (HIDP_DEVICE_DESC*)((PUCHAR)fdoExt + 0x58);
+		//ExAllocatePoolWithTag(NonPagedPool, sizeof(HIDP_DEVICE_DESC), 'pdih'); // = (HIDP_DEVICE_DESC*)((PUCHAR)fdoExt + 0x58);
+
+		//USB_MON_DEBUG_INFO("[rawReportDescription] %I64x rawReportDescriptionLength: %xh \r\n", fdoExt->rawReportDescription, fdoExt->rawReportDescriptionLength);
+
+		MyGetCollectionDescription(fdoExt->rawReportDescription, fdoExt->rawReportDescriptionLength, NonPagedPool, &hid_device_desc);
+
+		DumpReport(&hid_device_desc);
+
+		RtlMoveMemory(ret, &hid_device_desc, sizeof(HIDP_DEVICE_DESC));
+
+	} while (FALSE);
+
+	return status;
 } 
 //-------------------------------------------------------------------------------------------//
 HID_DEVICE_NODE* CreateHidDeviceNode(
@@ -190,12 +231,13 @@ HID_DEVICE_NODE* CreateHidDeviceNode(
 	_In_ HIDP_DEVICE_DESC* parsedReport
 )
 {
+	HID_DEVICE_NODE* node = NULL;
 	if (!device_object || !mini_extension || !parsedReport)
 	{
 		return NULL;
 	}
 
-	HID_DEVICE_NODE* node = ExAllocatePool(NonPagedPool, sizeof(HID_DEVICE_NODE));
+	node = ExAllocatePoolWithTag(NonPagedPool, sizeof(HID_DEVICE_NODE), 'edon');
 	if (!node)
 	{
 		return NULL;
@@ -204,7 +246,8 @@ HID_DEVICE_NODE* CreateHidDeviceNode(
 	RtlZeroMemory(node, sizeof(HID_DEVICE_NODE));
 	node->device_object  = device_object;
 	node->mini_extension = mini_extension;
-	node->parsedReport = parsedReport;
+	RtlMoveMemory(&node->parsedReport , parsedReport , sizeof(HIDP_DEVICE_DESC));
+
 	return node;
 }
  
@@ -217,10 +260,8 @@ BOOLEAN  IsKeyboardOrMouseDevice(
 	HID_USB_DEVICE_EXTENSION* mini_extension    = NULL;
 	HIDCLASS_DEVICE_EXTENSION* hid_common_extension  = NULL;
 	WCHAR						DeviceName[256] = { 0 };
-	int i = 0;
 	GetDeviceName(device_object, DeviceName);
 
- 
 	hid_common_extension = (HIDCLASS_DEVICE_EXTENSION*)device_object->DeviceExtension;
 	if (!hid_common_extension)
 	{
@@ -237,6 +278,7 @@ BOOLEAN  IsKeyboardOrMouseDevice(
 	 
 	//DumpHidMiniDriverExtension(hid_common_extension); 
 
+	//Device Name = HID_0000000X
 	if (!hid_common_extension->isClientPdo)
 	{	
 		*hid_mini_extension = NULL;
@@ -283,84 +325,102 @@ NTSTATUS FreeHidClientPdoList()
 		g_hid_client_pdo_list = NULL;
 	}
 	return status;
-}
+} 
 //----------------------------------------------------------------------------------------------------------//
-NTSTATUS ReleaseHidRelation()
+NTSTATUS GetAllClientPdo(PDRIVER_OBJECT driver_object, ULONG* client_pdo_count)
 {
-	NTSTATUS status = STATUS_SUCCESS;
-	if (!g_hid_client_pdo_list)
-	{
-		status = STATUS_UNSUCCESSFUL;
-		return status;
-	}
-	InterlockedIncrement64(&g_hid_client_pdo_list->RefCount);
-	return status;
-}
-//----------------------------------------------------------------------------------------------------------//
-NTSTATUS AcquireHidRelation(
-	_Out_ PHID_DEVICE_LIST* device_object_list,
-	_Out_ PULONG size
-)
-{
-	*device_object_list = g_hid_client_pdo_list;
-	*size = g_hid_client_pdo_list->currentSize;
-	InterlockedIncrement64(&g_hid_client_pdo_list->RefCount);
-}
-
-//----------------------------------------------------------------------------------------------------------//
-NTSTATUS InitHidList(
-	_In_  PDRIVER_OBJECT pDriverObj, 
-	_Out_ PULONG current_size)
-{
-	NTSTATUS status = STATUS_UNSUCCESSFUL;
-	PDEVICE_OBJECT device_object = NULL;
-	if (!pDriverObj || !current_size || !g_hid_client_pdo_list)
-	{
-		return status;
-	}
-
-	device_object = pDriverObj->DeviceObject;
-
+	PDEVICE_OBJECT	device_object = driver_object->DeviceObject; 
+	ULONG	hid_client_pdo_count  = 0;
+	NTSTATUS		status = STATUS_UNSUCCESSFUL;
 	while (device_object)
 	{
 		HID_DEVICE_NODE*					node = NULL;
-		HIDP_DEVICE_DESC*				  report = NULL;
+		HIDP_DEVICE_DESC				  report = { 0 };
 		HID_USB_DEVICE_EXTENSION* mini_extension = NULL;
 
 		if (!IsKeyboardOrMouseDevice(device_object, &mini_extension))
 		{
-			device_object = device_object->NextDevice;
-			continue;
+			goto Next;
 		}
-
+		 
 		if (!mini_extension)
 		{
-			device_object = device_object->NextDevice;
-			continue;
+			goto Next;
 		}
 
-		report =  GetReport(device_object->DeviceExtension); 
-		node   =  CreateHidDeviceNode(device_object, mini_extension, report);
-
-		if (node && report)
+		if (!NT_SUCCESS(GetReportByDeviceExtension(device_object->DeviceExtension, &report)))
 		{
-			AddToChainListTail(g_hid_client_pdo_list->head, node);
-			(*current_size)++;
-			USB_MON_DEBUG_INFO("Inserted one element: %I64x InferfaceDesc: %I64X device_object: %I64x \r\n",node->device_object, node->mini_extension, device_object);
-			USB_MON_DEBUG_INFO("Added one element :%x \r\n", *current_size);
+			goto Next;
 		}
+
+		node = CreateHidDeviceNode(device_object, mini_extension, &report);
+		if (!node)
+		{
+			goto Next;
+		}
+
+		AddToChainListTail(g_hid_client_pdo_list->head, node);
+		hid_client_pdo_count++;
+
+		USB_MON_DEBUG_INFO("Inserted one element: %I64x InferfaceDesc: %I64X device_object: %I64x \r\n", node->device_object, node->mini_extension, device_object);
+		USB_MON_DEBUG_INFO("Added one element :%x \r\n", hid_client_pdo_count);
+Next:
 		device_object = device_object->NextDevice;
 	}
-
-	if (*current_size > 0)
+	if (hid_client_pdo_count)
 	{
+		*client_pdo_count = hid_client_pdo_count;
 		status = STATUS_SUCCESS;
 	}
+	return status;
+}
+//----------------------------------------------------------------------------------------------------------//
+NTSTATUS InitPdoList(_Out_ PULONG current_size)
+{
+	NTSTATUS		  	  status = STATUS_UNSUCCESSFUL; 
+	PDRIVER_OBJECT driver_object = NULL;
+	ULONG			 return_size = 0;
+
+	do {
+		if (!current_size || !g_hid_client_pdo_list)
+		{
+			USB_MON_DEBUG_INFO("Empty Params \r\n");
+			status = STATUS_UNSUCCESSFUL;
+			break;
+		}
+
+		if (!NT_SUCCESS(GetDriverObjectByName(HID_USB_DEVICE, &driver_object)))
+		{
+			USB_MON_DEBUG_INFO("Get Drv Obj Error \r\n");
+			status = STATUS_UNSUCCESSFUL;
+			break;
+		}
+
+		if (!driver_object)
+		{
+			USB_MON_DEBUG_INFO("Empty DrvObj \r\n");
+			status = STATUS_UNSUCCESSFUL; 
+			break;
+		}
+
+		if (!NT_SUCCESS(GetAllClientPdo(driver_object, &return_size)))
+		{
+			USB_MON_DEBUG_INFO("GetAllClientPdo Error \r\n");
+			status = STATUS_UNSUCCESSFUL;
+			break; 
+		}
+		if (return_size > 0)
+		{
+			status = STATUS_SUCCESS;
+			*current_size = return_size;
+		}
+
+	} while (FALSE);
 	
 	return status;
 }
 //----------------------------------------------------------------------------------------------------------//
-NTSTATUS CreateHidList()
+NTSTATUS AllocatePdoList()
 {
 	NTSTATUS status = STATUS_UNSUCCESSFUL;
 	do
@@ -400,22 +460,15 @@ NTSTATUS InitHidClientPdoList(
 	ULONG			  current_size = 0;
 	NTSTATUS			status = STATUS_UNSUCCESSFUL;
 
-	do { 
-		if(!NT_SUCCESS(GetDriverObjectByName(HID_USB_DEVICE, &pDriverObj)))
-		{
-			USB_MON_DEBUG_INFO("Get Drv Obj Error \r\n");
- 			status = STATUS_UNSUCCESSFUL;
-			break;
-		}
-
-		if (!NT_SUCCESS(CreateHidList(g_hid_client_pdo_list)))
+	do {  
+		if (!NT_SUCCESS(AllocatePdoList()))
 		{
 			USB_MON_DEBUG_INFO("Create List Error \r\n");
 			status = STATUS_UNSUCCESSFUL;
 			break;
 		}
 
-		if (!NT_SUCCESS(InitHidList(pDriverObj, &current_size)))
+		if (!NT_SUCCESS(InitPdoList(&current_size)))
 		{
 			USB_MON_DEBUG_INFO("Init List Error \r\n");
 			FreeHidClientPdoList();

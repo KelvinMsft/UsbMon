@@ -9,9 +9,16 @@ InitHidClientPdoList(
 
 NTSTATUS 
 FreeHidClientPdoList();
- 
+
 NTSTATUS
-ExtractDataFromChannel(
+ExtractKeyboardData(
+	_In_	 PHIDP_COLLECTION_DESC collectionDesc,
+	_In_	 HIDP_REPORT_TYPE type,
+	_Inout_  EXTRACTDATA* ExtractedData
+);
+
+NTSTATUS
+ExtractMouseData(
 	PHIDP_COLLECTION_DESC collectionDesc,
 	HIDP_REPORT_TYPE type,
 	EXTRACTDATA* ExtractedData
