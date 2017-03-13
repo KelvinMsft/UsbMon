@@ -60,7 +60,7 @@ typedef struct _PENDINGIRP_LIST
 #define UrbGetTransferLength(urb)		 (urb->UrbBulkOrInterruptTransfer.TransferBufferLength) 
 #define UrbGetTransferPipeHandle(urb)	 (urb->UrbBulkOrInterruptTransfer.PipeHandle)
 #define UrbIsInputTransfer(urb)			 (UrbGetTransferFlags(urb) & (USBD_TRANSFER_DIRECTION_IN | USBD_SHORT_TRANSFER_OK))
-#define UrbIsOutputTransfer(urb)		 (UrbGetTransferFlags(urb) & (USBD_TRANSFER_DIRECTION_OUT | !USBD_SHORT_TRANSFER_OK))
+#define UrbIsOutputTransfer(urb)		 (UrbGetTransferFlags(urb) & (USBD_TRANSFER_DIRECTION_OUT ))
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -241,6 +241,7 @@ NTSTATUS HandleKeyboardData(HIJACK_CONTEXT* pContext, HIDP_REPORT_TYPE reportTyp
 		RtlMoveMemory(normalKey, (PUCHAR)UrbGetTransferBuffer(pContext->urb) + data.KBDDATA.NormalKeyOffset, data.KBDDATA.NormalKeySize);
 		RtlMoveMemory(SpecialKey, (PUCHAR)UrbGetTransferBuffer(pContext->urb) + data.KBDDATA.SpecialKeyOffset, data.KBDDATA.SpecialKeySize);
 		RtlMoveMemory(LedKey,     (PUCHAR)UrbGetTransferBuffer(pContext->urb) + data.KBDDATA.LedKeyOffset, data.KBDDATA.LedKeySize);
+	
 		USB_MON_DEBUG_INFO("Enter: ");
  	
 		for (int i = 0; i < data.KBDDATA.SpecialKeySize; i++)
@@ -262,6 +263,7 @@ NTSTATUS HandleKeyboardData(HIJACK_CONTEXT* pContext, HIDP_REPORT_TYPE reportTyp
 		} 
 
 		USB_MON_DEBUG_INFO("\r\n");
+		
 		ExFreePool(extractor);
 		extractor = NULL;
 	}
@@ -277,6 +279,17 @@ NTSTATUS HandleMouseData(HIJACK_CONTEXT* pContext, HIDP_REPORT_TYPE reportType)
 	NTSTATUS								 status = STATUS_UNSUCCESSFUL;
 	ULONG								   colIndex = pdoExt->collectionIndex - 1;
 	ULONG								  totalSize = 0;
+
+	if (!pContext)
+	{
+		status = STATUS_UNSUCCESSFUL;
+		return status;
+	}
+	if (!pContext->node)
+	{
+		status = STATUS_UNSUCCESSFUL;
+		return status;
+	} 
 
 	//Top-Collection == Mouse && Usage Page == Desktop 
 	if (!IsMouseUsage(pContext, colIndex) ||
@@ -338,9 +351,7 @@ NTSTATUS  MyCompletionCallback(
 	HIJACK_CONTEXT*		   pContext = (HIJACK_CONTEXT*)Context;
 	PVOID					context = NULL;
 	IO_COMPLETION_ROUTINE* callback = NULL;
-	WCHAR			DeviceName[256] = { 0 };
-	HIDP_REPORT_TYPE	 reportType = 0;
-
+	WCHAR			DeviceName[256] = { 0 }; 
 	if (!pContext)
 	{
 		USB_MON_DEBUG_INFO("EmptyContext");
@@ -384,8 +395,8 @@ NTSTATUS  MyCompletionCallback(
 	}
 
   	GetDeviceName(DeviceObject, DeviceName);
-	USB_MON_DEBUG_INFO("Mouse/Keyboard DeviceName: %ws DriverName: %ws \r\n", DeviceObject->DriverObject->DriverName.Buffer, DeviceName); 
-	USB_MON_DEBUG_INFO("Class: %x Protocol: %x \r\n" , pContext->node->mini_extension->InterfaceDesc->Class, pContext->node->mini_extension->InterfaceDesc->Protocol);
+	USB_MON_DEBUG_INFO("DriverName: %ws \r\nDeviceName: %ws \r\n", DeviceObject->DriverObject->DriverName.Buffer, DeviceName); 
+	//USB_MON_DEBUG_INFO("Class: %x Protocol: %x \r\n" , pContext->node->mini_extension->InterfaceDesc->Class, pContext->node->mini_extension->InterfaceDesc->Protocol);
 	
 	if (UrbIsInputTransfer(pContext->urb))
 	{
@@ -395,18 +406,25 @@ NTSTATUS  MyCompletionCallback(
 		for (int i = 0; i < UrbGetTransferLength(pContext->urb); i++)
 		{
 			USB_MON_DEBUG_INFO("%x ", *UrbTransferBuf++);
-		}
-		USB_MON_DEBUG_INFO("\r\n"); 
-		reportType = HidP_Input;
+		}	
+		USB_MON_DEBUG_INFO("\r\n");  
+		HandleMouseData(pContext, HidP_Input);
+		HandleKeyboardData(pContext, HidP_Input);
+
 	}
 
 	if(UrbIsOutputTransfer(pContext->urb))
 	{
 		USB_MON_DEBUG_INFO("Output Data: "); 
-		USB_MON_DEBUG_INFO("\r\n");
-		reportType = HidP_Output;
+		PUCHAR UrbTransferBuf = (PUCHAR)UrbGetTransferBuffer(pContext->urb);
+		for (int i = 0; i < UrbGetTransferLength(pContext->urb); i++)
+		{
+			USB_MON_DEBUG_INFO("%x ", *UrbTransferBuf++);
+		}
+		USB_MON_DEBUG_INFO("\r\n"); 
+		HandleMouseData(pContext, HidP_Output);
+		HandleKeyboardData(pContext, HidP_Output);
 	}
-
 
 	if (DeviceObject->DeviceExtension)
 	{
@@ -414,10 +432,6 @@ NTSTATUS  MyCompletionCallback(
 		PDO_EXTENSION* pdoExt = &hid_common_extension->pdoExt;
 
 		//DumpReport(pContext->node->parsedReport);
-
-		USB_MON_DEBUG_INFO("CollectionDescLength: %x \r\n", pContext->node->parsedReport.CollectionDescLength);
-		HandleMouseData(pContext, reportType); 
-		HandleKeyboardData(pContext, reportType);
 	}
 
 	//Extract Mouse
@@ -526,14 +540,12 @@ NTSTATUS DispatchInternalDeviceControl(
 		
 			class_extension = (HIDCLASS_DEVICE_EXTENSION*)node->device_object->DeviceExtension;
 			 
-
+			//if FDO (HID_000000x), then next
 			if(!class_extension->isClientPdo)
 			{ 
 				continue;
 			}
-
-			//UnitTest(class_extension);
-
+			  
 			hijack = (HIJACK_CONTEXT*)ExAllocatePoolWithTag(NonPagedPool, sizeof(HIJACK_CONTEXT), 'kcaj');
 			if (!hijack)
 			{
@@ -560,7 +572,7 @@ NTSTATUS DispatchInternalDeviceControl(
 			AddToChainListTail(g_pending_irp_header->head, new_entry);
 
 			//Fake Context for Completion Routine
-			hijack->DeviceObject = node->device_object;
+			hijack->DeviceObject = node->device_object;		//USBHUB device
 			hijack->urb			 = urb;
 			hijack->node		 = node;
 			hijack->pending_irp  = new_entry;

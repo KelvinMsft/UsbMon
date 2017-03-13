@@ -263,6 +263,7 @@ NTSTATUS ExtractKeyboardData(
 	}
 
 	SelectChannel(type, collectionDesc, &selected_channel);
+	
 	USB_MON_DEBUG_INFO("Start: %x End: %x ReportType: %s \r\n", selected_channel.start, selected_channel.end, selected_channel.reportType);
 	
 	channel = selected_channel.channel; 
