@@ -367,11 +367,13 @@ NTSTATUS GetAllClientPdo(PDRIVER_OBJECT driver_object, ULONG* client_pdo_count)
 Next:
 		device_object = device_object->NextDevice;
 	}
+
 	if (hid_client_pdo_count)
 	{
 		*client_pdo_count = hid_client_pdo_count;
 		status = STATUS_SUCCESS;
 	}
+
 	return status;
 }
 //----------------------------------------------------------------------------------------------------------//

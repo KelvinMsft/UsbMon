@@ -56,7 +56,7 @@ typedef struct _EXTRACT_DATA
 			UCHAR OffsetZ;
 			UCHAR ZOffsetSize;
 			UCHAR OffsetButton;
-			UCHAR BtnOffsetSize;
+			UCHAR BtnOffsetSize;  
 			BOOLEAN IsAbsolute;
 		}MOUDATA;
 
@@ -67,9 +67,9 @@ typedef struct _EXTRACT_DATA
 			UCHAR  NormalKeyOffset;
 			UCHAR  NormalKeySize;
 			UCHAR  LedKeyOffset;
-			UCHAR  LedKeySize;
+			UCHAR  LedKeySize;  
 		}KBDDATA;
-
+		 
 	};
  
 }EXTRACTDATA, *PEXTRACTDATA;

@@ -4,6 +4,13 @@
 #include "WinParse.h"
 #include "UsbType.h"
 
+typedef struct _SELECTED_CHANNEL
+{
+	HIDP_CHANNEL_DESC*            channel;
+	ULONG							start;
+	ULONG							  end;
+	CHAR				  reportType[256];
+}SELETEDCHANNEL, *PSELECTEDCHANNEL;
 //------------------------------------------------------------------------------------------------------------------------------//
 VOID DumpReport(
 	_In_ HIDP_DEVICE_DESC* report)
@@ -59,6 +66,7 @@ VOID DumpChannel(
 	{
 		return;
 	}
+
 	HIDP_CHANNEL_DESC*            channel = NULL;
 	ULONG start = 0;
 	ULONG end = 0;
@@ -156,6 +164,9 @@ VOID DumpChannel(
 				USB_MON_DEBUG_INFO("ALIAS! ");
 			}
 		}
+
+		USB_MON_DEBUG_INFO("\r\n");
+
 		if (Flags & CHANNEL_DUMP_RANGE_RELATED)
 		{
 			if (channel->IsRange)
@@ -164,7 +175,6 @@ VOID DumpChannel(
 				USB_MON_DEBUG_INFO("channel Range.UsageMax:  %d		   OFFSET_FIELD: %X  \r\n", channel->Range.UsageMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.UsageMax));
 				USB_MON_DEBUG_INFO("channel Range.DataIndexMax:  %d	   OFFSET_FIELD: %X  \r\n", channel->Range.DataIndexMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.DataIndexMax));
 				USB_MON_DEBUG_INFO("channel Range.DataIndexMin: %d	   OFFSET_FIELD: %X  \r\n", channel->Range.DataIndexMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.DataIndexMin));
-
 			}
 			else
 			{
@@ -205,7 +215,37 @@ VOID DumpChannel(
 		channel++;
 	}
 }
-
+//------------------------------------------------------------------------------------------------------------------------------//
+VOID SelectChannel(
+	_In_ HIDP_REPORT_TYPE				type,	
+	_In_ PHIDP_COLLECTION_DESC	collectionDesc,
+	_Out_ SELETEDCHANNEL*       selectedChannel
+)
+{
+	switch (type)
+	{
+	case HidP_Input:
+		selectedChannel->channel = &collectionDesc->PreparsedData->Data[collectionDesc->PreparsedData->Input.Offset];
+		selectedChannel->start = collectionDesc->PreparsedData->Input.Offset;
+		selectedChannel->end = collectionDesc->PreparsedData->Input.Index;
+		strncpy(selectedChannel->reportType , "Input Report", sizeof("Input Report"));
+		break;
+	case HidP_Output:
+		selectedChannel->channel = &collectionDesc->PreparsedData->Data[collectionDesc->PreparsedData->Output.Offset];
+		selectedChannel->start = collectionDesc->PreparsedData->Output.Offset;
+		selectedChannel->end = collectionDesc->PreparsedData->Output.Index;
+		strncpy(selectedChannel->reportType, "Output Report", sizeof("Output Report"));
+		break;
+	case HidP_Feature:
+		selectedChannel->channel = &collectionDesc->PreparsedData->Data[collectionDesc->PreparsedData->Feature.Offset];
+		selectedChannel->start = collectionDesc->PreparsedData->Feature.Offset;
+		selectedChannel->end = collectionDesc->PreparsedData->Feature.Index;
+		strncpy(selectedChannel->reportType , "Feature Report", sizeof("Feature Report"));
+		break;
+	default:
+		break;
+	}
+}
 //------------------------------------------------------------------------------------------------------------------------------//
 NTSTATUS ExtractKeyboardData(
 	_In_	 PHIDP_COLLECTION_DESC collectionDesc,
@@ -213,9 +253,7 @@ NTSTATUS ExtractKeyboardData(
 	_Inout_  EXTRACTDATA* ExtractedData)
 {
 	HIDP_CHANNEL_DESC*            channel = NULL;
-	ULONG start = 0;
-	ULONG end = 0;
-	CHAR* reportType = NULL;
+	SELETEDCHANNEL			     selected_channel = { 0 };
 	NTSTATUS status = STATUS_SUCCESS;
 
 	if (!collectionDesc || !ExtractedData)
@@ -224,34 +262,12 @@ NTSTATUS ExtractKeyboardData(
 		return status;
 	}
 
-	switch (type)
-	{
-	case HidP_Input:
-		channel = &collectionDesc->PreparsedData->Data[collectionDesc->PreparsedData->Input.Offset];
-		start = collectionDesc->PreparsedData->Input.Offset;
-		end = collectionDesc->PreparsedData->Input.Index;
-		reportType = "Input Report";
-		break;
-	case HidP_Output:
-		channel = &collectionDesc->PreparsedData->Data[collectionDesc->PreparsedData->Output.Offset];
-		start = collectionDesc->PreparsedData->Output.Offset;
-		end = collectionDesc->PreparsedData->Output.Index;
-		reportType = "Output Report";
-		break;
-	case HidP_Feature:
-		channel = &collectionDesc->PreparsedData->Data[collectionDesc->PreparsedData->Feature.Offset];
-		start = collectionDesc->PreparsedData->Feature.Offset;
-		end = collectionDesc->PreparsedData->Feature.Index;
-		reportType = "Feature Report";
-		break;
-	default:
-		break;
-	}
-
-	USB_MON_DEBUG_INFO("Start: %x End: %x ReportType: %s \r\n", start, end, reportType);
-
-	for (int k = start; k < end; k++)
-	{
+	SelectChannel(type, collectionDesc, &selected_channel);
+	USB_MON_DEBUG_INFO("Start: %x End: %x ReportType: %s \r\n", selected_channel.start, selected_channel.end, selected_channel.reportType);
+	
+	channel = selected_channel.channel; 
+	for (int k = selected_channel.start; k < selected_channel.end; k++)
+	{ 
 		switch (channel->UsagePage)
 		{
 			case HID_LEDS:
@@ -280,8 +296,7 @@ NTSTATUS ExtractKeyboardData(
 		}
 		ExtractedData->MOUDATA.IsAbsolute = channel->IsAbsolute;
 		channel++;
-	}
-
+	} 
 	return status;
 }
 //------------------------------------------------------------------------------------------------------------------------------//
@@ -291,9 +306,7 @@ NTSTATUS ExtractMouseData(
 	_Inout_  EXTRACTDATA* ExtractedData)
 {
 	HIDP_CHANNEL_DESC*            channel = NULL;
-	ULONG start = 0;
-	ULONG end = 0;
-	CHAR* reportType = NULL;
+	SELETEDCHANNEL			     selected_channel = { 0 };
 	NTSTATUS status = STATUS_SUCCESS;
 
 	if (!collectionDesc || !ExtractedData)
@@ -302,39 +315,17 @@ NTSTATUS ExtractMouseData(
 		return status; 
 	}
 
-	switch (type)
-	{
-	case HidP_Input:
-		channel = &collectionDesc->PreparsedData->Data[collectionDesc->PreparsedData->Input.Offset];
-		start = collectionDesc->PreparsedData->Input.Offset;
-		end = collectionDesc->PreparsedData->Input.Index;
-		reportType = "Input Report";
-		break;
-	case HidP_Output:
-		channel = &collectionDesc->PreparsedData->Data[collectionDesc->PreparsedData->Output.Offset];
-		start = collectionDesc->PreparsedData->Output.Offset;
-		end = collectionDesc->PreparsedData->Output.Index;
-		reportType = "Output Report";
-		break;
-	case HidP_Feature:
-		channel = &collectionDesc->PreparsedData->Data[collectionDesc->PreparsedData->Feature.Offset];
-		start = collectionDesc->PreparsedData->Feature.Offset;
-		end = collectionDesc->PreparsedData->Feature.Index;
-		reportType = "Feature Report";
-		break;
-	default:
-		break;
-	}
+	SelectChannel(type, collectionDesc, &selected_channel);
 
-	USB_MON_DEBUG_INFO("Start: %x End: %x ReportType: %s \r\n", start, end, reportType);
-
-	for (int k = start; k < end; k++)
-	{
+	USB_MON_DEBUG_INFO("Start: %x End: %x ReportType: %s \r\n", selected_channel.start, selected_channel.end, selected_channel.reportType); 
+	channel = selected_channel.channel;
+	for (int k = selected_channel.start; k < selected_channel.end; k++)
+	{ 
 		//Root Collection 
 		if (channel->IsButton)
 		{ 
 			ExtractedData->MOUDATA.OffsetButton = channel->ByteOffset - 1;
-			ExtractedData->MOUDATA.BtnOffsetSize = channel->ByteEnd - channel->ByteOffset; 
+			ExtractedData->MOUDATA.BtnOffsetSize = channel->ByteEnd - channel->ByteOffset;  
 		} 
 		 if (!channel->IsRange)
 		 {
