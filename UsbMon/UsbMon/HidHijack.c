@@ -435,24 +435,37 @@ NTSTATUS HandleMouseData(
 	_In_ HIDP_REPORT_TYPE reportType
 )
 {
-	HIDCLASS_DEVICE_EXTENSION* hid_common_extension = (HIDCLASS_DEVICE_EXTENSION*)(pContext->DeviceObject->DeviceExtension);
-	PDO_EXTENSION*							 pdoExt = &hid_common_extension->pdoExt;
+	HIDCLASS_DEVICE_EXTENSION* hid_common_extension = NULL;
+	PDO_EXTENSION*							 pdoExt = NULL;
 	EXTRACTDATA								   data = { 0 };
 	NTSTATUS								 status = STATUS_UNSUCCESSFUL;
-	ULONG								   colIndex = pdoExt->collectionIndex - 1;
+	ULONG								   colIndex = 0;
 	ULONG								  totalSize = 0;
 
 	if (!pContext)
 	{
+		USB_MON_DEBUG_INFO("NULL pContext\r\n");
 		status = STATUS_UNSUCCESSFUL;
 		return status;
 	}
 	if (!pContext->node)
 	{
+		USB_MON_DEBUG_INFO("NULL pContext->node\r\n"); 
 		status = STATUS_UNSUCCESSFUL;
 		return status;
 	}
 
+	hid_common_extension = (HIDCLASS_DEVICE_EXTENSION*)(pContext->DeviceObject->DeviceExtension);	
+	pdoExt				 = &hid_common_extension->pdoExt;
+	colIndex			 = pdoExt->collectionIndex - 1;
+
+	
+	if (!pdoExt)
+	{
+		USB_MON_DEBUG_INFO("NULL pdoExt \r\n");
+		status = STATUS_UNSUCCESSFUL;
+		return status; 
+	}
 	//Top-Collection == Mouse && Usage Page == Desktop 
 	if (!IsMouseUsage(pContext, colIndex) ||
 		!IsDesktopUsagePage(pContext, colIndex))
@@ -518,6 +531,7 @@ NTSTATUS  HidUsb_CompletionCallback(
 	PVOID					context = NULL;
 	IO_COMPLETION_ROUTINE* callback = NULL;
 	WCHAR			DeviceName[256] = { 0 };
+
 	if (!pContext)
 	{
 		USB_MON_DEBUG_INFO("EmptyContext");
@@ -530,7 +544,7 @@ NTSTATUS  HidUsb_CompletionCallback(
 		return STATUS_UNSUCCESSFUL;
 	}
 
-	context = pContext->pending_irp->oldContext;
+	context  = pContext->pending_irp->oldContext;
 	callback = pContext->pending_irp->oldRoutine;
 	if (!context || !callback)
 	{
@@ -575,7 +589,7 @@ NTSTATUS  HidUsb_CompletionCallback(
 		}
 		USB_MON_DEBUG_INFO("\r\n");
 		HandleMouseData(pContext, HidP_Input);
-		HandleKeyboardData(pContext, HidP_Input);
+	//	HandleKeyboardData(pContext, HidP_Input);
 	}
 
 	if (UrbIsOutputTransfer(pContext->urb))
@@ -594,6 +608,9 @@ NTSTATUS  HidUsb_CompletionCallback(
 		ExFreePool(pContext);
 		pContext = NULL;
 	}
+
+	USB_MON_DEBUG_INFO("return old routine \r\n");
+
 
 	return callback(DeviceObject, Irp, context);
 }
@@ -682,7 +699,7 @@ NTSTATUS HidUsb_InternalDeviceControl(
 			//Completion Routine hook
 			irpStack->Context = hijack;
 			irpStack->CompletionRoutine = HidUsb_CompletionCallback;
-
+			
 		}
 	} while (0);
 

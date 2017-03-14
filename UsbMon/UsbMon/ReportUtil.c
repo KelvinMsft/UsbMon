@@ -365,7 +365,7 @@ NTSTATUS ExtractMouseData(
 					ExtractedData->MOUDATA.ZOffsetSize = channel->ByteEnd - channel->ByteOffset;
 					break;
 				default:
-					USB_MON_COMMON_DBG_BREAK();	//FATAL ! Ignore it
+					//USB_MON_COMMON_DBG_BREAK();	//FATAL ! Ignore it
 					break;
 				}
 			}

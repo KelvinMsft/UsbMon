@@ -592,7 +592,7 @@ NTSTATUS InitPdoListByHidDriver(
 	_Out_ PULONG ListSize
 )
 {
-	NTSTATUS		  	  status = STATUS_UNSUCCESSFUL; 
+	NTSTATUS	   		  status = STATUS_SUCCESS;
 	PDRIVER_OBJECT driver_object = NULL;
 	ULONG			 return_size = 0;
 
@@ -618,18 +618,12 @@ NTSTATUS InitPdoListByHidDriver(
 			break;
 		}
 
-		if (!NT_SUCCESS(VerifyHidDeviceObject(driver_object, &g_listSize)))
+		if (!NT_SUCCESS(VerifyHidDeviceObject(driver_object, &ListSize)))
 		{
 			USB_MON_DEBUG_INFO("VerifyHidDeviceObject Error \r\n");
 			status = STATUS_UNSUCCESSFUL;
 			break; 
-		}
-		if (return_size > 0)
-		{
-			status = STATUS_SUCCESS;
-			*ListSize = return_size;
-		}
-
+		}  
 	} while (FALSE);
 	
 	return status;
@@ -653,7 +647,7 @@ NTSTATUS AllocatePdoList()
 
 		RtlZeroMemory(g_hid_client_pdo_list, sizeof(HID_DEVICE_LIST));
 
-		g_hid_client_pdo_list->head = NewChainListHeaderEx(LISTFLAG_FTMUTEXLOCK | LISTFLAG_AUTOFREE, NULL, 0);
+		g_hid_client_pdo_list->head = NewChainListHeaderEx(LISTFLAG_SPINLOCK | LISTFLAG_AUTOFREE, NULL, 0);
 		if (!g_hid_client_pdo_list->head)
 		{
 			ExFreePool(g_hid_client_pdo_list);
@@ -669,23 +663,14 @@ NTSTATUS AllocatePdoList()
 //----------------------------------------------------------------------------------------------------------//
 NTSTATUS InitHidClientPdoList(
 	_Out_ PHID_DEVICE_LIST* ClientPdoList,
-	_Out_ PULONG ClientPdoListSize
+	_Out_ PULONG		 ClientPdoListSize
 )
 {
  	PDRIVER_OBJECT	    pDriverObj = NULL;
 	ULONG			  current_size = 0;
 	NTSTATUS			status = STATUS_UNSUCCESSFUL;
 
-	do {  
-		if (g_hid_client_pdo_list)
-		{
-			ClientPdoList = g_hid_client_pdo_list;
-			ClientPdoList = g_listSize;
-			g_hid_client_pdo_list->RefCount++;
-			status = STATUS_SUCCESS;
-			break;
-		}
-
+	do {   
 		if (!NT_SUCCESS(AllocatePdoList()))
 		{
 			USB_MON_DEBUG_INFO("Create List Error \r\n");
@@ -693,7 +678,7 @@ NTSTATUS InitHidClientPdoList(
 			break;
 		}
 
-		if (!NT_SUCCESS(InitPdoListByHidDriver(&current_size)))
+		if (!NT_SUCCESS(InitPdoListByHidDriver(&ClientPdoListSize)))
 		{
 			USB_MON_DEBUG_INFO("Init List Error \r\n");
 			FreeHidClientPdoList();
@@ -701,13 +686,13 @@ NTSTATUS InitHidClientPdoList(
 			break;
 		}
 		 
-		if (current_size > 0 && g_hid_client_pdo_list)
+		if (g_hid_client_pdo_list)
 		{
 			*ClientPdoList		= g_hid_client_pdo_list;
-			*ClientPdoListSize  = g_listSize;
+			*ClientPdoListSize  = current_size;
+			g_listSize		    = current_size;
 
-			g_hid_client_pdo_list->RefCount = 1;
-
+			g_hid_client_pdo_list->RefCount = 1; 
 			USB_MON_DEBUG_INFO("Create Success\r\n");
 
 			status = STATUS_SUCCESS;
