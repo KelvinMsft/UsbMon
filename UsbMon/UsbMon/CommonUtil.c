@@ -34,6 +34,7 @@ extern NTSTATUS ObReferenceObjectByName(
 /////////////////////////////////////////////////////////////////////////////////////////////// 
 //// Implementation
 //// 
+//----------------------------------------------------------------------------------------//
 NTSTATUS KeSleep(LONG msec)
 {
 	LARGE_INTEGER my_interval;
@@ -41,6 +42,7 @@ NTSTATUS KeSleep(LONG msec)
 	my_interval.QuadPart *= msec;
 	return KeDelayExecutionThread(KernelMode, 0, &my_interval);
 }
+
 //----------------------------------------------------------------------------------------//
 NTSTATUS GetDriverObjectByName(WCHAR* name, PDRIVER_OBJECT* pDriverObj)
 {
@@ -66,6 +68,7 @@ NTSTATUS GetDriverObjectByName(WCHAR* name, PDRIVER_OBJECT* pDriverObj)
 	return status;
 }
 
+//----------------------------------------------------------------------------------------//
 NTSTATUS GetDeviceName(PDEVICE_OBJECT device_object, WCHAR* DeviceNameBuf)
 {
 	UCHAR	 Buffer[sizeof(OBJECT_NAME_INFORMATION) + 512] = { 0 };
@@ -84,4 +87,4 @@ NTSTATUS GetDeviceName(PDEVICE_OBJECT device_object, WCHAR* DeviceNameBuf)
 	} 
 	return status;
 }
- 
+//----------------------------------------------------------------------------------------//

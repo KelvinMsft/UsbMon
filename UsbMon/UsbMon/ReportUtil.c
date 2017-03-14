@@ -11,6 +11,7 @@ typedef struct _SELECTED_CHANNEL
 	ULONG							  end;
 	CHAR				  reportType[256];
 }SELETEDCHANNEL, *PSELECTEDCHANNEL;
+
 //------------------------------------------------------------------------------------------------------------------------------//
 VOID DumpReport(
 	_In_ HIDP_DEVICE_DESC* report)
@@ -56,6 +57,7 @@ VOID DumpReport(
 		reportDesc++;
 	}
 }
+
 //------------------------------------------------------------------------------------------------------------------------------//
 VOID DumpChannel(
 	_In_ PHIDP_COLLECTION_DESC collectionDesc, 
@@ -253,6 +255,7 @@ NTSTATUS SelectChannel(
 	status = STATUS_SUCCESS;
 	return status;
 }
+
 //------------------------------------------------------------------------------------------------------------------------------//
 NTSTATUS ExtractKeyboardData(
 	_In_	 PHIDP_COLLECTION_DESC collectionDesc,
@@ -307,6 +310,7 @@ NTSTATUS ExtractKeyboardData(
 	} 
 	return status;
 }
+
 //------------------------------------------------------------------------------------------------------------------------------//
 NTSTATUS ExtractMouseData(
 	_In_	 PHIDP_COLLECTION_DESC collectionDesc, 

@@ -73,11 +73,61 @@
 #define HID_NOT_RANGE_USAGE_WHELL 0x38  
 //-------------------------------------------//
 
+NTSTATUS
+ExtractKeyboardData(
+	_In_	 PHIDP_COLLECTION_DESC collectionDesc,
+	_In_	 HIDP_REPORT_TYPE type,
+	_Inout_  EXTRACTDATA* ExtractedData
+);
+
+NTSTATUS
+ExtractMouseData(
+	PHIDP_COLLECTION_DESC collectionDesc,
+	HIDP_REPORT_TYPE type,
+	EXTRACTDATA* ExtractedData
+);
+
+/*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Routine Description:
+
+			DumpReport
+			 
+Arguments:
+			report	- structure of HIDP_DEVICE_DESC, it saved all report, 
+					  we dump it all
+
+Return Value: 
+			No 
+-----------------------------------------------------------------------------------*/
 VOID 
 DumpReport(
 	HIDP_DEVICE_DESC* report
 );
 
+
+
+
+
+/*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Routine Description:
+
+			DumpChannel
+
+
+Arguments:
+			collectionDesc - Collection Description , it saved all channel. a channel
+							 respect to the Usage in report descriptor 
+
+			type		   - what report type of channel to be dumped
+
+			Flags		   - which part of channel need to be dumped
+
+Return Value: 
+			No
+
+-----------------------------------------------------------------------------------*/
 VOID 
 DumpChannel(
 	PHIDP_COLLECTION_DESC collectionDesc, 

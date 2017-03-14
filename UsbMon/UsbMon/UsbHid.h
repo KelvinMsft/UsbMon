@@ -4,44 +4,61 @@
 #include <fltKernel.h> 
 #include "local.h"
 
-NTSTATUS 
-InitHidClientPdoList(
-	PHID_DEVICE_LIST* device_object_list,
-	PULONG size);
+/*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-BOOLEAN IsHidDevicePipe(
-	_In_ TChainListHeader* header,
-	_In_ USBD_PIPE_HANDLE handle,
-	_Out_ PHID_DEVICE_NODE* node);
+Routine Description:
+		Determine is it HID device pipe
 
-NTSTATUS 
-FreeHidClientPdoList();
-
-NTSTATUS
-ExtractKeyboardData(
-	_In_	 PHIDP_COLLECTION_DESC collectionDesc,
-	_In_	 HIDP_REPORT_TYPE type,
-	_Inout_  EXTRACTDATA* ExtractedData
+Arguments:
+		TChainListHeader - list header of HID device pipe
+		handle			 - handle of HID device pipe 
+		node			 - output node which is found
+		 
+Return Value:	
+		BOOLEAN			 - true  , if it handle in list
+						 - false , Depended on old completion
+-----------------------------------------------------------------------------------*/
+BOOLEAN  IsHidDevicePipe(
+	_In_ TChainListHeader* PipeListHeader,
+	_In_ USBD_PIPE_HANDLE  PipeHandle,
+	_Out_ PHID_DEVICE_NODE*  node
 );
 
-NTSTATUS
-ExtractMouseData(
-	PHIDP_COLLECTION_DESC collectionDesc,
-	HIDP_REPORT_TYPE type,
-	EXTRACTDATA* ExtractedData
-);
+/*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Routine Description:
+		Free Client Pdo List, and each node
+
+Arguments:
+		TChainListHeader - list of HID device pipe
+		handle			 - handle of HID device pipe 
+		node			 - output node
+		 
+Return Value:	
+		NTSTATUS		 - STATUS_SUCCESS      , if it is Freed
+						 - STATUS_UNSUCCESSFUL , if is can't be freed
+-----------------------------------------------------------------------------------*/
+NTSTATUS FreeHidClientPdoList();
+
  
-VOID 
-DumpChannel(
-	PHIDP_COLLECTION_DESC collectionDesc, 
-	HIDP_REPORT_TYPE type,
-	ULONG Flags
-);
+/*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-VOID 
-DumpReport(
-	HIDP_DEVICE_DESC* report
+Routine Description:
+		1. Allocate Client Pdo List needed memory
+		2. Init Client Pdo List by getting all of client PDO
+	 
+Arguments:
+		TChainListHeader - list of HID device pipe
+		handle			 - handle of HID device pipe 
+		node			 - output node
+		 
+Return Value:	
+		NTSTATUS		 - true  , if it initial succesfully
+						 - false , if it initial faile
+-----------------------------------------------------------------------------------*/
+NTSTATUS InitHidClientPdoList(
+	_Out_ PHID_DEVICE_LIST* ClientPdoList,
+	_Out_ PULONG		ClientPdoListSize
 );
-
 
 #endif

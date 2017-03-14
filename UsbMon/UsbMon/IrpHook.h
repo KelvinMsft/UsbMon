@@ -37,6 +37,7 @@ PVOID	DoIrpHook(
 	_In_		PVOID			NewFunction,  
 	_In_		Action			action
 );
+
 //--------------------------------------------------------------------------------------
 //	
 //
@@ -46,6 +47,7 @@ IRPHOOKOBJ*	CreateIrpObject(
 	_In_	PVOID		   oldFunction,
 	_In_	PVOID		   newFunction
 );
+
 //--------------------------------------------------------------------------------------
 //	
 //

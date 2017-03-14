@@ -42,7 +42,7 @@ NTSTATUS DriverEntry(
 	_In_ PUNICODE_STRING String)
 { 
 	NTSTATUS					  status = STATUS_UNSUCCESSFUL; 
-	object->DriverUnload = DriverUnload;
+	object->DriverUnload			     = DriverUnload;
 	status = InitializeHidPenetrate(USB2);
 	return status;
 } 
