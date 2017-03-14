@@ -1,5 +1,6 @@
 #ifndef __USB_UTIL_HEADER__
-#define __USB_UTIL_HEADER__ 
+#define __USB_UTIL_HEADER__
+
 #include <fltKernel.h> 
 #include "UsbType.h"
 #include "CommonUtil.h"

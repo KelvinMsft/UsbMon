@@ -1,3 +1,6 @@
+#ifndef __USB_HID_HEADER__
+#define __USB_HID_HEADER__ 
+
 #include <fltKernel.h> 
 #include "local.h"
 
@@ -41,3 +44,4 @@ DumpReport(
 );
 
 
+#endif

@@ -1,7 +1,6 @@
 #include <fltKernel.h>
 #include "UsbUtil.h" 
-#include "UsbHid.h"
-#include "UsbType.h"
+#include "UsbHid.h" 
 #include "IrpHook.h"
 #include "ReportUtil.h"
  
@@ -11,20 +10,21 @@
 /////////////////////////////////////////////////////////////////////////////////////////////// 
 //// Types
 ////  
+
 typedef struct PENDINGIRP
 {
-	PIRP						  Irp;
-	PIO_STACK_LOCATION		 IrpStack;
-	PVOID					oldContext;
-	IO_COMPLETION_ROUTINE*	oldRoutine;
+	PIRP						  Irp;			//Irp
+	PIO_STACK_LOCATION		 IrpStack;			//Old IRP stack
+	PVOID					oldContext;			//Old IRP routine argument
+	IO_COMPLETION_ROUTINE*	oldRoutine;			//Old IRP routine address
 }PENDINGIRP, *PPENDINGIRP;
 
 typedef struct HIJACK_CONTEXT
 {
-	PDEVICE_OBJECT		   DeviceObject;
-	PURB							urb;
-	HID_DEVICE_NODE*			   node;
-	PENDINGIRP*			    pending_irp;
+	PDEVICE_OBJECT		   DeviceObject;		// Hid deivce
+	PURB							urb;		// Urb packet saved in IRP hook
+	HID_DEVICE_NODE*			   node;		// An old context we need 
+	PENDINGIRP*			    pending_irp;		// pending irp node for cancellation
 }HIJACK_CONTEXT, *PHIJACK_CONTEXT;
 
 
@@ -78,15 +78,20 @@ PHID_DEVICE_LIST  g_HidPipeList					   = NULL;
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 Routine Description:
-		 Init Pending IRP Linked-List for saving any 
-		 IRP we hooked
+
+		 Allocated Pending IRP Linked-List memory 
+		 for saving any IRP-related information
 
 Arguments:
+		
 		No
 
 Return Value:
-	NTSTATUS	- STATUS_SUCCESS if initial successfully
-				- STATUS_UNSUCCESSFUL if failed
+
+		NTSTATUS	- STATUS_SUCCESS if initial successfully
+
+					- STATUS_UNSUCCESSFUL if failed
+
 -------------------------------------------------------*/
 NTSTATUS		InitPendingIrpLinkedList();
 
@@ -102,10 +107,12 @@ Arguments:
 		No
 
 Return Value:
+
 		NTSTATUS	- STATUS_SUCCESS if Free Memory 
 					  successfully
 
 					- STATUS_UNSUCCESSFUL if failed
+
 -------------------------------------------------------*/
 NTSTATUS		FreePendingIrpList();
 
@@ -130,20 +137,23 @@ Return Value:
 -------------------------------------------------------*/
 LOOKUP_STATUS	LookupPendingIrpCallback(
 	_In_ PENDINGIRP* pending_irp_node,
-	_In_ void*		 context
+	_In_ PVOID		 context
 ); 
   
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 Routine Description:
+
 		Remove Pending IRP Linked-List for saving any
 		IRP we hooked, and set a Lookup callback
 		(LookupPendingIrpCallback)
 
 Arguments:
+
 		No
 
 Return Value:
+
 	NTSTATUS	- STATUS_SUCCESS if recover successfully
 				- STATUS_UNSUCCESSFUL if failed
 -------------------------------------------------------*/
@@ -153,52 +163,115 @@ NTSTATUS		RecoverAllPendingIrp();
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 Routine Description:
-		Handling And Extract keyboard URB IRP
+
+		Handling And Extract data from keyboard URB 
 
 Arguments:
-		No
 
+		pContext	- Hijack Context included all we need 
+					  see HIJACK_CONTEXT declaration.
+
+		reportType	- Hid Report Type 
+						-	HidP_Input,
+						-	HidP_Output,
+						-	HidP_Feature
 Return Value:
+
 		NTSTATUS	- STATUS_SUCCESS if Handle successfully
 					- STATUS_UNSUCCESSFUL if failed
 -------------------------------------------------------*/
 NTSTATUS HandleKeyboardData(
-	HIJACK_CONTEXT* pContext, 
-	HIDP_REPORT_TYPE reportType
+	_In_ HIJACK_CONTEXT* pContext, 
+	_In_ HIDP_REPORT_TYPE reportType
 );
+
+
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 Routine Description:
-		Handling And Extract mouse URB IRP
+
+		Handling And Extract data from mouse URB 
 
 Arguments:
-		No
 
+		pContext	- Hijack Context included all we need
+					  see HIJACK_CONTEXT declaration.
+
+		reportType	- Hid Report Type
+						-	HidP_Input,
+						-	HidP_Output,
+						-	HidP_Feature
 Return Value:
+
 		NTSTATUS	- STATUS_SUCCESS if Handle successfully
 					- STATUS_UNSUCCESSFUL if failed
 -------------------------------------------------------*/
 NTSTATUS HandleMouseData(
-	HIJACK_CONTEXT* pContext, 
-	HIDP_REPORT_TYPE reportType
-);
+	_In_ HIJACK_CONTEXT* pContext, 
+	_In_ HIDP_REPORT_TYPE reportType
+); 
 
-NTSTATUS HidUsb_CompletionCallback(
-	_In_     PDEVICE_OBJECT DeviceObject,
-	_In_     PIRP           Irp,
-	_In_	 PVOID          Context
-);
 
+/*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Routine Description:
+
+		- Proxy Function of USB Hub of Internal Control Irp
+		- It intercept all internal IOCTL ,
+		I.e. IOCTL_INTERNAL_USB_SUBMIT_URB -> URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER 
+			1. Check is it mouse / keyboard
+			2. Save a IRP Context (included old IRP completion function)
+			3. Hook Completion of IRP
+			4. Insert into Pending IRP List
+
+Arguments:
+
+		DeviceObject - USB Hub Device Object, iusb3hub , usbhub ,... etc
+		Irp			 - IRP come from upper level
+
+Return Value:
+
+		NTSTATUS	 - STATUS_UNSUCCESSFUL   , If failed of any one of argument check.
+					 - STATUS_XXXXXXXXXXXX   , Depended on IRP Handler
+
+-----------------------------------------------------------------------------------*/
 NTSTATUS HidUsb_InternalDeviceControl(
 	_Inout_ struct _DEVICE_OBJECT *DeviceObject,
 	_Inout_ struct _IRP           *Irp
 ); 
 
- 
-NTSTATUS InitializeHidPenetrate(
-	USB_HUB_VERSION UsbVersion
+/*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Routine Description:
+
+		- Proxy Function of Hid URB IRP Completion
+		- Extract Data by specific report format
+		- call old IRP completion
+
+Arguments:
+
+		DeviceObject - Hid Device Object , Class Driver-Created Device Object , 
+					   device named - HID000000X, a FDO of HidUsb(HidClass)
+
+		Irp			 - IRP of the original request
+
+Return Value:
+
+		NTSTATUS	 - STATUS_UNSUCCESSFUL   , If failed of any one of argument check.
+					   STATUS_XXXXXXXXXXXX   , Depended on old completion
+-----------------------------------------------------------------------------------*/
+NTSTATUS  HidUsb_CompletionCallback(
+	_In_     PDEVICE_OBJECT DeviceObject,
+	_In_     PIRP           Irp,
+	_In_	 PVOID          Context
 );
- 
+
+//See HidHijack.h for detail
+NTSTATUS InitializeHidPenetrate(
+	_In_ USB_HUB_VERSION UsbVersion
+);
+
+//See HidHijack.h for detail
 NTSTATUS UnInitializeHidPenetrate();
 
 #ifdef ALLOC_PRAGMA
@@ -211,6 +284,7 @@ NTSTATUS UnInitializeHidPenetrate();
 //// Implementation
 //// 
 //// 
+
 //----------------------------------------------------------------------------------------//
 NTSTATUS InitPendingIrpLinkedList()
 {
@@ -253,7 +327,8 @@ NTSTATUS FreePendingIrpList()
 //-------------------------------------------------------------------------------------------//
 LOOKUP_STATUS LookupPendingIrpCallback(
 	_In_ PENDINGIRP* pending_irp_node,
-	_In_ void*		 context)
+	_In_ void*		 context
+)
 {
 	UNREFERENCED_PARAMETER(context);
 
@@ -278,11 +353,12 @@ NTSTATUS RecoverAllPendingIrp()
 	}
 	return status;
 }
-
-
  
 //----------------------------------------------------------------------------------------//
-NTSTATUS HandleKeyboardData(HIJACK_CONTEXT* pContext, HIDP_REPORT_TYPE reportType)
+NTSTATUS HandleKeyboardData(
+	_In_ HIJACK_CONTEXT* pContext, 
+	_In_ HIDP_REPORT_TYPE reportType
+)
 {
 	HIDCLASS_DEVICE_EXTENSION* hid_common_extension = (HIDCLASS_DEVICE_EXTENSION*)(pContext->DeviceObject->DeviceExtension);
 	PDO_EXTENSION*							 pdoExt = &hid_common_extension->pdoExt;
@@ -354,7 +430,10 @@ NTSTATUS HandleKeyboardData(HIJACK_CONTEXT* pContext, HIDP_REPORT_TYPE reportTyp
 	return status;
 }
 //----------------------------------------------------------------------------------------//
-NTSTATUS HandleMouseData(HIJACK_CONTEXT* pContext, HIDP_REPORT_TYPE reportType)
+NTSTATUS HandleMouseData(
+	_In_ HIJACK_CONTEXT* pContext, 
+	_In_ HIDP_REPORT_TYPE reportType
+)
 {
 	HIDCLASS_DEVICE_EXTENSION* hid_common_extension = (HIDCLASS_DEVICE_EXTENSION*)(pContext->DeviceObject->DeviceExtension);
 	PDO_EXTENSION*							 pdoExt = &hid_common_extension->pdoExt;
@@ -428,25 +507,7 @@ NTSTATUS HandleMouseData(HIJACK_CONTEXT* pContext, HIDP_REPORT_TYPE reportType)
 	return status;
 }
  
-
-/*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-Routine Description:
-	- Proxy Function of Hid URB IRP Completion
-	- Extract Data by specific report format
-	- call old IRP completion 
-
-Arguments:
-		DeviceObject - Hid Device Object , Class Driver-Created Device Object by 
-					   MiniDriver DriverObject, device named - HID000000X, a FDO
-					   of HidUsb(HidClass)
-
-		Irp			 - IRP of the originla request
-
-Return Value:
-	STATUS_UNSUCCESSFUL   - If failed of any one of argument check.
-	STATUS_XXXXXXXXXXXX   - Depended on old completion 
------------------------------------------------------------------------------------*/
+ 
 NTSTATUS  HidUsb_CompletionCallback(
 	_In_     PDEVICE_OBJECT DeviceObject,			 
 	_In_     PIRP           Irp,
@@ -539,26 +600,7 @@ NTSTATUS  HidUsb_CompletionCallback(
 
 
 
-/*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-Routine Description:
-- Proxy Function of USB Hub of Internal Control Irp
-- It intercept all internal IOCTL ,
-I.e. IOCTL_INTERNAL_USB_SUBMIT_URB -> URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER
-
-1. Check is it mouse / keyboard
-2. Save a IRP Context (included old IRP completion function)
-3. Hook Completion of IRP
-4. Insert into Pending IRP List
-
-Arguments:
-- USB Hub Device Object
-- IRP
-
-Return Value:
-- NTSTATUS
-
------------------------------------------------------------------------------------*/
+//----------------------------------------------------------------------------------------//
 NTSTATUS HidUsb_InternalDeviceControl(
 	_Inout_ struct _DEVICE_OBJECT *DeviceObject,
 	_Inout_ struct _IRP           *Irp
@@ -657,12 +699,10 @@ NTSTATUS HidUsb_InternalDeviceControl(
 	return g_pDispatchInternalDeviceControl(DeviceObject, Irp);
 }
  
- 
-
- 
- 
 //----------------------------------------------------------------------------------------//
-NTSTATUS InitializeHidPenetrate(USB_HUB_VERSION UsbVersion)
+NTSTATUS InitializeHidPenetrate(
+	_In_ USB_HUB_VERSION UsbVersion
+)
 {
 	PDRIVER_OBJECT			  pDriverObj = NULL;
 	NTSTATUS status = STATUS_UNSUCCESSFUL;
