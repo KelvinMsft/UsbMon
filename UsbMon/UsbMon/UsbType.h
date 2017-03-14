@@ -41,6 +41,7 @@ typedef struct _HID_DEVICE_NODE
 	HID_USB_DEVICE_EXTENSION*		mini_extension;
 	HIDP_DEVICE_DESC				parsedReport;
 }HID_DEVICE_NODE, *PHID_DEVICE_NODE;
+ 
 
 
 typedef struct _EXTRACT_DATA

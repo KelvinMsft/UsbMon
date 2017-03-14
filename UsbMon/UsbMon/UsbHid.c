@@ -545,9 +545,9 @@ NTSTATUS VerifyHidDeviceObject(
 	while (device_object)
 	{
 		HID_DEVICE_NODE*					node = NULL;
-		HIDP_DEVICE_DESC				  report = { 0 };
+		HIDP_DEVICE_DESC*				  report = NULL;
 		HID_USB_DEVICE_EXTENSION* mini_extension = NULL;
-
+		 
 		if (!VerifyDevice(device_object, &mini_extension))
 		{
 			goto Next;
@@ -558,13 +558,19 @@ NTSTATUS VerifyHidDeviceObject(
 			goto Next;
 		}
 
-		status = GetAllReportByDeviceExtension(device_object->DeviceExtension, &report);
+		report = (HIDP_DEVICE_DESC*)ExAllocatePoolWithTag(NonPagedPool, sizeof(HIDP_DEVICE_DESC), 'csed');
+		if (!report)
+		{
+			goto Next;
+		}
+
+		status = GetAllReportByDeviceExtension(device_object->DeviceExtension, report);
 		if (!NT_SUCCESS(status))
 		{
 			goto Next;
 		}
 
-		node = CreateHidDeviceNode(device_object, mini_extension, &report);
+		node = CreateHidDeviceNode(device_object, mini_extension, report);
 		if (!node)
 		{
 			goto Next;
@@ -577,6 +583,12 @@ NTSTATUS VerifyHidDeviceObject(
 		USB_MON_DEBUG_INFO("Added one element :%x \r\n", HidClientPdoCount);
 Next:
 		device_object = device_object->NextDevice;
+
+		if (report)
+		{
+			ExFreePool(report);
+			report = NULL;
+		}
 	}
 
 	if (HidClientPdoCount)

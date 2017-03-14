@@ -458,8 +458,7 @@ NTSTATUS HandleMouseData(
 	hid_common_extension = (HIDCLASS_DEVICE_EXTENSION*)(pContext->DeviceObject->DeviceExtension);	
 	pdoExt				 = &hid_common_extension->pdoExt;
 	colIndex			 = pdoExt->collectionIndex - 1;
-
-	
+	 
 	if (!pdoExt)
 	{
 		USB_MON_DEBUG_INFO("NULL pdoExt \r\n");
