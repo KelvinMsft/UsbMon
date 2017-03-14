@@ -1801,7 +1801,7 @@ HidP_ParseCollections(
 					//
 					// A constant channel with no usage.  Skip it.
 					//
-
+		
 					usage = HidP_FreeUsageList(usage);
 					ASSERT(usage == &firstUsage);
 					ASSERT(0 == usage->Depth);

@@ -116,8 +116,7 @@ typedef struct _HIDP_PREPARSED_DATA
 /////////////////////////////////////////////////////////////////////////////////////////////// 
 //// Global/Extern Variable 
 //// 
-HID_DEVICE_LIST* g_hid_client_pdo_list = NULL;
-
+HID_DEVICE_LIST*  g_hid_client_pdo_list = NULL; 
 HIDP_DEVICE_DESC* g_hid_collection = NULL;
 
 /////////////////////////////////////////////////////////////////////////////////////////////// 
@@ -127,8 +126,7 @@ HIDP_DEVICE_DESC* g_hid_collection = NULL;
 #define ARRAY_SIZE						 100
 #define HIDP_PREPARSED_DATA_SIGNATURE1	 'PdiH'
 #define HIDP_PREPARSED_DATA_SIGNATURE2   'RDK '
- 
- 
+  
 
 /////////////////////////////////////////////////////////////////////////////////////////////// 
 //// Prototype
@@ -137,34 +135,58 @@ HIDP_DEVICE_DESC* g_hid_collection = NULL;
 /////////////////////////////////////////////////////////////////////////////////////////////// 
 //// Implementation
 ////  
-
-//----------------------------------------------------------------------------------------------------------//
-NTSTATUS ReleaseHidRelation()
-{
-	NTSTATUS status = STATUS_SUCCESS;
-	if (!g_hid_client_pdo_list)
-	{
-		status = STATUS_UNSUCCESSFUL;
-		return status;
-	}
-	InterlockedIncrement64(&g_hid_client_pdo_list->RefCount);
-	return status;
-}
-//----------------------------------------------------------------------------------------------------------//
-NTSTATUS AcquireHidRelation(
-	_Out_ PHID_DEVICE_LIST* device_object_list,
-	_Out_ PULONG size
+//----------------------------------------------------------------------------------------//
+LOOKUP_STATUS LookupPipeFromPipeList(
+	PHID_DEVICE_NODE Data,
+	void* Context
 )
 {
-	*device_object_list = g_hid_client_pdo_list;
-	*size = g_hid_client_pdo_list->currentSize;
-	InterlockedIncrement64(&g_hid_client_pdo_list->RefCount);
+
+	NTSTATUS								   status = STATUS_UNSUCCESSFUL;
+	USBD_PIPE_HANDLE			 pipe_handle_from_urb = Context;
+	USBD_PIPE_INFORMATION* pipe_handle_from_whitelist = Data->mini_extension->InterfaceDesc->Pipes;
+	ULONG								NumberOfPipes = Data->mini_extension->InterfaceDesc->NumberOfPipes;
+	ULONG i;
+	for (i = 0; i < NumberOfPipes; i++)
+	{
+		if (pipe_handle_from_urb == pipe_handle_from_whitelist[i].PipeHandle)
+		{
+			status = STATUS_SUCCESS;
+			break;
+		}
+	}
+
+	if (!NT_SUCCESS(status))
+	{
+		return 	CLIST_FINDCB_CTN;
+	}
+	return CLIST_FINDCB_RET;
+}
+
+//----------------------------------------------------------------------------------------// 
+BOOLEAN IsHidDevicePipe(
+	_In_ TChainListHeader* header,
+	_In_ USBD_PIPE_HANDLE handle,
+	_Out_ PHID_DEVICE_NODE* node
+)
+{
+	BOOLEAN exist = FALSE;
+
+	*node = QueryFromChainListByCallback(header, LookupPipeFromPipeList, handle);
+
+	if (*node)
+	{
+		exist = TRUE;
+	}
+
+	return exist;
 }
 
 //----------------------------------------------------------------------------------------------------------//
 NTSTATUS GetReportByDeviceExtension(
 	_In_  HIDCLASS_DEVICE_EXTENSION* hid_common_extension, 
-	_Out_ HIDP_DEVICE_DESC* ret)
+	_Out_ HIDP_DEVICE_DESC* ret
+)
 {
 	PDO_EXTENSION* pdoExt = NULL;
 	FDO_EXTENSION* fdoExt = NULL; 
@@ -224,6 +246,7 @@ NTSTATUS GetReportByDeviceExtension(
 
 	return status;
 } 
+
 //-------------------------------------------------------------------------------------------//
 HID_DEVICE_NODE* CreateHidDeviceNode(
 	_In_ PDEVICE_OBJECT device_object,

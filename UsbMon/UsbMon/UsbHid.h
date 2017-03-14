@@ -4,8 +4,12 @@
 NTSTATUS 
 InitHidClientPdoList(
 	PHID_DEVICE_LIST* device_object_list,
-	PULONG size
-);
+	PULONG size);
+
+BOOLEAN IsHidDevicePipe(
+	_In_ TChainListHeader* header,
+	_In_ USBD_PIPE_HANDLE handle,
+	_Out_ PHID_DEVICE_NODE* node);
 
 NTSTATUS 
 FreeHidClientPdoList();

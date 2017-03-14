@@ -86,11 +86,11 @@ typedef struct _HIDP_CHANNEL_DESC
 	ULONG  MoreChannels : 1; // Are there more channel desc associated with
 							 // this array.  This happens if there is a
 							 // several usages for one main item.
-	ULONG  IsConst : 1; // Does this channel represent filler
-	ULONG  IsButton : 1; // Is this a channel of binary usages, not value usages.
-	ULONG  IsAbsolute : 1; // As apposed to relative
+	ULONG  IsConst : 1;		 // Does this channel represent filler
+	ULONG  IsButton : 1;	 // Is this a channel of binary usages, not value usages.
+	ULONG  IsAbsolute : 1;	 // As apposed to relative
 	ULONG  IsRange : 1;
-	ULONG  IsAlias : 1; // a usage described in a delimiter
+	ULONG  IsAlias : 1;		 // a usage described in a delimiter
 	ULONG  IsStringRange : 1;
 	ULONG  IsDesignatorRange : 1;
 	ULONG  Reserved : 20;

@@ -51,6 +51,9 @@
     <ClInclude Include="ReportUtil.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="HidHijack.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Driver.c">
@@ -75,6 +78,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ReportUtil.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="HidHijack.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
