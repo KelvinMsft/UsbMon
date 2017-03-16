@@ -231,7 +231,7 @@ NTSTATUS HidP_TranslateUsage(
 );
 
 NTSTATUS
-MyGetCollectionDescription(
+GetCollectionDescription(
 	IN     PHIDP_REPORT_DESCRIPTOR   ReportDesc,
 	IN     ULONG                     DescLength,
 	IN     POOL_TYPE                 PoolType,

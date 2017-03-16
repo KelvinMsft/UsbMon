@@ -80,7 +80,7 @@ PHIDP_PARSE_LOCAL_RANGE_LIST HidP_PopUsageList(PHIDP_PARSE_LOCAL_RANGE_LIST);
 #pragma warning(disable: 4100)
 
 NTSTATUS
-MyGetCollectionDescription(
+GetCollectionDescription(
 	IN     PHIDP_REPORT_DESCRIPTOR   ReportDesc,
 	IN     ULONG                     DescLength,
 	IN     POOL_TYPE                 PoolType,

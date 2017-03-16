@@ -1,7 +1,10 @@
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     #include "UsbHid.h"
 #include "UsbUtil.h" 
 #include "WinParse.h"
-#include "ReportUtil.h"
+#include "ReportUtil.h"  
+#include "wdmguid.h"
+#include "IrpHook.h"
+
 #define HIDP_MAX_UNKNOWN_ITEMS 4
 /*
 struct _CHANNEL_REPORT_HEADER
@@ -118,8 +121,9 @@ typedef struct _HIDP_PREPARSED_DATA
 //// 
 HID_DEVICE_LIST*  g_hid_client_pdo_list = NULL; 
 ULONG			  g_listSize = NULL;
-HIDP_DEVICE_DESC* g_hid_collection = NULL;
-
+HIDP_DEVICE_DESC* g_hid_collection = NULL; 
+PVOID			  g_PnpCallbackEntry = NULL;
+DRIVER_DISPATCH*  g_pOldPnpHandler = NULL;
 /////////////////////////////////////////////////////////////////////////////////////////////// 
 //// Marco
 //// 
@@ -336,23 +340,159 @@ Return Value:
 -----------------------------------------------------------------------------------*/
 NTSTATUS FreeHidClientPdoList();
 
+/*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Routine Description:
+
+		Monitor IRP IRP_MN_REMOVE_DEVICE AND IRP_MN_START_DEVICE Event
+
+Arguments:
+
+		No
+
+Return Value:
+
+		NTSTATUS			- STATUS_SUCCESS				, if translate success
+							- STATUS_UNSUCCESSFUL or others	, if translate error
+
+-----------------------------------------------------------------------------------*/
+
 
 /////////////////////////////////////////////////////////////////////////////////////////////// 
 //// Implementation
-////  
+////
 
+//--------------------------------------------------------------------------------------------//
+ULONG SearchHidNodeCallback(
+	_In_ PHID_DEVICE_NODE HidNode,
+	_In_ void* pDeviceObject
+)
+{
+	PDEVICE_OBJECT DeviceObject = (PDEVICE_OBJECT)pDeviceObject;
+	if (DeviceObject == HidNode->device_object)
+	{
+		return CLIST_FINDCB_RET;
+	}
+	return CLIST_FINDCB_CTN;
+}
+//--------------------------------------------------------------------------------------------//
+IRPHOOKOBJ* GetHidNode(
+	_In_ PDRIVER_OBJECT DeviceObject
+)
+{ 
+	return QueryFromChainListByCallback(g_hid_client_pdo_list->head, SearchHidNodeCallback, DeviceObject);
+}
+
+
+NTSTATUS HidUsbPnpIrpHandler(
+	_Inout_ struct _DEVICE_OBJECT *DeviceObject,
+	_Inout_ struct _IRP           *Irp
+)
+{
+	PIO_STACK_LOCATION irpStack;
+	WCHAR* DeviceName[256] = { 0 };
+	GetDeviceName(DeviceObject, DeviceName); 
+	USB_MON_DEBUG_INFO("Pdo Name: %ws \r\n", DeviceName);
+	do
+	{
+		HIDCLASS_DEVICE_EXTENSION* ClassExt = (HIDCLASS_DEVICE_EXTENSION*)DeviceObject->DeviceExtension;
+		if (ClassExt->isClientPdo)
+		{ 
+			USB_MON_DEBUG_INFO("IsClientPdo: %x \r\n", ClassExt->isClientPdo);
+
+			irpStack = IoGetCurrentIrpStackLocation(Irp);
+			if (irpStack->MinorFunction == IRP_MN_REMOVE_DEVICE)
+			{
+				USB_MON_DEBUG_INFO("REMOVE Device\r\n");
+				DelFromChainListByPointer(g_hid_client_pdo_list->head, GetHidNode(DeviceObject));
+				
+				g_hid_client_pdo_list->currentSize--;
+			}
+
+			if (irpStack->MinorFunction == IRP_MN_START_DEVICE)
+			{
+				NTSTATUS status;
+				HID_USB_DEVICE_EXTENSION* mini_extension = NULL;
+				HIDP_DEVICE_DESC*			   AllReport = NULL;
+				PHID_DEVICE_NODE*					node = NULL;
+
+				USB_MON_DEBUG_INFO("Add Device\r\n");
+				if (!VerifyDevice(DeviceObject, &mini_extension))
+				{
+					break;
+				}
+
+				AllReport = (HIDP_DEVICE_DESC*)ExAllocatePoolWithTag(NonPagedPool, sizeof(HIDP_DEVICE_DESC), 'csed');
+				if (!AllReport)
+				{
+					break;
+				}
+
+				status = GetAllReportByDeviceExtension(DeviceObject->DeviceExtension, AllReport);
+				if (!NT_SUCCESS(status))
+				{
+					if (AllReport)
+					{
+						ExFreePool(AllReport);
+						AllReport = NULL;
+					}
+					break;
+				}
+
+				node = CreateHidDeviceNode(DeviceObject, mini_extension, AllReport);
+				AddToChainListTail(g_hid_client_pdo_list->head, node);
+
+				if (AllReport)
+				{
+					ExFreePool(AllReport);
+					AllReport = NULL;
+				}
+
+				g_hid_client_pdo_list->currentSize++;
+			}
+		}
+	} while (FALSE);
+	
+	IRPHOOKOBJ* HookObj = GetIrpHookObject(DeviceObject->DriverObject, IRP_MJ_PNP);
+	if (HookObj)
+	{
+		if (HookObj->oldFunction)
+		{
+			return HookObj->oldFunction(DeviceObject, Irp);
+		}
+	}
+
+	return g_pOldPnpHandler(DeviceObject, Irp);
+}   
 //----------------------------------------------------------------------------------------//
 LOOKUP_STATUS LookupPipeHandleCallback(
 	PHID_DEVICE_NODE Data,
 	void* Context
 )
 {
+	if (!Data || !Context)
+	{
+		return CLIST_FINDCB_RET;
+	}
+	if (!Data->mini_extension)
+	{
+		return CLIST_FINDCB_RET;
+	}
+	if (!Data->mini_extension->InterfaceDesc)
+	{
+		return CLIST_FINDCB_RET;
+	}
+	if (!Data->mini_extension->InterfaceDesc->Pipes)
+	{
+		return CLIST_FINDCB_RET;
+	}
 
 	NTSTATUS								   status = STATUS_UNSUCCESSFUL;
 	USBD_PIPE_HANDLE				PipeHandleFromUrb = Context;
 	USBD_PIPE_INFORMATION*	 PipeHandleFromWhiteLists = Data->mini_extension->InterfaceDesc->Pipes;
 	ULONG								NumberOfPipes = Data->mini_extension->InterfaceDesc->NumberOfPipes;
 	ULONG i;
+
 	for (i = 0; i < NumberOfPipes; i++)
 	{
 		if (PipeHandleFromUrb == PipeHandleFromWhiteLists[i].PipeHandle)
@@ -442,7 +582,7 @@ NTSTATUS GetAllReportByDeviceExtension(
 
 		//USB_MON_DEBUG_INFO("[rawReportDescription] %I64x rawReportDescriptionLength: %xh \r\n", fdoExt->rawReportDescription, fdoExt->rawReportDescriptionLength);
 
-		status = MyGetCollectionDescription(fdoExt->rawReportDescription, fdoExt->rawReportDescriptionLength, NonPagedPool, &hid_device_desc);
+		status = GetCollectionDescription(fdoExt->rawReportDescription, fdoExt->rawReportDescriptionLength, NonPagedPool, &hid_device_desc);
 
 		DumpReport(&hid_device_desc);
 
@@ -478,7 +618,7 @@ HID_DEVICE_NODE* CreateHidDeviceNode(
 	RtlMoveMemory(&node->parsedReport , parsedReport , sizeof(HIDP_DEVICE_DESC));
 
 	return node;
-}
+} 
  
 //---------------------------------------------------------------------------------------------------------//
 BOOLEAN  VerifyDevice(
@@ -605,7 +745,7 @@ NTSTATUS InitPdoListByHidDriver(
 )
 {
 	NTSTATUS	   		  status = STATUS_SUCCESS;
-	PDRIVER_OBJECT driver_object = NULL;
+	PDRIVER_OBJECT HidDriverObj = NULL;
 	ULONG			 return_size = 0;
 
 	do {
@@ -616,21 +756,31 @@ NTSTATUS InitPdoListByHidDriver(
 			break;
 		}
 
-		if (!NT_SUCCESS(GetDriverObjectByName(HID_USB_DEVICE, &driver_object)))
+		if (!NT_SUCCESS(GetDriverObjectByName(HID_USB_DEVICE, &HidDriverObj)))
 		{
 			USB_MON_DEBUG_INFO("Get Drv Obj Error \r\n");
 			status = STATUS_UNSUCCESSFUL;
 			break;
+		} 
+
+		//Do Irp Hook for URB transmit
+		g_pOldPnpHandler = (PDRIVER_DISPATCH)DoIrpHook(HidDriverObj, IRP_MJ_PNP, HidUsbPnpIrpHandler, Start);
+		if (!g_pOldPnpHandler)
+		{ 
+			USB_MON_DEBUG_INFO("DoIrpHook Error \r\n");
+			status = STATUS_UNSUCCESSFUL;
+			return status;
 		}
 
-		if (!driver_object)
+	 
+		if (!HidDriverObj)
 		{
 			USB_MON_DEBUG_INFO("Empty DrvObj \r\n");
 			status = STATUS_UNSUCCESSFUL; 
 			break;
 		}
 
-		if (!NT_SUCCESS(VerifyHidDeviceObject(driver_object, &ListSize)))
+		if (!NT_SUCCESS(VerifyHidDeviceObject(HidDriverObj, &ListSize)))
 		{
 			USB_MON_DEBUG_INFO("VerifyHidDeviceObject Error \r\n");
 			status = STATUS_UNSUCCESSFUL;
@@ -670,8 +820,7 @@ NTSTATUS AllocatePdoList()
 		status = STATUS_SUCCESS;
 	} while (0);
 	return status;
-}
-
+} 
 //----------------------------------------------------------------------------------------------------------//
 NTSTATUS InitHidClientPdoList(
 	_Out_ PHID_DEVICE_LIST* ClientPdoList,
@@ -730,6 +879,12 @@ NTSTATUS FreeHidClientPdoList()
 		ExFreePool(g_hid_client_pdo_list);
 		g_hid_client_pdo_list = NULL;
 	}
+
+	if (g_PnpCallbackEntry)
+	{
+		IoUnregisterPlugPlayNotification(g_PnpCallbackEntry);
+	}
+	
 	return status;
 } 
 

@@ -41,6 +41,7 @@ typedef struct _PENDINGIRP_LIST
 ////  
 //// 
 
+#define IsSafeNode(x)					 (x->node)
 //Hijack Context Marco
 #define GetCollectionDesc(x, y)			 &x->node->parsedReport.CollectionDesc[y]
 #define IsMouseUsage(x, y)				 (x->node->parsedReport.CollectionDesc[y].Usage==HID_MOU_USAGE)
@@ -465,6 +466,20 @@ NTSTATUS HandleMouseData(
 		status = STATUS_UNSUCCESSFUL;
 		return status; 
 	}
+
+	if (!pContext->node)
+	{
+		USB_MON_DEBUG_INFO("NULL pdoExt \r\n");
+		status = STATUS_UNSUCCESSFUL;
+		return status;
+	}
+
+	if (!IsSafeNode(pContext))
+	{
+		status = STATUS_SUCCESS;
+		return status;
+	}
+
 	//Top-Collection == Mouse && Usage Page == Desktop 
 	if (!IsMouseUsage(pContext, colIndex) ||
 		!IsDesktopUsagePage(pContext, colIndex))
@@ -472,6 +487,7 @@ NTSTATUS HandleMouseData(
 		status = STATUS_SUCCESS;
 		return status;
 	}
+	
 
 	USB_MON_DEBUG_INFO("collectionIndex: %x collectionNum: %x \r\n", pdoExt->collectionIndex, pdoExt->collectionNum);
 
@@ -652,7 +668,8 @@ NTSTATUS HidUsb_InternalDeviceControl(
 		{
 			HIDCLASS_DEVICE_EXTENSION* class_extension = NULL;
 
-			if (!node)
+			if (!node ||
+				!node->device_object)
 			{
 				continue;
 			}
@@ -683,21 +700,25 @@ NTSTATUS HidUsb_InternalDeviceControl(
 
 			//Save all we need to use when unload driver / delete node , 
 			//Add to linked list
-			new_entry->Irp		  = Irp;
-			new_entry->oldRoutine = irpStack->CompletionRoutine;
-			new_entry->oldContext = irpStack->Context;
-			new_entry->IrpStack   = irpStack;
-			AddToChainListTail(g_pending_irp_header->head, new_entry);
+			if (irpStack)
+			{
+				new_entry->Irp = Irp;
+				new_entry->oldRoutine = irpStack->CompletionRoutine;
+				new_entry->oldContext = irpStack->Context;
+				new_entry->IrpStack = irpStack;
+				AddToChainListTail(g_pending_irp_header->head, new_entry);
+		
+				//Fake Context for Completion Routine
+				hijack->DeviceObject = node->device_object;		//USBHUB device
+				hijack->urb = urb;
+				hijack->node = node;
+				hijack->pending_irp = new_entry;
 
-			//Fake Context for Completion Routine
-			hijack->DeviceObject = node->device_object;		//USBHUB device
-			hijack->urb = urb;
-			hijack->node = node;
-			hijack->pending_irp = new_entry;
+				//Completion Routine hook
+				irpStack->Context = hijack;
+				irpStack->CompletionRoutine = HidUsb_CompletionCallback;	
 
-			//Completion Routine hook
-			irpStack->Context = hijack;
-			irpStack->CompletionRoutine = HidUsb_CompletionCallback;
+			}
 			
 		}
 	} while (0);
@@ -707,7 +728,7 @@ NTSTATUS HidUsb_InternalDeviceControl(
 	if (object)
 	{
 		if (object->oldFunction)
-		{
+		{ 
 			return object->oldFunction(DeviceObject, Irp);
 		}
 	}
@@ -759,6 +780,7 @@ NTSTATUS InitializeHidPenetrate(
 		return status;
 	}
 
+ 
 	//Do Irp Hook for URB transmit
 	g_pDispatchInternalDeviceControl = (PDRIVER_DISPATCH)DoIrpHook(pDriverObj, IRP_MJ_INTERNAL_DEVICE_CONTROL, HidUsb_InternalDeviceControl, Start);
 	if (!g_pDispatchInternalDeviceControl)
@@ -768,7 +790,7 @@ NTSTATUS InitializeHidPenetrate(
 		USB_MON_DEBUG_INFO("DoIrpHook Error \r\n");
 		status = STATUS_UNSUCCESSFUL;
 		return status;
-	}
+	} 
 }
 
 //----------------------------------------------------------------------------------------//

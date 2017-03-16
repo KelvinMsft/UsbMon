@@ -88,3 +88,30 @@ NTSTATUS GetDeviceName(PDEVICE_OBJECT device_object, WCHAR* DeviceNameBuf)
 	return status;
 }
 //----------------------------------------------------------------------------------------//
+NTSTATUS USBSymLinkToPath(PUNICODE_STRING pusSymLink, PUNICODE_STRING pusDosPath) 
+{
+	UNICODE_STRING usSymLinkPath;
+	NTSTATUS       ntStatus;
+	PFILE_OBJECT   pfVolume;
+	PDEVICE_OBJECT pdVolume;
+
+	// Check parameters
+	if (!pusSymLink || !pusDosPath) return STATUS_INVALID_PARAMETER;
+
+	// Create symbolic link path
+	usSymLinkPath.Length = 0;
+	usSymLinkPath.MaximumLength = pusSymLink->MaximumLength + 8;
+	usSymLinkPath.Buffer = ExAllocatePool(NonPagedPool, usSymLinkPath.MaximumLength);
+	RtlAppendUnicodeToString(&usSymLinkPath, L"\\??\\");
+	RtlAppendUnicodeStringToString(&usSymLinkPath, pusSymLink);
+
+	// Get file object and device object for volume
+	ntStatus = IoGetDeviceObjectPointer(&usSymLinkPath, FILE_ALL_ACCESS, &pfVolume, &pdVolume);
+	ExFreePool(usSymLinkPath.Buffer);
+	if (!NT_SUCCESS(ntStatus)) return ntStatus;
+
+	// Get DOS name for volume
+	ntStatus = IoVolumeDeviceToDosName(pdVolume, pusDosPath);
+	ObDereferenceObject(pfVolume);
+	return ntStatus;
+}
