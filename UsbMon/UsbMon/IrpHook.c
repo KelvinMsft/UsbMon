@@ -29,7 +29,7 @@ typedef struct SEARCHPARAM
 ////	Global Variable
 ////
 ////
-IRPHOOKLIST* ListHeader = NULL;
+IRPHOOKLIST* g_IrpHookList = NULL;
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,7 +67,7 @@ IRPHOOKOBJ* GetIrpHookObject(
 	SEARCHPARAM param = { 0 };
 	param.driver_object = driver_object;
 	param.IrpCode = IrpCode;
-	return QueryFromChainListByCallback(ListHeader->head, SearchIrpHookObjectCallback, &param); 
+	return QueryFromChainListByCallback(g_IrpHookList->head, SearchIrpHookObjectCallback, &param); 
 } 
 
 //--------------------------------------------------------------------------------------------//
@@ -81,7 +81,7 @@ ULONG RemoveIrpHookCallback(
 	if (hook_obj)
 	{ 
 		DoIrpHook(hook_obj->driver_object, hook_obj->IrpCode, hook_obj->oldFunction, Stop);
-		USB_MON_DEBUG_INFO("RemoveIrpHookCallback Once \r\n");
+		USB_MON_DEBUG_INFO("RemoveIrpHookCallback Once hook_obj->driver_object: %ws \r\n", hook_obj->driver_object->DriverName.Buffer);
 		hook_obj = NULL;  
 	}  
 	return CLIST_FINDCB_CTN | CLIST_FINDCB_DEL;
@@ -91,11 +91,11 @@ ULONG RemoveIrpHookCallback(
 NTSTATUS RemoveAllIrpObject()
 {
 	NTSTATUS    status = STATUS_UNSUCCESSFUL;  
-	if (ListHeader)
+	if (g_IrpHookList)
 	{ 
-		QueryFromChainListByCallback(ListHeader->head, RemoveIrpHookCallback, NULL); 
-		ExFreePool(ListHeader);
-		ListHeader = NULL; 
+		QueryFromChainListByCallback(g_IrpHookList->head, RemoveIrpHookCallback, NULL); 
+		ExFreePool(g_IrpHookList);
+		g_IrpHookList = NULL; 
 		status = STATUS_SUCCESS;
 	}
 
@@ -104,7 +104,7 @@ NTSTATUS RemoveAllIrpObject()
  
 //--------------------------------------------------------------------------------------------//
 IRPHOOKOBJ* CreateIrpObject(
-	_In_ PDRIVER_OBJECT driver_object, 
+	_In_ PDRIVER_OBJECT DriverObject,
 	_In_ ULONG IrpCode, 
 	_In_ PVOID oldFunction, 
 	_In_ PVOID newFunction)
@@ -113,23 +113,60 @@ IRPHOOKOBJ* CreateIrpObject(
 
 	if (!HookObj)
 	{
+		USB_MON_DEBUG_INFO("Empty Hook Object \r\n");
 		return NULL; 
 	}
 
 	RtlZeroMemory(HookObj, sizeof(IRPHOOKOBJ));
 
-	HookObj->driver_object = driver_object;
+	HookObj->driver_object = DriverObject;
 	HookObj->IrpCode = IrpCode;
 	HookObj->newFunction = newFunction;
 	HookObj->oldFunction = oldFunction;
  
-	if (!AddToChainListTail(ListHeader->head, HookObj))
+	if (!AddToChainListTail(g_IrpHookList->head, HookObj))
 	{
+		USB_MON_DEBUG_INFO("Cannot Add to list \r\n");  
 		ExFreePool(HookObj);
 		HookObj = NULL;
 	}
+
+	USB_MON_DEBUG_INFO("IRP List Size: %x with DriverName: %ws \r\n", g_IrpHookList->head->Count, DriverObject->DriverName.Buffer);
+
 	return HookObj;
 }
+
+//--------------------------------------------------------------------------------------------//
+NTSTATUS AllocateIrpHookLinkedList()
+{
+	NTSTATUS status = STATUS_UNSUCCESSFUL;
+	do {
+		if (!g_IrpHookList)
+		{
+			g_IrpHookList = (IRPHOOKLIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(IRPHOOKLIST), 'opri');
+			if (!g_IrpHookList)
+			{
+				status = STATUS_UNSUCCESSFUL;
+				break; 
+			}
+			RtlZeroMemory(g_IrpHookList, sizeof(IRPHOOKLIST));
+		}
+		if (!g_IrpHookList)
+		{
+			g_IrpHookList->head = NewChainListHeaderEx(LISTFLAG_SPINLOCK | LISTFLAG_AUTOFREE, NULL, 0);
+			if (!g_IrpHookList->head)
+			{
+				ExFreePool(g_IrpHookList);
+				g_IrpHookList = NULL;
+				status = STATUS_UNSUCCESSFUL;
+				break;
+			}
+			g_IrpHookList->RefCount = 1;
+		}
+		status = STATUS_SUCCESS;
+	} while (FALSE);
+	return status;
+} 
 
 //--------------------------------------------------------------------------------------------//
 PVOID DoIrpHook(
@@ -139,7 +176,6 @@ PVOID DoIrpHook(
 	_In_  	  Action action
 )
 {
- 
 	PVOID old_irp_function = NULL;
 
 	if (!driver_object || !NewFunction)
@@ -147,9 +183,9 @@ PVOID DoIrpHook(
 		return old_irp_function;
 	}
 
-	if (!ListHeader)
+	if (!g_IrpHookList)
 	{
-		if (!NT_SUCCESS(InitIrpHookLinkedList()))
+		if (!NT_SUCCESS(AllocateIrpHookLinkedList()))
 		{
 			return old_irp_function;
 		}
@@ -172,40 +208,6 @@ PVOID DoIrpHook(
 	} 
 
 	return old_irp_function;
-}
-
+} 
 //--------------------------------------------------------------------------------------------//
-//ÃèÊö:
-// 1. Create Header
-// 2. Create List
-//
-NTSTATUS InitIrpHookLinkedList()
-{
-	NTSTATUS status = STATUS_UNSUCCESSFUL;
 
-	if (!ListHeader)
-	{
-		ListHeader = (IRPHOOKLIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(IRPHOOKLIST), 'opri');  
-	}
-
-	if (!ListHeader)
-	{
-		status = STATUS_UNSUCCESSFUL;
-		return status;
-	}
-
-	RtlZeroMemory(ListHeader, sizeof(IRPHOOKLIST));
-	ListHeader->head = NewChainListHeaderEx(LISTFLAG_SPINLOCK | LISTFLAG_AUTOFREE, NULL, 0);
-	 
-	if (!ListHeader->head)
-	{
-		ExFreePool(ListHeader);
-		ListHeader = NULL;			
-		status = STATUS_UNSUCCESSFUL;
-		return status;
-	} 	 
-	ListHeader->RefCount = 1;
-	status = STATUS_SUCCESS;
-	return status;
-}
-//--------------------------------------------------------------------------------------------//

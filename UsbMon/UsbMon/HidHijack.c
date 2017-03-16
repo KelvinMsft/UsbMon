@@ -58,7 +58,7 @@ typedef struct _PENDINGIRP_LIST
 #define UrbIsOutputTransfer(urb)		 (UrbGetTransferFlags(urb) & (USBD_TRANSFER_DIRECTION_OUT | USBD_DEFAULT_PIPE_TRANSFER))
 
 #define GetNodeByPTR(ListHead,NodeValue) QueryFromChainListByULONGPTR(ListHead, (ULONG_PTR)NodeValue);	  
-#define GetRealPendingIrpByIrp(irp)		 GetNodeByPTR(g_pending_irp_header->head, irp)
+#define GetRealPendingIrpByIrp(irp)		 GetNodeByPTR(g_PendingIrpList->head, irp)
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 ////	Global Variable
@@ -67,7 +67,7 @@ typedef struct _PENDINGIRP_LIST
 DRIVER_DISPATCH*  g_pDispatchInternalDeviceControl = NULL;
 volatile LONG	  g_current_index				   = 0;
 BOOLEAN			  g_bUnloaded					   = FALSE;
-PENDINGIRPLIST*	  g_pending_irp_header			   = NULL;
+PENDINGIRPLIST*	  g_PendingIrpList			   = NULL;
 PHID_DEVICE_LIST  g_HidPipeList					   = NULL;
 
  
@@ -94,7 +94,7 @@ Return Value:
 					- STATUS_UNSUCCESSFUL if failed
 
 -------------------------------------------------------*/
-NTSTATUS		InitPendingIrpLinkedList();
+NTSTATUS		AllocatePendingIrpLinkedList();
 
  
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -287,41 +287,50 @@ NTSTATUS UnInitializeHidPenetrate();
 //// 
 
 //----------------------------------------------------------------------------------------//
-NTSTATUS InitPendingIrpLinkedList()
+NTSTATUS AllocatePendingIrpLinkedList()
 {
 	NTSTATUS status = STATUS_UNSUCCESSFUL;
-	if (!g_pending_irp_header)
+	do
 	{
-		g_pending_irp_header = (PENDINGIRPLIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(PENDINGIRPLIST), 'kcaj');
-	}
+		if (!g_PendingIrpList)
+		{
+			g_PendingIrpList = (PENDINGIRPLIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(PENDINGIRPLIST), 'kcaj');
+			if (!g_PendingIrpList)
+			{
+				status = STATUS_UNSUCCESSFUL;
+				break;
+			} 
+			RtlZeroMemory(g_PendingIrpList, sizeof(PENDINGIRPLIST));
+		} 
 
-	if (g_pending_irp_header)
-	{
-		//USB_MON_DEBUG_INFO("Allocation Error \r\n");
-		RtlZeroMemory(g_pending_irp_header, sizeof(PENDINGIRPLIST));
-		g_pending_irp_header->head = NewChainListHeaderEx(LISTFLAG_SPINLOCK | LISTFLAG_AUTOFREE, NULL, 0);
-	}
+		if (!g_PendingIrpList->head)
+		{
+			g_PendingIrpList->head = NewChainListHeaderEx(LISTFLAG_SPINLOCK | LISTFLAG_AUTOFREE, NULL, 0);
+			if (!g_PendingIrpList->head)
+			{
+				ExFreePool(g_PendingIrpList);
+				g_PendingIrpList = NULL;
+				status = STATUS_UNSUCCESSFUL;
+				break;
+			}
+			g_PendingIrpList->RefCount = 1;
+		}
 
-	if (g_pending_irp_header->head)
-	{
-		g_pending_irp_header->RefCount = 1;
-		status = STATUS_SUCCESS;
-	}
-
-	return status;
-
+		status = STATUS_SUCCESS; 
+	}while (FALSE);
+	return status; 
 }
 //----------------------------------------------------------------------------------------//
 NTSTATUS FreePendingIrpList()
 {
-	if (g_pending_irp_header)
+	if (g_PendingIrpList)
 	{
-		if (g_pending_irp_header->head)
+		if (g_PendingIrpList->head)
 		{
-			CHAINLIST_SAFE_FREE(g_pending_irp_header->head);
+			CHAINLIST_SAFE_FREE(g_PendingIrpList->head);
 		}
-		ExFreePool(g_pending_irp_header);
-		g_pending_irp_header = NULL;
+		ExFreePool(g_PendingIrpList);
+		g_PendingIrpList = NULL;
 	}
 }
 
@@ -348,7 +357,7 @@ LOOKUP_STATUS LookupPendingIrpCallback(
 NTSTATUS RecoverAllPendingIrp()
 {
 	NTSTATUS						   status = STATUS_UNSUCCESSFUL;
-	if (QueryFromChainListByCallback(g_pending_irp_header->head, LookupPendingIrpCallback, NULL))
+	if (QueryFromChainListByCallback(g_PendingIrpList->head, LookupPendingIrpCallback, NULL))
 	{
 		status = STATUS_SUCCESS;
 	}
@@ -584,7 +593,7 @@ NTSTATUS  HidUsb_CompletionCallback(
 	}
 
 	//If Driver is not unloading , delete it 
-	if (!DelFromChainListByPointer(g_pending_irp_header->head, pContext->pending_irp))
+	if (!DelFromChainListByPointer(g_PendingIrpList->head, pContext->pending_irp))
 	{
 		USB_MON_DEBUG_INFO("FATAL: Delete element FAILED \r\n");
 	}
@@ -706,7 +715,7 @@ NTSTATUS HidUsb_InternalDeviceControl(
 				new_entry->oldRoutine = irpStack->CompletionRoutine;
 				new_entry->oldContext = irpStack->Context;
 				new_entry->IrpStack = irpStack;
-				AddToChainListTail(g_pending_irp_header->head, new_entry);
+				AddToChainListTail(g_PendingIrpList->head, new_entry);
 		
 				//Fake Context for Completion Routine
 				hijack->DeviceObject = node->device_object;		//USBHUB device
@@ -761,17 +770,17 @@ NTSTATUS InitializeHidPenetrate(
 	USB_MON_DEBUG_INFO("Done Init --- Device_object_list: %I64X Size: %x \r\n", g_HidPipeList, g_current_index);
 
 	//Init Irp Linked-List
-	status = InitPendingIrpLinkedList();
+	status = AllocatePendingIrpLinkedList();
 	if (!NT_SUCCESS(status))
 	{
-		USB_MON_DEBUG_INFO("InitPendingIrpLinkedList Error \r\n");
+		USB_MON_DEBUG_INFO("AllocatePendingIrpLinkedList Error \r\n");
 		FreeHidClientPdoList();
 		return status;
 	}
 
 
 	//Init Irp Hook for URB transmit
-	status = InitIrpHookLinkedList();
+	status = AllocateIrpHookLinkedList();
 	if (!NT_SUCCESS(status))
 	{
 		FreeHidClientPdoList();

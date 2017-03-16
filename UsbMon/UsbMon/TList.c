@@ -33,7 +33,7 @@ PChainListHeader NewChainListHeaderEx(ULONG Flag,TChainLisActionCallback  ChainL
 		List->Version=1;
 		List->Flag=Flag;
 		List->Count=0;
-		List->ListHeader=NULL;
+		List->g_IrpHookList=NULL;
 		List->BlockHeader=NULL;
 		List->ChainLisActionCallback=ChainLisActionCallback;
 		List->LockType=Flag&MASKFLAG_LOCK;
@@ -65,9 +65,9 @@ PChainListHeader NewChainListHeaderEx(ULONG Flag,TChainLisActionCallback  ChainL
 			KeInitializeMutex(&List->Mutex,0);
 		}
 		
-		List->ListHeader=&BlockHeader->ListCell[0];
-		List->ListHeader->Next=List->ListHeader;
-		List->ListHeader->Prev=List->ListHeader;
+		List->g_IrpHookList=&BlockHeader->ListCell[0];
+		List->g_IrpHookList->Next=List->g_IrpHookList;
+		List->g_IrpHookList->Prev=List->g_IrpHookList;
 	}
 
 	return List;
@@ -83,14 +83,14 @@ void  FreeChainListHeader(PChainListHeader List)
 	if(List)
 	{
 			PListCellBlock  BlockHeader,bDelBlock;
-			PListCell		ListHeader,ListCell,beDelCell;
+			PListCell		g_IrpHookList,ListCell,beDelCell;
 			
 			EntryListLock(List);
 			
-			ListHeader=List->ListHeader;
-			ListCell=ListHeader->Next;
+			g_IrpHookList=List->g_IrpHookList;
+			ListCell=g_IrpHookList->Next;
 			
-			while(ListCell!=ListHeader)
+			while(ListCell!=g_IrpHookList)
 			{
 	            beDelCell=ListCell;
 	            ListCell=ListCell->Next;
@@ -301,11 +301,11 @@ static void FreeListCell(PChainListHeader List,PListCell Cell)
 static PListCell GetListCellByIndex(PChainListHeader List,ULONG Index)
 {
 	ULONG i;
-	PListCell Cell=List->ListHeader;
+	PListCell Cell=List->g_IrpHookList;
 	for(i=0;;i++)
 	{
 			Cell=Cell->Next;
-			if(Cell==List->ListHeader)
+			if(Cell==List->g_IrpHookList)
 			{
 				Cell=NULL;
 				break;
@@ -321,11 +321,11 @@ static PListCell GetListCellByIndex(PChainListHeader List,ULONG Index)
 static PListCell GetListCellByData(PChainListHeader List,void* Data)
 {
 	ULONG i;
-	PListCell Cell=List->ListHeader;
+	PListCell Cell=List->g_IrpHookList;
 	for(i=0;;i++)
 	{
 		Cell=Cell->Next;
-		if(Cell==List->ListHeader)
+		if(Cell==List->g_IrpHookList)
 		{
 			Cell=NULL;
 			break;
@@ -402,7 +402,7 @@ BOOLEAN AddToChainListTail(PChainListHeader List,void* Data)
 	if(Cell)
 	{
 			Cell->Pointer=Data;
-			AddToListComm((PListComm)List->ListHeader,(PListComm)Cell);
+			AddToListComm((PListComm)List->g_IrpHookList,(PListComm)Cell);
 			IniRefListCell(List,Cell);
 			List->Count++;
 			Ret=TRUE;
@@ -427,7 +427,7 @@ BOOLEAN InsertToChainList(PChainListHeader List,ULONG Index,void* Data)
 		Cell->Pointer=Data;
 	    if(!Header)
 	    {
-	            AddToListComm((PListComm)List->ListHeader,(PListComm)Cell);
+	            AddToListComm((PListComm)List->g_IrpHookList,(PListComm)Cell);
 	    }
 	    else
 	    {
@@ -453,7 +453,7 @@ BOOLEAN  DelFromChainListByPointer(PChainListHeader List,void* Data)
 	}
 
 	EntryListLock(List);
-	Header=List->ListHeader;
+	Header=List->g_IrpHookList;
 	for(Cell=Header->Next;Cell!=Header;Cell=Cell->Next)
 	{
 		 if(Cell->Pointer==Data)
@@ -483,7 +483,7 @@ BOOLEAN  DelFromChainListByIndex(PChainListHeader List,ULONG Index)
 	}
 
 	EntryListLock(List);
-	Header=List->ListHeader;
+	Header=List->g_IrpHookList;
 	Cell=Header->Next;
 	for(i=0;Cell!=Header&&i<Index;i++)
 	{
@@ -512,7 +512,7 @@ BOOLEAN DelFromChainList(PChainListHeader List,PListCell delCell)
 	}
 
 	EntryListLock(List);
-	Header=List->ListHeader;
+	Header=List->g_IrpHookList;
 	for(Cell=Header->Next;Cell!=Header;Cell=Cell->Next)
 	{
 		 if(Cell==delCell)
@@ -540,7 +540,7 @@ BOOLEAN DelNoneFromChainList(PChainListHeader List,BOOLEAN isTail)
 	}
 
 	EntryListLock(List);
-	Header=List->ListHeader;
+	Header=List->g_IrpHookList;
 	if(List->Count)
 	{
 		if(isTail)
@@ -590,7 +590,7 @@ void* QueryFromChainListByULONG(PChainListHeader List,ULONG ID)
 			return NULL;
 	}
 	EntryListLock(List);
-	Header=List->ListHeader;
+	Header=List->g_IrpHookList;
 	for(Cell=Header->Next;Cell!=Header;Cell=Cell->Next)
 	{
 		 if(*(ULONG*)Cell->Pointer==ID)
@@ -613,7 +613,7 @@ void* QueryFromChainListByULONG64(PChainListHeader List,ULONGLONG ID)
 			return NULL;
 	}
 	EntryListLock(List);
-	Header=List->ListHeader;
+	Header=List->g_IrpHookList;
 	for(Cell=Header->Next;Cell!=Header;Cell=Cell->Next)
 	{
 		 if(*(ULONGLONG*)Cell->Pointer==ID)
@@ -636,7 +636,7 @@ void* QueryFromChainListByULONGPTR(PChainListHeader List,ULONG_PTR ID)
 			return NULL;
 	}
 	EntryListLock(List);
-	Header=List->ListHeader;
+	Header=List->g_IrpHookList;
 	for(Cell=Header->Next;Cell!=Header;Cell=Cell->Next)
 	{
 		 if(*(ULONG_PTR*)Cell->Pointer==ID)
@@ -659,7 +659,7 @@ void* QueryFromChainListByMemEx(PChainListHeader List,ULONG Offset,void* Mem,ULO
 			return NULL;
 	}
 	EntryListLock(List);
-	Header=List->ListHeader;
+	Header=List->g_IrpHookList;
 	for(Cell=Header->Next;Cell!=Header;Cell=Cell->Next)
 	{
 		 if(RtlCompareMemory((char*)Cell->Pointer+Offset,Mem,Length)==Length)
@@ -692,7 +692,7 @@ void* QueryFromChainListByCallback(PChainListHeader List,TQueryChainListCallback
 			return NULL;
 	}
 	EntryListLock(List);
-	Header=List->ListHeader;
+	Header=List->g_IrpHookList;
 	for(Cell=Header->Next;Cell!=Header;Cell=Cell->Next)
 	{
 		ULONG   Error=Callback(Cell->Pointer,Context);

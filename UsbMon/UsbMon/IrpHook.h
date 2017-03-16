@@ -64,6 +64,6 @@ NTSTATUS	RemoveAllIrpObject();
 //--------------------------------------------------------------------------------------
 //	
 //
-NTSTATUS	InitIrpHookLinkedList();
+NTSTATUS	AllocateIrpHookLinkedList();
 
 #endif

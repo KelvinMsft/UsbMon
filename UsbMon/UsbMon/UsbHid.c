@@ -119,7 +119,7 @@ typedef struct _HIDP_PREPARSED_DATA
 /////////////////////////////////////////////////////////////////////////////////////////////// 
 //// Global/Extern Variable 
 //// 
-HID_DEVICE_LIST*  g_hid_client_pdo_list = NULL; 
+HID_DEVICE_LIST*  g_HidClientPdoList = NULL; 
 ULONG			  g_listSize = NULL;
 HIDP_DEVICE_DESC* g_hid_collection = NULL; 
 PVOID			  g_PnpCallbackEntry = NULL;
@@ -237,7 +237,7 @@ Return Value:
 							- STATUS_UNSUCCESSFUL or others	, if translate error
 
 -----------------------------------------------------------------------------------*/
-BOOLEAN  VerifyDevice(
+BOOLEAN  IsHidTypeDevice(
 	_In_  PDEVICE_OBJECT				   DeviceObject,
 	_Out_ PHID_USB_DEVICE_EXTENSION*	  MiniExtension
 );
@@ -356,12 +356,35 @@ Return Value:
 							- STATUS_UNSUCCESSFUL or others	, if translate error
 
 -----------------------------------------------------------------------------------*/
+NTSTATUS HidUsbPnpIrpHandler(
+	_Inout_ struct _DEVICE_OBJECT *DeviceObject,
+	_Inout_ struct _IRP           *Irp
+);
 
+
+/*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Routine Description:
+
+		Verify a Device is it hid device and add it into linked list
+
+Arguments:
+
+		DeviceObject		- Device to be verify
+
+Return Value:
+
+		NTSTATUS			- STATUS_SUCCESS				, if verify device success
+							- STATUS_UNSUCCESSFUL or others	, if verify device error
+
+-----------------------------------------------------------------------------------*/
+NTSTATUS VerifyDevice(
+	_In_  PDEVICE_OBJECT DeviceObject, 
+	_Out_ PHID_DEVICE_NODE* Node);
 
 /////////////////////////////////////////////////////////////////////////////////////////////// 
 //// Implementation
 ////
-
 //--------------------------------------------------------------------------------------------//
 ULONG SearchHidNodeCallback(
 	_In_ PHID_DEVICE_NODE HidNode,
@@ -380,8 +403,9 @@ IRPHOOKOBJ* GetHidNode(
 	_In_ PDRIVER_OBJECT DeviceObject
 )
 { 
-	return QueryFromChainListByCallback(g_hid_client_pdo_list->head, SearchHidNodeCallback, DeviceObject);
+	return QueryFromChainListByCallback(g_HidClientPdoList->head, SearchHidNodeCallback, DeviceObject);
 }
+
 //--------------------------------------------------------------------------------------------//
 NTSTATUS HidUsbPnpIrpHandler(
 	_Inout_ struct _DEVICE_OBJECT *DeviceObject,
@@ -403,51 +427,25 @@ NTSTATUS HidUsbPnpIrpHandler(
 			if (irpStack->MinorFunction == IRP_MN_REMOVE_DEVICE)
 			{
 				USB_MON_DEBUG_INFO("REMOVE Device\r\n");
-				DelFromChainListByPointer(g_hid_client_pdo_list->head, GetHidNode(DeviceObject));
-				
-				g_hid_client_pdo_list->currentSize--;
+				DelFromChainListByPointer(g_HidClientPdoList->head, GetHidNode(DeviceObject));  
+				g_HidClientPdoList->currentSize--;
 			}
 
 			if (irpStack->MinorFunction == IRP_MN_START_DEVICE)
-			{
-				NTSTATUS status;
-				HID_USB_DEVICE_EXTENSION* mini_extension = NULL;
-				HIDP_DEVICE_DESC*			   AllReport = NULL;
-				PHID_DEVICE_NODE*					node = NULL;
-
-				USB_MON_DEBUG_INFO("Add Device\r\n");
-				if (!VerifyDevice(DeviceObject, &mini_extension))
+			{  
+				HID_DEVICE_NODE* node = NULL;
+				if (!NT_SUCCESS(VerifyDevice(DeviceObject, &node)))
 				{
 					break;
 				}
 
-				AllReport = (HIDP_DEVICE_DESC*)ExAllocatePoolWithTag(NonPagedPool, sizeof(HIDP_DEVICE_DESC), 'csed');
-				if (!AllReport)
+				if (node)
 				{
-					break;
+					AddToChainListTail(g_HidClientPdoList->head, node);
+					g_HidClientPdoList->currentSize++; 
 				}
 
-				status = GetAllReportByDeviceExtension(DeviceObject->DeviceExtension, AllReport);
-				if (!NT_SUCCESS(status))
-				{
-					if (AllReport)
-					{
-						ExFreePool(AllReport);
-						AllReport = NULL;
-					}
-					break;
-				}
-
-				node = CreateHidDeviceNode(DeviceObject, mini_extension, AllReport);
-				AddToChainListTail(g_hid_client_pdo_list->head, node);
-
-				if (AllReport)
-				{
-					ExFreePool(AllReport);
-					AllReport = NULL;
-				}
-
-				g_hid_client_pdo_list->currentSize++;
+				USB_MON_DEBUG_INFO("Add Device\r\n"); 
 			}
 		}
 	} while (FALSE);
@@ -590,13 +588,13 @@ NTSTATUS GetAllReportByDeviceExtension(
 
 //-------------------------------------------------------------------------------------------//
 HID_DEVICE_NODE* CreateHidDeviceNode(
-	_In_ PDEVICE_OBJECT device_object,
+	_In_ PDEVICE_OBJECT DeviceObject,
 	_In_ HID_USB_DEVICE_EXTENSION* MiniExtension,
-	_In_ HIDP_DEVICE_DESC* parsedReport
+	_In_ HIDP_DEVICE_DESC* ParsedReport
 )
 {
 	HID_DEVICE_NODE* node = NULL;
-	if (!device_object || !MiniExtension || !parsedReport)
+	if (!DeviceObject || !MiniExtension || !ParsedReport)
 	{
 		return NULL;
 	}
@@ -608,15 +606,75 @@ HID_DEVICE_NODE* CreateHidDeviceNode(
 	}
 
 	RtlZeroMemory(node, sizeof(HID_DEVICE_NODE));
-	node->device_object  = device_object;
+	node->device_object  = DeviceObject;
 	node->mini_extension = MiniExtension;
-	RtlMoveMemory(&node->parsedReport , parsedReport , sizeof(HIDP_DEVICE_DESC));
+	RtlMoveMemory(&node->parsedReport , ParsedReport, sizeof(HIDP_DEVICE_DESC));
 
 	return node;
 } 
- 
 //---------------------------------------------------------------------------------------------------------//
-BOOLEAN  VerifyDevice(
+NTSTATUS VerifyDevice(
+	_In_  PDEVICE_OBJECT DeviceObject, 
+	_Out_ PHID_DEVICE_NODE* Node)
+{
+	HIDP_DEVICE_DESC* report = NULL;
+	NTSTATUS status = STATUS_UNSUCCESSFUL; 
+	PHID_USB_DEVICE_EXTENSION MiniExtension = NULL;
+	HID_DEVICE_NODE* node = NULL;
+	do {
+
+		if (!DeviceObject || !g_HidClientPdoList)
+		{
+			status = STATUS_UNSUCCESSFUL; 
+			break;
+		} 
+
+		if (!IsHidTypeDevice(DeviceObject, &MiniExtension))
+		{
+			if (!MiniExtension)
+			{
+				status = STATUS_UNSUCCESSFUL; 
+				break;
+			}
+		}
+
+		report = (HIDP_DEVICE_DESC*)ExAllocatePoolWithTag(NonPagedPool, sizeof(HIDP_DEVICE_DESC), 'csed');
+		if (!report)
+		{
+			status = STATUS_UNSUCCESSFUL; 
+			break;
+		}
+
+		status = GetAllReportByDeviceExtension(DeviceObject->DeviceExtension, report);
+		if (!NT_SUCCESS(status))
+		{
+			break;
+		}
+
+		node = CreateHidDeviceNode(DeviceObject, MiniExtension, report);
+		if (!node)
+		{
+			status = STATUS_UNSUCCESSFUL;
+			break;
+		}
+
+		*Node = node;
+		status = STATUS_SUCCESS;
+
+ 		USB_MON_DEBUG_INFO("Inserted one element: %I64x InferfaceDesc: %I64X device_object: %I64x \r\n", node->device_object, node->mini_extension, DeviceObject);
+
+	} while (FALSE);
+
+	if (report)
+	{
+		ExFreePool(report);
+		report = NULL;
+	}
+
+	return status; 
+}
+//---------------------------------------------------------------------------------------------------------//
+BOOLEAN  IsHidTypeDevice(
 	_In_  PDEVICE_OBJECT				   DeviceObject,
 	_Out_ PHID_USB_DEVICE_EXTENSION*      MiniExtension
 )
@@ -624,112 +682,98 @@ BOOLEAN  VerifyDevice(
 	HID_USB_DEVICE_EXTENSION*  pMiniExtension   = NULL;
 	HIDCLASS_DEVICE_EXTENSION* pClassExtension  = NULL;
 	WCHAR						DeviceName[256] = { 0 };
-	GetDeviceName(DeviceObject, DeviceName);
-
-	pClassExtension = (HIDCLASS_DEVICE_EXTENSION*)DeviceObject->DeviceExtension;
-	if (!pClassExtension)
+	BOOLEAN			 					   ret  = FALSE; 
+	do
 	{
-		return FALSE;
-	}
- 
-	 
-	//USB_MON_DEBUG_INFO("Extension_common: %I64X sizeof: %x \r\n", hid_common_extension, sizeof(HID_USB_DEVICE_EXTENSION));
-	pMiniExtension = (HID_USB_DEVICE_EXTENSION*)pClassExtension->hidExt.MiniDeviceExtension;
-	if (!pMiniExtension)
-	{
-		return FALSE;
-	} 	
-	 
-	//DumpHidMiniDriverExtension(hid_common_extension); 
+		if (!DeviceObject)
+		{
+			ret = FALSE;
+			break;
+		}
 
-	//Device Name = HID_0000000X
-	if (!pClassExtension->isClientPdo)
-	{	
-		*MiniExtension = NULL;
-		return FALSE; 
-	}
-	 
-	if ( pMiniExtension->InterfaceDesc->Class == 3 &&			//HidClass Device
-		(pMiniExtension->InterfaceDesc->Protocol == 1 ||		//Keyboard
-		 pMiniExtension->InterfaceDesc->Protocol == 2 ||		//Mouse
-		 pMiniExtension->InterfaceDesc->Protocol == 0) )			
-	{  
-		USB_MON_DEBUG_INFO("---------------------------------------------------------------------------------------------------- \r\n");
+		pClassExtension = (HIDCLASS_DEVICE_EXTENSION*)DeviceObject->DeviceExtension;
+		if (!pClassExtension)
+		{
+			ret = FALSE;
+			break; 
+		}
 
-		USB_MON_DEBUG_INFO("hid_common_extension: %I64x \r\n", pClassExtension);
-		USB_MON_DEBUG_INFO("DeviceObj: %I64X  DriverName: %ws DeviceName: %ws \r\n", DeviceObject, DeviceObject->DriverObject->DriverName.Buffer, DeviceName);
-		USB_MON_DEBUG_INFO("collectionIndex: %x collectionNum: %x \r\n", pClassExtension->pdoExt.collectionIndex, pClassExtension->pdoExt.collectionNum);
+		//USB_MON_DEBUG_INFO("Extension_common: %I64X sizeof: %x \r\n", hid_common_extension, sizeof(HID_USB_DEVICE_EXTENSION));
+		pMiniExtension = (HID_USB_DEVICE_EXTENSION*)pClassExtension->hidExt.MiniDeviceExtension;
+		if (!pMiniExtension)
+		{
+			ret = FALSE;
+			break; 
+		}
 
-		USB_MON_DEBUG_INFO("---------------------------------------------------------------------------------------------------- \r\n"); 
-		*MiniExtension = pMiniExtension; 
-		return TRUE;
-	} 
-	return FALSE;
+		//DumpHidMiniDriverExtension(hid_common_extension); 
+
+		//Device Name = HID_0000000X
+		if (!pClassExtension->isClientPdo)
+		{
+			*MiniExtension = NULL;
+			ret = FALSE;
+			break; 
+		}
+
+		if (pMiniExtension->InterfaceDesc->Class == 3 &&			//HidClass Device
+			(pMiniExtension->InterfaceDesc->Protocol == 1 ||		//Keyboard
+				pMiniExtension->InterfaceDesc->Protocol == 2 ||		//Mouse
+				pMiniExtension->InterfaceDesc->Protocol == 0))
+		{
+			GetDeviceName(DeviceObject, DeviceName);
+			
+			USB_MON_DEBUG_INFO("---------------------------------------------------------------------------------------------------- \r\n");
+
+			USB_MON_DEBUG_INFO("hid_common_extension: %I64x \r\n", pClassExtension);
+
+			USB_MON_DEBUG_INFO("DeviceObj: %I64X  DriverName: %ws DeviceName: %ws \r\n", DeviceObject, DeviceObject->DriverObject->DriverName.Buffer, DeviceName);
+
+			USB_MON_DEBUG_INFO("collectionIndex: %x collectionNum: %x \r\n", pClassExtension->pdoExt.collectionIndex, pClassExtension->pdoExt.collectionNum);
+
+			USB_MON_DEBUG_INFO("---------------------------------------------------------------------------------------------------- \r\n");
+
+			*MiniExtension = pMiniExtension;
+			ret =  TRUE;
+			break; 
+		}
+
+	} while (FALSE);
+
+	return ret;
 }
- 
 //----------------------------------------------------------------------------------------------------------//
 NTSTATUS VerifyHidDeviceObject(
 	_In_ PDRIVER_OBJECT DriverObject,
 	_Out_ ULONG* ClientPdoCount
 )
 {
-	PDEVICE_OBJECT	device_object = DriverObject->DeviceObject;
+	PDEVICE_OBJECT	DeviceObject = NULL;
 	ULONG		HidClientPdoCount = 0;
 	NTSTATUS			   status = STATUS_UNSUCCESSFUL;
 
-	while (device_object)
+	if (!g_HidClientPdoList || !DriverObject)
 	{
-		HID_DEVICE_NODE*					node = NULL;
-		HIDP_DEVICE_DESC*				  report = NULL;
-		HID_USB_DEVICE_EXTENSION* mini_extension = NULL;
+		return status;
+	}
 
-		if (!g_hid_client_pdo_list)
+	DeviceObject = DriverObject->DeviceObject;
+	while (DeviceObject)
+	{
+		HID_DEVICE_NODE* node = NULL ;
+		if (!NT_SUCCESS(VerifyDevice(DeviceObject, &node)))
 		{
 			goto Next;
-		}
+		} 
 
-		if (!VerifyDevice(device_object, &mini_extension))
+		if (node)
 		{
-			goto Next;
+			AddToChainListTail(g_HidClientPdoList->head, node);
+			g_HidClientPdoList->currentSize++; 
+			HidClientPdoCount++;
 		}
-		 
-		if (!mini_extension)
-		{
-			goto Next;
-		}
-
-		report = (HIDP_DEVICE_DESC*)ExAllocatePoolWithTag(NonPagedPool, sizeof(HIDP_DEVICE_DESC), 'csed');
-		if (!report)
-		{
-			goto Next;
-		}
-
-		status = GetAllReportByDeviceExtension(device_object->DeviceExtension, report);
-		if (!NT_SUCCESS(status))
-		{
-			goto Next;
-		}
-
-		node = CreateHidDeviceNode(device_object, mini_extension, report);
-		if (!node)
-		{
-			goto Next;
-		}
-
-		AddToChainListTail(g_hid_client_pdo_list->head, node);
-
-		HidClientPdoCount++;
-
-		USB_MON_DEBUG_INFO("Inserted one element: %I64x InferfaceDesc: %I64X device_object: %I64x \r\n", node->device_object, node->mini_extension, device_object);
-		USB_MON_DEBUG_INFO("Added one element :%x \r\n", HidClientPdoCount);
 Next:
-		device_object = device_object->NextDevice;
-
-		if (report)
-		{
-			ExFreePool(report);
-			report = NULL;
-		}
+		DeviceObject = DeviceObject->NextDevice;
 	}
 
 	if (HidClientPdoCount)
@@ -750,7 +794,7 @@ NTSTATUS InitPdoListByHidDriver(
 	ULONG			 return_size = 0;
 
 	do {
-		if (!ListSize || !g_hid_client_pdo_list)
+		if (!ListSize || !g_HidClientPdoList)
 		{
 			USB_MON_DEBUG_INFO("Empty Params \r\n");
 			status = STATUS_UNSUCCESSFUL;
@@ -770,10 +814,9 @@ NTSTATUS InitPdoListByHidDriver(
 		{ 
 			USB_MON_DEBUG_INFO("DoIrpHook Error \r\n");
 			status = STATUS_UNSUCCESSFUL;
-			return status;
+			break;
 		}
 
-	 
 		if (!HidDriverObj)
 		{
 			USB_MON_DEBUG_INFO("Empty DrvObj \r\n");
@@ -787,36 +830,37 @@ NTSTATUS InitPdoListByHidDriver(
 			status = STATUS_UNSUCCESSFUL;
 			break; 
 		}  
+
 	} while (FALSE);
 	
 	return status;
 }
 //----------------------------------------------------------------------------------------------------------//
-NTSTATUS AllocatePdoList()
+NTSTATUS AllocateClientPdoList()
 {
 	NTSTATUS status = STATUS_UNSUCCESSFUL;
 	do
 	{
-		if (!g_hid_client_pdo_list)
+		if (!g_HidClientPdoList)
 		{
-			g_hid_client_pdo_list = (HID_DEVICE_LIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(HID_DEVICE_LIST), 'ldih');
-		}
-
-		if (!g_hid_client_pdo_list)
+			g_HidClientPdoList = (HID_DEVICE_LIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(HID_DEVICE_LIST), 'ldih');	
+			if (!g_HidClientPdoList)
+			{
+ 				status = STATUS_UNSUCCESSFUL;
+				break;
+			}
+			RtlZeroMemory(g_HidClientPdoList, sizeof(HID_DEVICE_LIST));
+		} 
+		if (!g_HidClientPdoList)
 		{
- 			status = STATUS_UNSUCCESSFUL;
-			break;
-		}
-
-		RtlZeroMemory(g_hid_client_pdo_list, sizeof(HID_DEVICE_LIST));
-
-		g_hid_client_pdo_list->head = NewChainListHeaderEx(LISTFLAG_SPINLOCK | LISTFLAG_AUTOFREE, NULL, 0);
-		if (!g_hid_client_pdo_list->head)
-		{
-			ExFreePool(g_hid_client_pdo_list);
-			g_hid_client_pdo_list = NULL;
-			status = STATUS_UNSUCCESSFUL;
-			break;
+			g_HidClientPdoList->head = NewChainListHeaderEx(LISTFLAG_SPINLOCK | LISTFLAG_AUTOFREE, NULL, 0);
+			if (!g_HidClientPdoList->head)
+			{
+				ExFreePool(g_HidClientPdoList);
+				g_HidClientPdoList = NULL;
+				status = STATUS_UNSUCCESSFUL;
+				break;
+			}
 		}
 		status = STATUS_SUCCESS;
 	} while (0);
@@ -833,7 +877,7 @@ NTSTATUS InitHidClientPdoList(
 	NTSTATUS			status = STATUS_UNSUCCESSFUL;
 
 	do {   
-		if (!NT_SUCCESS(AllocatePdoList()))
+		if (!NT_SUCCESS(AllocateClientPdoList()))
 		{
 			USB_MON_DEBUG_INFO("Create List Error \r\n");
 			status = STATUS_UNSUCCESSFUL;
@@ -848,15 +892,14 @@ NTSTATUS InitHidClientPdoList(
 			break;
 		}
 		 
-		if (g_hid_client_pdo_list)
+		if (g_HidClientPdoList)
 		{
-			*ClientPdoList		= g_hid_client_pdo_list;
+			*ClientPdoList		= g_HidClientPdoList;
 			*ClientPdoListSize  = current_size;
 			g_listSize		    = current_size;
 
-			g_hid_client_pdo_list->RefCount = 1; 
-			USB_MON_DEBUG_INFO("Create Success\r\n");
-
+			g_HidClientPdoList->RefCount = 1; 
+			USB_MON_DEBUG_INFO("Create Success\r\n"); 
 			status = STATUS_SUCCESS;
 
 			break;
@@ -871,14 +914,14 @@ NTSTATUS FreeHidClientPdoList()
 {
 	NTSTATUS status = STATUS_SUCCESS;
 	//Free White List
-	if (g_hid_client_pdo_list)
+	if (g_HidClientPdoList)
 	{
-		if (g_hid_client_pdo_list->head)
+		if (g_HidClientPdoList->head)
 		{
-			CHAINLIST_SAFE_FREE(g_hid_client_pdo_list->head);
+			CHAINLIST_SAFE_FREE(g_HidClientPdoList->head);
 		}
-		ExFreePool(g_hid_client_pdo_list);
-		g_hid_client_pdo_list = NULL;
+		ExFreePool(g_HidClientPdoList);
+		g_HidClientPdoList = NULL;
 	}
 
 	if (g_PnpCallbackEntry)

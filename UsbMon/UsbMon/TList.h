@@ -63,7 +63,7 @@ typedef struct
 	ULONG		             Version;
 	ULONG		             Flag;
 	ULONG 		             Count;
-	PListCell                ListHeader;
+	PListCell                g_IrpHookList;
 	PListCellBlock           BlockHeader;
 	
 	TChainLisActionCallback  ChainLisActionCallback;
