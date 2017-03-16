@@ -382,8 +382,7 @@ IRPHOOKOBJ* GetHidNode(
 { 
 	return QueryFromChainListByCallback(g_hid_client_pdo_list->head, SearchHidNodeCallback, DeviceObject);
 }
-
-
+//--------------------------------------------------------------------------------------------//
 NTSTATUS HidUsbPnpIrpHandler(
 	_Inout_ struct _DEVICE_OBJECT *DeviceObject,
 	_Inout_ struct _IRP           *Irp
@@ -577,12 +576,8 @@ NTSTATUS GetAllReportByDeviceExtension(
 		USB_MON_DEBUG_INFO("Pdo->CollectionIndex: %I64x \r\n", pdoExt->collectionIndex);
 		USB_MON_DEBUG_INFO("Pdo->CollectionNum: %I64x \r\n", pdoExt->collectionNum);
 
-		// = (HIDP_DEVICE_DESC*)((PUCHAR)fdoExt + 0x58);
-		//ExAllocatePoolWithTag(NonPagedPool, sizeof(HIDP_DEVICE_DESC), 'pdih'); // = (HIDP_DEVICE_DESC*)((PUCHAR)fdoExt + 0x58);
+		status = GetCollectionDescription(fdoExt->rawReportDescription, fdoExt->rawReportDescriptionLength, NonPagedPool, &hid_device_desc);//==(HIDP_DEVICE_DESC*)((PUCHAR)fdoExt + 0x58);
 
-		//USB_MON_DEBUG_INFO("[rawReportDescription] %I64x rawReportDescriptionLength: %xh \r\n", fdoExt->rawReportDescription, fdoExt->rawReportDescriptionLength);
-
-		status = GetCollectionDescription(fdoExt->rawReportDescription, fdoExt->rawReportDescriptionLength, NonPagedPool, &hid_device_desc);
 
 		DumpReport(&hid_device_desc);
 
@@ -687,7 +682,12 @@ NTSTATUS VerifyHidDeviceObject(
 		HID_DEVICE_NODE*					node = NULL;
 		HIDP_DEVICE_DESC*				  report = NULL;
 		HID_USB_DEVICE_EXTENSION* mini_extension = NULL;
-		 
+
+		if (!g_hid_client_pdo_list)
+		{
+			goto Next;
+		}
+
 		if (!VerifyDevice(device_object, &mini_extension))
 		{
 			goto Next;
@@ -717,6 +717,7 @@ NTSTATUS VerifyHidDeviceObject(
 		}
 
 		AddToChainListTail(g_hid_client_pdo_list->head, node);
+
 		HidClientPdoCount++;
 
 		USB_MON_DEBUG_INFO("Inserted one element: %I64x InferfaceDesc: %I64X device_object: %I64x \r\n", node->device_object, node->mini_extension, device_object);
