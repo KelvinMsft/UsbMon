@@ -282,6 +282,7 @@ NTSTATUS ExtractKeyboardData(
 	{ 
 		switch (channel->UsagePage)
 		{
+			//Output use
 			case HID_LEDS:
 			{
 				ExtractedData->KBDDATA.LedKeyOffset = channel->ByteOffset - 1;

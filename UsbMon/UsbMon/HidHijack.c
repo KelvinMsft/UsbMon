@@ -44,6 +44,7 @@ typedef struct _PENDINGIRP_LIST
 #define IsSafeNode(x)					 (x->node)
 //Hijack Context Marco
 #define GetCollectionDesc(x, y)			 &x->node->parsedReport.CollectionDesc[y]
+#define IsPredefinedPage(x, y)			 (x->node->parsedReport.CollectionDesc[y].UsagePage <= HID_MAX_PAGE)
 #define IsMouseUsage(x, y)				 (x->node->parsedReport.CollectionDesc[y].Usage==HID_MOU_USAGE)
 #define IsKeyboardUsage(x, y)			 (x->node->parsedReport.CollectionDesc[y].Usage==HID_KBD_USAGE)
 #define IsDesktopUsagePage(x, y)		 (x->node->parsedReport.CollectionDesc[y].UsagePage==HID_GENERIC_DESKTOP_PAGE)
@@ -441,7 +442,7 @@ NTSTATUS HandleKeyboardData(
 }
 //----------------------------------------------------------------------------------------//
 NTSTATUS HandleMouseData(
-	_In_ HIJACK_CONTEXT* pContext, 
+	_In_ HIJACK_CONTEXT* pContext,
 	_In_ HIDP_REPORT_TYPE reportType
 )
 {
@@ -451,7 +452,8 @@ NTSTATUS HandleMouseData(
 	NTSTATUS								 status = STATUS_UNSUCCESSFUL;
 	ULONG								   colIndex = 0;
 	ULONG								  totalSize = 0;
-
+	BOOLEAN								    IsMouse = FALSE;
+	BOOLEAN								    IsKbd   = FALSE;
 	if (!pContext)
 	{
 		USB_DEBUG_INFO_LN_EX("NULL pContext");
@@ -466,8 +468,7 @@ NTSTATUS HandleMouseData(
 		return status;
 	}
 
-	hid_common_extension = (HIDCLASS_DEVICE_EXTENSION*)(pContext->DeviceObject->DeviceExtension);	
-
+	hid_common_extension = (HIDCLASS_DEVICE_EXTENSION*)(pContext->DeviceObject->DeviceExtension);
 	if (!hid_common_extension)
 	{
 		USB_DEBUG_INFO_LN_EX("NULL hid_common_extension");
@@ -475,49 +476,67 @@ NTSTATUS HandleMouseData(
 		return status;
 	}
 
-	pdoExt				 = &hid_common_extension->pdoExt; 
- 
+	pdoExt = &hid_common_extension->pdoExt;
+
 	if (!pdoExt)
 	{
 		USB_DEBUG_INFO_LN_EX("NULL pdoExt");
 		status = STATUS_UNSUCCESSFUL;
-		return status; 
-	} 
+		return status;
+	}
 	colIndex = pdoExt->collectionIndex - 1;
 
 	if (!IsSafeNode(pContext))
 	{
-		status = STATUS_SUCCESS;
+		status = STATUS_UNSUCCESSFUL;
 		return status;
 	}
-	 
-	//Top-Collection == Mouse && Usage Page == Desktop 
-	if (!IsMouseUsage(pContext, colIndex) ||
-		!IsDesktopUsagePage(pContext, colIndex))
+
+	if (!IsPredefinedPage(pContext, colIndex))
 	{
-		status = STATUS_SUCCESS;
+		status = STATUS_UNSUCCESSFUL;
 		return status;
-	} 
+	}
+ 
+	if (IsDesktopUsagePage(pContext, colIndex))
+	{
+		status = STATUS_UNSUCCESSFUL;
+		return status;
+	}
 
-	status = ExtractMouseData(GetCollectionDesc(pContext, colIndex), reportType, &data);
+	//Top-Collection == Mouse && Usage Page == Desktop 
+	if (IsMouseUsage(pContext, colIndex))
+	{
+		status = ExtractMouseData(GetCollectionDesc(pContext, colIndex), reportType, &data);
+		//USB_DEBUG_INFO_LN_EX("collectionIndex: %x collectionNum: %x", pdoExt->collectionIndex, pdoExt->collectionNum);
+		USB_DEBUG_INFO_LN_EX("OffsetX: %X		 Size: %x", data.MOUDATA.OffsetX, data.MOUDATA.XOffsetSize);
+		USB_DEBUG_INFO_LN_EX("OffsetY: %X		 Size: %x", data.MOUDATA.OffsetY, data.MOUDATA.YOffsetSize);
+		USB_DEBUG_INFO_LN_EX("OffsetZ: %X		 Size: %x", data.MOUDATA.OffsetZ, data.MOUDATA.ZOffsetSize);
+		USB_DEBUG_INFO_LN_EX("OffsetButton: %X   Size: %x ", data.MOUDATA.OffsetButton, data.MOUDATA.BtnOffsetSize);
+		totalSize = data.MOUDATA.XOffsetSize + data.MOUDATA.YOffsetSize + data.MOUDATA.ZOffsetSize + data.MOUDATA.BtnOffsetSize;
+		IsMouse = TRUE;
+	}
+	if (IsKeyboardUsage(pContext, colIndex))
+	{
+		status = ExtractKeyboardData(GetCollectionDesc(pContext, colIndex), reportType, &data);
+		//USB_DEBUG_INFO_LN_EX("collectionIndex: %x collectionNum: %x", pdoExt->collectionIndex, pdoExt->collectionNum);
+		USB_DEBUG_INFO_LN_EX("NormalKeyOffset:  %X	Size: %x", data.KBDDATA.NormalKeyOffset, data.KBDDATA.NormalKeySize);
+		USB_DEBUG_INFO_LN_EX("SpecialKeyOffset: %X  Size: %x", data.KBDDATA.SpecialKeyOffset, data.KBDDATA.SpecialKeySize);
+		totalSize = data.KBDDATA.NormalKeySize + data.KBDDATA.SpecialKeySize;
+		IsKbd = TRUE;
+	}
 
-	/*
-	USB_DEBUG_INFO_LN_EX("collectionIndex: %x collectionNum: %x", pdoExt->collectionIndex, pdoExt->collectionNum);
-	USB_DEBUG_INFO_LN_EX("OffsetX: %X		 Size: %x" , data.MOUDATA.OffsetX, data.MOUDATA.XOffsetSize);
-	USB_DEBUG_INFO_LN_EX("OffsetY: %X		 Size: %x", data.MOUDATA.OffsetY, data.MOUDATA.YOffsetSize);
-	USB_DEBUG_INFO_LN_EX("OffsetZ: %X		 Size: %x", data.MOUDATA.OffsetZ, data.MOUDATA.ZOffsetSize);
-	USB_DEBUG_INFO_LN_EX("OffsetButton: %X Size: %x ", data.MOUDATA.OffsetButton, data.MOUDATA.BtnOffsetSize);
-	*/
-
-	totalSize = data.MOUDATA.XOffsetSize + data.MOUDATA.YOffsetSize + data.MOUDATA.ZOffsetSize + data.MOUDATA.BtnOffsetSize;
+	 DUMP_DEVICE_NAME(pContext->DeviceObject);
+	 USB_DEBUG_INFO_LN_EX("ColIndex: %x \r\n", colIndex);
 	if (!totalSize)
 	{
-		status = STATUS_SUCCESS;
+		USB_DEBUG_INFO_LN_EX("Cannot Get Moudata \r\n");
+		status = STATUS_UNSUCCESSFUL;
 		return status;
 	}
 
 	char* extractor = ExAllocatePool(NonPagedPool, totalSize);
-	if (extractor)
+	if (extractor && IsMouse)
 	{
 		char* x = extractor;
 		char* y = extractor + data.MOUDATA.XOffsetSize;
@@ -543,6 +562,29 @@ NTSTATUS HandleMouseData(
 		ExFreePool(extractor);
 		extractor = NULL;
 	}
+
+	if (extractor && IsKbd)
+	{ 
+		char* SpecialKey = extractor;
+		char* NormalKey = extractor + data.KBDDATA.NormalKeySize;
+	
+		RtlZeroMemory(extractor, totalSize);
+		RtlMoveMemory(SpecialKey, (PUCHAR)UrbGetTransferBuffer(pContext->urb) + data.KBDDATA.SpecialKeyOffset, data.KBDDATA.SpecialKeySize);
+		RtlMoveMemory(NormalKey,(PUCHAR)UrbGetTransferBuffer(pContext->urb) + data.KBDDATA.NormalKeyOffset, data.KBDDATA.NormalKeySize);
+		for (int i = 0; i < data.KBDDATA.NormalKeySize; i++)
+		{
+			USB_NATIVE_DEBUG_INFO("%x ", NormalKey++);
+		}
+		for (int i = 0; i < data.KBDDATA.SpecialKeySize; i++)
+		{
+			USB_NATIVE_DEBUG_INFO("%x ", SpecialKey++);
+		}
+		USB_DEBUG_INFO_LN();
+		ExFreePool(extractor);
+		extractor = NULL;
+	}
+
+
 
 	return status;
 }
@@ -605,13 +647,14 @@ NTSTATUS  HidUsb_CompletionCallback(
 	{
 		USB_COMMON_DEBUG_INFO("Input Data: ");
 		PUCHAR UrbTransferBuf = (PUCHAR)UrbGetTransferBuffer(pContext->urb);
-
-		for (int i = 0; i < UrbGetTransferLength(pContext->urb); i++)
+		if (NT_SUCCESS(HandleMouseData(pContext, HidP_Input)))
 		{
-			USB_NATIVE_DEBUG_INFO("%x ", *UrbTransferBuf++);
+			for (int i = 0; i < UrbGetTransferLength(pContext->urb); i++)
+			{
+				USB_NATIVE_DEBUG_INFO("%x ", *UrbTransferBuf++);
+			}
+			USB_DEBUG_INFO_LN();
 		}
-		USB_DEBUG_INFO_LN();
-		HandleMouseData(pContext, HidP_Input);
 	}
 
 	if (UrbIsOutputTransfer(pContext->urb))

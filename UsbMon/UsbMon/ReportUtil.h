@@ -44,6 +44,8 @@
 #define HID_SCALE_PAGE				0x8D 
 #define HID_RESEVRED_POS_PAGE		0x8F
 #define HID_CAMERA_PAGE				0x90
+#define HID_ARCADE_PAGE				0x91
+#define HID_MAX_PAGE				HID_ARCADE_PAGE
 //-------------------------------------------//
 
 
@@ -71,6 +73,7 @@
 #define HID_USAGE_SLIDER		  0x36 
 #define HID_USAGE_DIAL			  0x37 
 #define HID_NOT_RANGE_USAGE_WHELL 0x38  
+
 //-------------------------------------------//
 
 NTSTATUS
