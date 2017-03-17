@@ -6,6 +6,16 @@
 ----------------------------------------------------
 Driver Stack:
 
+----->	  Filter 
+			|
+			|
+			|
+			|
+-----> MouClass / KbdClass.sys	(KbdServiceCallback)
+			|
+			|
+			|
+			|
 -----> MouHid / Kbdhid.sys			
 			|
 			|
