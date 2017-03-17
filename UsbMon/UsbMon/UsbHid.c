@@ -298,7 +298,7 @@ Return Value:
 							- STATUS_UNSUCCESSFUL or others	, if alloc error
 
 -----------------------------------------------------------------------------------*/
-NTSTATUS AllocatePdoList();
+NTSTATUS AllocateClientPdoList();
 
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
