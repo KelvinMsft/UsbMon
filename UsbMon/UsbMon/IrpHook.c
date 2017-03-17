@@ -111,6 +111,11 @@ IRPHOOKOBJ* CreateIrpObject(
 { 
 	IRPHOOKOBJ* HookObj = (IRPHOOKOBJ*)ExAllocatePoolWithTag(NonPagedPool, sizeof(IRPHOOKOBJ), 'opri');
 
+	if (!g_IrpHookList)
+	{
+		USB_MON_DEBUG_INFO("Empty Hook Object \r\n"); 
+		return NULL;
+	}
 	if (!HookObj)
 	{
 		USB_MON_DEBUG_INFO("Empty Hook Object \r\n");
@@ -120,9 +125,9 @@ IRPHOOKOBJ* CreateIrpObject(
 	RtlZeroMemory(HookObj, sizeof(IRPHOOKOBJ));
 
 	HookObj->driver_object = DriverObject;
-	HookObj->IrpCode = IrpCode;
-	HookObj->newFunction = newFunction;
-	HookObj->oldFunction = oldFunction;
+	HookObj->IrpCode	   = IrpCode;
+	HookObj->newFunction   = newFunction;
+	HookObj->oldFunction   = oldFunction;
  
 	if (!AddToChainListTail(g_IrpHookList->head, HookObj))
 	{
@@ -151,7 +156,7 @@ NTSTATUS AllocateIrpHookLinkedList()
 			}
 			RtlZeroMemory(g_IrpHookList, sizeof(IRPHOOKLIST));
 		}
-		if (!g_IrpHookList)
+		if (!g_IrpHookList->head)
 		{
 			g_IrpHookList->head = NewChainListHeaderEx(LISTFLAG_SPINLOCK | LISTFLAG_AUTOFREE, NULL, 0);
 			if (!g_IrpHookList->head)

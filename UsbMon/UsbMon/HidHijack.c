@@ -65,7 +65,7 @@ typedef struct _PENDINGIRP_LIST
 ////
 ////
 DRIVER_DISPATCH*  g_pDispatchInternalDeviceControl = NULL;
-volatile LONG	  g_current_index				   = 0;
+volatile LONG	  g_HidPipeListSize				   = 0;
 BOOLEAN			  g_bUnloaded					   = FALSE;
 PENDINGIRPLIST*	  g_PendingIrpList			   = NULL;
 PHID_DEVICE_LIST  g_HidPipeList					   = NULL;
@@ -458,37 +458,39 @@ NTSTATUS HandleMouseData(
 		status = STATUS_UNSUCCESSFUL;
 		return status;
 	}
-	if (!pContext->node)
+
+	if (!pContext->DeviceObject)
 	{
-		USB_MON_DEBUG_INFO("NULL pContext->node\r\n"); 
+		USB_MON_DEBUG_INFO("NULL DeviceObject\r\n");
 		status = STATUS_UNSUCCESSFUL;
 		return status;
 	}
 
 	hid_common_extension = (HIDCLASS_DEVICE_EXTENSION*)(pContext->DeviceObject->DeviceExtension);	
-	pdoExt				 = &hid_common_extension->pdoExt;
-	colIndex			 = pdoExt->collectionIndex - 1;
-	 
+
+	if (!hid_common_extension)
+	{
+		USB_MON_DEBUG_INFO("NULL hid_common_extension\r\n");
+		status = STATUS_UNSUCCESSFUL;
+		return status;
+	}
+
+	pdoExt				 = &hid_common_extension->pdoExt; 
+ 
 	if (!pdoExt)
 	{
 		USB_MON_DEBUG_INFO("NULL pdoExt \r\n");
 		status = STATUS_UNSUCCESSFUL;
 		return status; 
-	}
-
-	if (!pContext->node)
-	{
-		USB_MON_DEBUG_INFO("NULL pdoExt \r\n");
-		status = STATUS_UNSUCCESSFUL;
-		return status;
-	}
+	} 
+	colIndex = pdoExt->collectionIndex - 1;
 
 	if (!IsSafeNode(pContext))
 	{
 		status = STATUS_SUCCESS;
 		return status;
 	}
-
+	 
 	//Top-Collection == Mouse && Usage Page == Desktop 
 	if (!IsMouseUsage(pContext, colIndex) ||
 		!IsDesktopUsagePage(pContext, colIndex))
@@ -496,7 +498,6 @@ NTSTATUS HandleMouseData(
 		status = STATUS_SUCCESS;
 		return status;
 	}
-	
 
 	USB_MON_DEBUG_INFO("collectionIndex: %x collectionNum: %x \r\n", pdoExt->collectionIndex, pdoExt->collectionNum);
 
@@ -555,7 +556,7 @@ NTSTATUS  HidUsb_CompletionCallback(
 	PVOID					context = NULL;
 	IO_COMPLETION_ROUTINE* callback = NULL;
 	WCHAR			DeviceName[256] = { 0 };
-
+	USB_MON_DEBUG_INFO("Compete\r\n");
 	if (!pContext)
 	{
 		USB_MON_DEBUG_INFO("EmptyContext");
@@ -635,7 +636,6 @@ NTSTATUS  HidUsb_CompletionCallback(
 
 	USB_MON_DEBUG_INFO("return old routine \r\n");
 
-
 	return callback(DeviceObject, Irp, context);
 }
 
@@ -656,7 +656,7 @@ NTSTATUS HidUsb_InternalDeviceControl(
 		PHID_DEVICE_NODE	   node = NULL;
 
 		if (!g_HidPipeList)
-		{
+		{ 
 			break;
 		}
 
@@ -670,11 +670,13 @@ NTSTATUS HidUsb_InternalDeviceControl(
 		if (UrbGetFunction(urb) != URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER)
 		{
 			break;
-		} 
+		}  
 
 		//If Urb pipe handle is used by HID mouse / kbd device. 
 		if (IsHidDevicePipe(g_HidPipeList->head, UrbGetTransferPipeHandle(urb), &node))
 		{
+			USB_MON_DEBUG_INFO("irphooking... IsHidDevicePipe \r\n");
+
 			HIDCLASS_DEVICE_EXTENSION* class_extension = NULL;
 
 			if (!node ||
@@ -726,9 +728,8 @@ NTSTATUS HidUsb_InternalDeviceControl(
 				//Completion Routine hook
 				irpStack->Context = hijack;
 				irpStack->CompletionRoutine = HidUsb_CompletionCallback;	
-
+				USB_MON_DEBUG_INFO("hooked completion routine \r\n");
 			}
-			
 		}
 	} while (0);
 
@@ -760,14 +761,14 @@ NTSTATUS InitializeHidPenetrate(
 		return status;
 	}
 
-	status = InitHidClientPdoList(&g_HidPipeList, &(ULONG)g_current_index);
-	if (!NT_SUCCESS(status) || (!g_HidPipeList && !g_current_index))
+	status = InitHidClientPdoList(&g_HidPipeList, &(ULONG)g_HidPipeListSize);
+	if (!NT_SUCCESS(status) || (!g_HidPipeList && !g_HidPipeListSize))
 	{
 		USB_MON_DEBUG_INFO("No keyboard Or Mouse \r\n");
 		return status;
 	}
 
-	USB_MON_DEBUG_INFO("Done Init --- Device_object_list: %I64X Size: %x \r\n", g_HidPipeList, g_current_index);
+	USB_MON_DEBUG_INFO("Done Init --- Device_object_list: %I64X Head: %I64x Size: %x \r\n", g_HidPipeList, g_HidPipeList->head,g_HidPipeListSize);
 
 	//Init Irp Linked-List
 	status = AllocatePendingIrpLinkedList();
@@ -776,20 +777,8 @@ NTSTATUS InitializeHidPenetrate(
 		USB_MON_DEBUG_INFO("AllocatePendingIrpLinkedList Error \r\n");
 		FreeHidClientPdoList();
 		return status;
-	}
+	} 
 
-
-	//Init Irp Hook for URB transmit
-	status = AllocateIrpHookLinkedList();
-	if (!NT_SUCCESS(status))
-	{
-		FreeHidClientPdoList();
-		FreePendingIrpList();
-		USB_MON_DEBUG_INFO("InitIrpHook Error \r\n");
-		return status;
-	}
-
- 
 	//Do Irp Hook for URB transmit
 	g_pDispatchInternalDeviceControl = (PDRIVER_DISPATCH)DoIrpHook(pDriverObj, IRP_MJ_INTERNAL_DEVICE_CONTROL, HidUsb_InternalDeviceControl, Start);
 	if (!g_pDispatchInternalDeviceControl)

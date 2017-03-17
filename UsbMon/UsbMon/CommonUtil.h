@@ -39,8 +39,9 @@ typedef ULONG	 LOOKUP_STATUS;
   (void*)(0)
 #endif
 
-#define USB_MON_DEBUG_INFO(format, ...) DbgPrintEx(0,0,format,__VA_ARGS__)
 
+#define USB_MON_DEBUG_INFO2(format, ...) DbgPrintEx(0,0,format,__VA_ARGS__)
+#define USB_MON_DEBUG_INFO(format, ...) USB_MON_DEBUG_INFO2("[Func: %s => Line: %d] : "format"", __func__, __LINE__,  __VA_ARGS__)
 #define DELAY_ONE_MICROSECOND 	(-10)
 #define DELAY_ONE_MILLISECOND	(DELAY_ONE_MICROSECOND*1000)
 
