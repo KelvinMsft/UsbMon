@@ -37,19 +37,19 @@ extern NTSTATUS ObReferenceObjectByName(
 VOID PrintAllHidDriverName()
 {
 	WCHAR* Usbhub = GetUsbHubDriverNameByVersion(USB);
-	USB_MON_DEBUG_INFO("Usb Hub: %ws \r\n", Usbhub);
+	USB_DEBUG_INFO_LN_EX("Usb Hub: %ws ", Usbhub);
 
 	WCHAR* Usbhub2 = GetUsbHubDriverNameByVersion(USB2);
-	USB_MON_DEBUG_INFO("Usb Hub2: %ws \r\n", Usbhub2);
+	USB_DEBUG_INFO_LN_EX("Usb Hub2: %ws ", Usbhub2);
 
 	WCHAR* Usbhub3 = GetUsbHubDriverNameByVersion(USB3);
-	USB_MON_DEBUG_INFO("Usb Hub3: %ws \r\n", Usbhub3);
+	USB_DEBUG_INFO_LN_EX("Usb Hub3: %ws ", Usbhub3);
 
 	WCHAR* Usbhub_new = GetUsbHubDriverNameByVersion(USB3_NEW);
-	USB_MON_DEBUG_INFO("Usb Hub3_w8 above: %ws \r\n", Usbhub_new);
+	USB_DEBUG_INFO_LN_EX("Usb Hub3_w8 above: %ws", Usbhub_new);
 
 	WCHAR* Usb_ccgp = GetUsbHubDriverNameByVersion(USB_COMPOSITE);
-	USB_MON_DEBUG_INFO("Usb CCGP: %ws \r\n", Usb_ccgp);
+	USB_DEBUG_INFO_LN_EX("Usb CCGP: %ws ", Usb_ccgp);
 
 }
 
@@ -112,55 +112,53 @@ void DumpHidExtension(
 )
 {
 	ULONG i = 0; 
-	USB_MON_DEBUG_INFO("-----------------------------------------------------------------------------\r\n");
-
-	USB_MON_DEBUG_INFO(" --->PhysicalDeviceObject: %I64X \r\n", hid_common_extension->PhysicalDeviceObject);
-	USB_MON_DEBUG_INFO(" --->DriverObject: %I64X \r\n", hid_common_extension->PhysicalDeviceObject->DriverObject);
-	USB_MON_DEBUG_INFO(" --->NextDeviceObject: %I64X \r\n", hid_common_extension->NextDeviceObject);
-
-	USB_MON_DEBUG_INFO("  --->Status: %I64X \r\n", mini_extension->status);
-	USB_MON_DEBUG_INFO("  --->DeviceDesc: %I64X \r\n", mini_extension->DeviceDesc);
-	USB_MON_DEBUG_INFO("		--->bDeviceClass: %I64X \r\n", mini_extension->DeviceDesc->bDeviceClass);
-	USB_MON_DEBUG_INFO("		--->bDeviceSubClass: %I64X \r\n", mini_extension->DeviceDesc->bDeviceSubClass);
-	USB_MON_DEBUG_INFO("		--->bDeviceProtocol: %I64X \r\n", mini_extension->DeviceDesc->bDeviceProtocol);
-	USB_MON_DEBUG_INFO("		--->bDescriptorType: %I64X \r\n", mini_extension->DeviceDesc->bDescriptorType);
-	USB_MON_DEBUG_INFO("		--->bLength: %I64X \r\n", mini_extension->DeviceDesc->bLength);
-	USB_MON_DEBUG_INFO("		--->bMaxPacketSize0: %I64X \r\n", mini_extension->DeviceDesc->bMaxPacketSize0);
-	USB_MON_DEBUG_INFO("		--->bcdUSB: %I64X \r\n", mini_extension->DeviceDesc->bcdUSB);
-	USB_MON_DEBUG_INFO("		--->idProduct: %I64X \r\n", mini_extension->DeviceDesc->idProduct);
-	USB_MON_DEBUG_INFO("		--->idVendor: %I64X \r\n", mini_extension->DeviceDesc->idVendor);
-	USB_MON_DEBUG_INFO("  --->InterfaceDescDesc: %I64X \r\n", mini_extension->InterfaceDesc);
-	USB_MON_DEBUG_INFO("		--->Class: %I64X \r\n", mini_extension->InterfaceDesc->Class);
-	USB_MON_DEBUG_INFO("		--->SubClass: %I64X \r\n", mini_extension->InterfaceDesc->SubClass);
-	USB_MON_DEBUG_INFO("		--->Protocol: %I64X \r\n", mini_extension->InterfaceDesc->Protocol);
-	USB_MON_DEBUG_INFO("		--->NumOfPipes: %I64X \r\n", mini_extension->InterfaceDesc->NumberOfPipes);
-	USB_MON_DEBUG_INFO("		--->Length: %I64X \r\n", mini_extension->InterfaceDesc->Length);
-	USB_MON_DEBUG_INFO("		--->AlternateSetting: %I64X \r\n\r\n", mini_extension->InterfaceDesc->AlternateSetting);
+	USB_DEBUG_INFO_LN_EX("-----------------------------------------------------------------------------\r\n");
+	USB_DEBUG_INFO_LN_EX(" --->PhysicalDeviceObject: %I64X \r\n", hid_common_extension->PhysicalDeviceObject);
+	USB_DEBUG_INFO_LN_EX(" --->DriverObject: %I64X \r\n", hid_common_extension->PhysicalDeviceObject->DriverObject);
+	USB_DEBUG_INFO_LN_EX(" --->NextDeviceObject: %I64X \r\n", hid_common_extension->NextDeviceObject);
+	USB_DEBUG_INFO_LN_EX("  --->Status: %I64X \r\n", mini_extension->status);
+	USB_DEBUG_INFO_LN_EX("  --->DeviceDesc: %I64X \r\n", mini_extension->DeviceDesc);
+	USB_DEBUG_INFO_LN_EX("		--->bDeviceClass: %I64X \r\n", mini_extension->DeviceDesc->bDeviceClass);
+	USB_DEBUG_INFO_LN_EX("		--->bDeviceSubClass: %I64X \r\n", mini_extension->DeviceDesc->bDeviceSubClass);
+	USB_DEBUG_INFO_LN_EX("		--->bDeviceProtocol: %I64X \r\n", mini_extension->DeviceDesc->bDeviceProtocol);
+	USB_DEBUG_INFO_LN_EX("		--->bDescriptorType: %I64X \r\n", mini_extension->DeviceDesc->bDescriptorType);
+	USB_DEBUG_INFO_LN_EX("		--->bLength: %I64X \r\n", mini_extension->DeviceDesc->bLength);
+	USB_DEBUG_INFO_LN_EX("		--->bMaxPacketSize0: %I64X \r\n", mini_extension->DeviceDesc->bMaxPacketSize0);
+	USB_DEBUG_INFO_LN_EX("		--->bcdUSB: %I64X \r\n", mini_extension->DeviceDesc->bcdUSB);
+	USB_DEBUG_INFO_LN_EX("		--->idProduct: %I64X \r\n", mini_extension->DeviceDesc->idProduct);
+	USB_DEBUG_INFO_LN_EX("		--->idVendor: %I64X \r\n", mini_extension->DeviceDesc->idVendor);
+	USB_DEBUG_INFO_LN_EX("  --->InterfaceDescDesc: %I64X \r\n", mini_extension->InterfaceDesc);
+	USB_DEBUG_INFO_LN_EX("		--->Class: %I64X \r\n", mini_extension->InterfaceDesc->Class);
+	USB_DEBUG_INFO_LN_EX("		--->SubClass: %I64X \r\n", mini_extension->InterfaceDesc->SubClass);
+	USB_DEBUG_INFO_LN_EX("		--->Protocol: %I64X \r\n", mini_extension->InterfaceDesc->Protocol);
+	USB_DEBUG_INFO_LN_EX("		--->NumOfPipes: %I64X \r\n", mini_extension->InterfaceDesc->NumberOfPipes);
+	USB_DEBUG_INFO_LN_EX("		--->Length: %I64X \r\n", mini_extension->InterfaceDesc->Length);
+	USB_DEBUG_INFO_LN_EX("		--->AlternateSetting: %I64X \r\n\r\n", mini_extension->InterfaceDesc->AlternateSetting);
 
  	for (i = 0; i < mini_extension->InterfaceDesc->NumberOfPipes; i++)
 	{
 		USBD_PIPE_INFORMATION* Pipe_Information = &mini_extension->InterfaceDesc->Pipes[i];
-		USB_MON_DEBUG_INFO("  --->Pipe id: %x Information: %I64X \r\n",i, Pipe_Information);
-		USB_MON_DEBUG_INFO("		--->PipeHandle: %I64X \r\n", Pipe_Information->PipeHandle); 
-		USB_MON_DEBUG_INFO("		--->PipeAddress: %I64X \r\n", Pipe_Information->EndpointAddress); 
-		USB_MON_DEBUG_INFO("		--->PipeInterval: %I64X \r\n", Pipe_Information->Interval);
-		USB_MON_DEBUG_INFO("		--->PipeInterval: %I64X \r\n", Pipe_Information->MaximumPacketSize);
-		USB_MON_DEBUG_INFO("		--->PipeInterval: %I64X \r\n", Pipe_Information->MaximumTransferSize);
+		USB_DEBUG_INFO_LN_EX("  --->Pipe id: %x Information: %I64X ",i, Pipe_Information);
+		USB_DEBUG_INFO_LN_EX("		--->PipeHandle: %I64X ", Pipe_Information->PipeHandle); 
+		USB_DEBUG_INFO_LN_EX("		--->PipeAddress: %I64X ", Pipe_Information->EndpointAddress); 
+		USB_DEBUG_INFO_LN_EX("		--->PipeInterval: %I64X ", Pipe_Information->Interval);
+		USB_DEBUG_INFO_LN_EX("		--->PipeInterval: %I64X ", Pipe_Information->MaximumPacketSize);
+		USB_DEBUG_INFO_LN_EX("		--->PipeInterval: %I64X ", Pipe_Information->MaximumTransferSize);
 	}
 
 
 	HID_DESCRIPTOR* hid_desc = &(mini_extension)->HidDescriptor; 
 	 
-	USB_MON_DEBUG_INFO("  --->HidDescriptor: %IX \r\n", &hid_desc);
-	USB_MON_DEBUG_INFO("		--->bcdHID: %X \r\n", hid_desc->bcdHID);
-	USB_MON_DEBUG_INFO("		--->bCountry: %X \r\n", hid_desc->bCountry);
-	USB_MON_DEBUG_INFO("		--->bDescriptorType: %X \r\n", hid_desc->bDescriptorType);
-	USB_MON_DEBUG_INFO("		--->bLength: %X \r\n", hid_desc->bLength);
-	USB_MON_DEBUG_INFO("		--->bNumDescriptors: %X \r\n", hid_desc->bNumDescriptors);
-	USB_MON_DEBUG_INFO("		--->bReportType: %X \r\n", hid_desc->DescriptorList->bReportType);
-	USB_MON_DEBUG_INFO("		--->wReportLength: %X \r\n", hid_desc->DescriptorList->wReportLength);
+	USB_DEBUG_INFO_LN_EX("  --->HidDescriptor: %IX ", &hid_desc);
+	USB_DEBUG_INFO_LN_EX("		--->bcdHID: %X ", hid_desc->bcdHID);
+	USB_DEBUG_INFO_LN_EX("		--->bCountry: %X ", hid_desc->bCountry);
+	USB_DEBUG_INFO_LN_EX("		--->bDescriptorType: %X ", hid_desc->bDescriptorType);
+	USB_DEBUG_INFO_LN_EX("		--->bLength: %X ", hid_desc->bLength);
+	USB_DEBUG_INFO_LN_EX("		--->bNumDescriptors: %X ", hid_desc->bNumDescriptors);
+	USB_DEBUG_INFO_LN_EX("		--->bReportType: %X ", hid_desc->DescriptorList->bReportType);
+	USB_DEBUG_INFO_LN_EX("		--->wReportLength: %X ", hid_desc->DescriptorList->wReportLength);
 
-	USB_MON_DEBUG_INFO("-----------------------------------------------------------------------------\r\n");
+	USB_DEBUG_INFO_LN_EX("-----------------------------------------------------------------------------");
 
 }
 
@@ -188,13 +186,13 @@ VOID DumpUrb(
 {
 	struct _URB_HEADER urb_header = urb->UrbHeader;;
 
-	USB_MON_DEBUG_INFO("---------------URB HEADER------------- \r\n");
-	USB_MON_DEBUG_INFO("- Length: %x \r\n", urb_header.Length);
-	USB_MON_DEBUG_INFO("- Function: %x \r\n", urb_header.Function);
-	USB_MON_DEBUG_INFO("- Status: %x \r\n", urb_header.Status);
-	USB_MON_DEBUG_INFO("- UsbdDeviceHandle: %x \r\n", urb_header.UsbdDeviceHandle);
-	USB_MON_DEBUG_INFO("- UsbdFlags: %x \r\n", urb_header.UsbdFlags);
-	USB_MON_DEBUG_INFO("---------------URB Function------------- \r\n");
+	USB_DEBUG_INFO_LN_EX("---------------URB HEADER------------- ");
+	USB_DEBUG_INFO_LN_EX("- Length: %x ", urb_header.Length);
+	USB_DEBUG_INFO_LN_EX("- Function: %x ", urb_header.Function);
+	USB_DEBUG_INFO_LN_EX("- Status: %x ", urb_header.Status);
+	USB_DEBUG_INFO_LN_EX("- UsbdDeviceHandle: %x ", urb_header.UsbdDeviceHandle);
+	USB_DEBUG_INFO_LN_EX("- UsbdFlags: %x ", urb_header.UsbdFlags);
+	USB_DEBUG_INFO_LN_EX("---------------URB Function------------- ");
 
 	switch (urb_header.Function)
 	{

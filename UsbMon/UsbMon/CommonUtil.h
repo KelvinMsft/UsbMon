@@ -40,11 +40,19 @@ typedef ULONG	 LOOKUP_STATUS;
 #endif
 
 
-#define USB_MON_DEBUG_INFO2(format, ...) DbgPrintEx(0,0,format,__VA_ARGS__)
-#define USB_MON_DEBUG_INFO(format, ...) USB_MON_DEBUG_INFO2("[Func: %s => Line: %d] : "format"", __func__, __LINE__,  __VA_ARGS__)
+#define USB_NATIVE_DEBUG_INFO(format, ...)	DbgPrintEx(0,0,format,__VA_ARGS__) 
+
+#define USB_COMMON_DEBUG_INFO(format, ...)	USB_NATIVE_DEBUG_INFO("[%s] => [%s] => [%d] : "format, __FILE__ , __func__, __LINE__,  __VA_ARGS__)
+#define USB_DEBUG_INFO_LN()					USB_NATIVE_DEBUG_INFO("\r\n")
+#define USB_DEBUG_INFO_LN_EX(format, ...)	USB_COMMON_DEBUG_INFO(format"\r\n", __VA_ARGS__)
+
 #define DELAY_ONE_MICROSECOND 	(-10)
 #define DELAY_ONE_MILLISECOND	(DELAY_ONE_MICROSECOND*1000)
 
+#define DUMP_DEVICE_NAME(DeviceObject) \
+		WCHAR DeviceName[256] = {0};		\
+		GetDeviceName(DeviceObject, DeviceName);	\
+		USB_DEBUG_INFO_LN_EX("DriverName: %ws DeviceName: %ws Flags: %x", DeviceObject->DriverObject->DriverName.Buffer, DeviceName, UrbGetTransferFlags(pContext->urb));	\
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////// 
 //// Prototype

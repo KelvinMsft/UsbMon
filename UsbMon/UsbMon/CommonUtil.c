@@ -87,6 +87,7 @@ NTSTATUS GetDeviceName(PDEVICE_OBJECT device_object, WCHAR* DeviceNameBuf)
 	} 
 	return status;
 }
+
 //----------------------------------------------------------------------------------------//
 NTSTATUS USBSymLinkToPath(PUNICODE_STRING pusSymLink, PUNICODE_STRING pusDosPath) 
 {

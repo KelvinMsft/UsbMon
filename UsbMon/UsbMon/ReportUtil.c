@@ -22,38 +22,38 @@ VOID DumpReport(
 		ASSERT(collectionDesc->PreparsedData->Signature1 == HIDP_PREPARSED_DATA_SIGNATURE1);
 		ASSERT(collectionDesc->PreparsedData->Signature2 == HIDP_PREPARSED_DATA_SIGNATURE2);
 
-		USB_MON_DEBUG_INFO("+++++++++++++++++++++++++++++++++++++++++++++++++++++++\r\n");
-		USB_MON_DEBUG_INFO("[Collection] Usage: %xh \r\n", collectionDesc->Usage);
-		USB_MON_DEBUG_INFO("[Collection] UsagePage: %xh \r\n", collectionDesc->UsagePage);
-		USB_MON_DEBUG_INFO("[Collection] InputLength: %xh \r\n", collectionDesc->InputLength);
-		USB_MON_DEBUG_INFO("[Collection] OutputLength: %xh \r\n", collectionDesc->OutputLength);
-		USB_MON_DEBUG_INFO("[Collection] FeatureLength: %xh \r\n", collectionDesc->FeatureLength);
-		USB_MON_DEBUG_INFO("[Collection] CollectionNumber: %x \r\n", collectionDesc->CollectionNumber);
-		USB_MON_DEBUG_INFO("[Collection] PreparsedData: %I64x \r\n", collectionDesc->PreparsedData);
+		USB_DEBUG_INFO_LN_EX("+++++++++++++++++++++++++++++++++++++++++++++++++++++++");
+		USB_DEBUG_INFO_LN_EX("[Collection] Usage: %xh", collectionDesc->Usage);
+		USB_DEBUG_INFO_LN_EX("[Collection] UsagePage: %xh ", collectionDesc->UsagePage);
+		USB_DEBUG_INFO_LN_EX("[Collection] InputLength: %xh ", collectionDesc->InputLength);
+		USB_DEBUG_INFO_LN_EX("[Collection] OutputLength: %xh ", collectionDesc->OutputLength);
+		USB_DEBUG_INFO_LN_EX("[Collection] FeatureLength: %xh ", collectionDesc->FeatureLength);
+		USB_DEBUG_INFO_LN_EX("[Collection] CollectionNumber: %x ", collectionDesc->CollectionNumber);
+		USB_DEBUG_INFO_LN_EX("[Collection] PreparsedData: %I64x ", collectionDesc->PreparsedData);
 
-		USB_MON_DEBUG_INFO("[Collection] Input Offset: %x  Index: %x \r\n", collectionDesc->PreparsedData->Input.Offset, collectionDesc->PreparsedData->Input.Index);
-		USB_MON_DEBUG_INFO("[Collection] Output Offset: %x Index: %x \r\n", collectionDesc->PreparsedData->Output.Offset, collectionDesc->PreparsedData->Output.Index);
-		USB_MON_DEBUG_INFO("[Collection] Feature Offset: %x Index: %x \r\n", collectionDesc->PreparsedData->Feature.Offset, collectionDesc->PreparsedData->Feature.Index);
+		USB_DEBUG_INFO_LN_EX("[Collection] Input Offset: %x  Index: %x ", collectionDesc->PreparsedData->Input.Offset, collectionDesc->PreparsedData->Input.Index);
+		USB_DEBUG_INFO_LN_EX("[Collection] Output Offset: %x Index: %x ", collectionDesc->PreparsedData->Output.Offset, collectionDesc->PreparsedData->Output.Index);
+		USB_DEBUG_INFO_LN_EX("[Collection] Feature Offset: %x Index: %x ", collectionDesc->PreparsedData->Feature.Offset, collectionDesc->PreparsedData->Feature.Index);
 
 
 		DumpChannel(collectionDesc, HidP_Input, CHANNEL_DUMP_ALL);
 		DumpChannel(collectionDesc, HidP_Output, CHANNEL_DUMP_ALL);
 		DumpChannel(collectionDesc, HidP_Feature, CHANNEL_DUMP_ALL);
 
-		USB_MON_DEBUG_INFO("+++++++++++++++++++++++++++++++++++++++++++++++++++++++\r\n");
+		USB_DEBUG_INFO_LN_EX("+++++++++++++++++++++++++++++++++++++++++++++++++++++++");
 		collectionDesc++;
 	}
 
 	PHIDP_REPORT_IDS      reportDesc = &report->ReportIDs[0];
 	for (int i = 0; i < report->ReportIDsLength; i++)
 	{
-		USB_MON_DEBUG_INFO("*******************************************************\r\n");
-		USB_MON_DEBUG_INFO("[Report] ReportID: %xh \r\n", reportDesc->ReportID);
-		USB_MON_DEBUG_INFO("[Report] InputLength: %xh \r\n", reportDesc->InputLength);
-		USB_MON_DEBUG_INFO("[Report] OutputLength: %xh \r\n", reportDesc->OutputLength);
-		USB_MON_DEBUG_INFO("[Report] FeatureLength: %xh \r\n", reportDesc->FeatureLength);
-		USB_MON_DEBUG_INFO("[Report] CollectionNumber: %x \r\n", reportDesc->CollectionNumber);
-		USB_MON_DEBUG_INFO("*******************************************************\r\n");
+		USB_DEBUG_INFO_LN_EX("*******************************************************");
+		USB_DEBUG_INFO_LN_EX("[Report] ReportID: %xh ", reportDesc->ReportID);
+		USB_DEBUG_INFO_LN_EX("[Report] InputLength: %xh ", reportDesc->InputLength);
+		USB_DEBUG_INFO_LN_EX("[Report] OutputLength: %xh ", reportDesc->OutputLength);
+		USB_DEBUG_INFO_LN_EX("[Report] FeatureLength: %xh ", reportDesc->FeatureLength);
+		USB_DEBUG_INFO_LN_EX("[Report] CollectionNumber: %x ", reportDesc->CollectionNumber);
+		USB_DEBUG_INFO_LN_EX("*******************************************************");
 		reportDesc++;
 	}
 }
@@ -100,108 +100,108 @@ VOID DumpChannel(
 
 	for (int k = start; k < end; k++)
 	{
-		USB_MON_DEBUG_INFO("+++++++++++++++++++++++ %s +++++++++++++++++++++\r\n", reportType);
+		USB_DEBUG_INFO_LN_EX("+++++++++++++++++++++++ %s +++++++++++++++++++++", reportType);
 		if (Flags & CHANNEL_DUMP_REPORT_REALTED)
 		{
-			USB_MON_DEBUG_INFO(" UsagePage: %x		OFFSET_FIELD: %x \r\n", channel->UsagePage, FIELD_OFFSET(HIDP_CHANNEL_DESC, UsagePage));
-			USB_MON_DEBUG_INFO(" ReportID: %d		OFFSET_FIELD: %x \r\n", channel->ReportID, FIELD_OFFSET(HIDP_CHANNEL_DESC, ReportID));
-			USB_MON_DEBUG_INFO(" ReportSize: %d		OFFSET_FIELD: %x \r\n", channel->ReportSize, FIELD_OFFSET(HIDP_CHANNEL_DESC, ReportSize));
-			USB_MON_DEBUG_INFO(" ReportCount: %d		OFFSET_FIELD: %x \r\n", channel->ReportCount, FIELD_OFFSET(HIDP_CHANNEL_DESC, ReportCount));
+			USB_DEBUG_INFO_LN_EX(" UsagePage: %x		OFFSET_FIELD: %x ", channel->UsagePage, FIELD_OFFSET(HIDP_CHANNEL_DESC, UsagePage));
+			USB_DEBUG_INFO_LN_EX(" ReportID: %d		OFFSET_FIELD: %x ", channel->ReportID, FIELD_OFFSET(HIDP_CHANNEL_DESC, ReportID));
+			USB_DEBUG_INFO_LN_EX(" ReportSize: %d		OFFSET_FIELD: %x ", channel->ReportSize, FIELD_OFFSET(HIDP_CHANNEL_DESC, ReportSize));
+			USB_DEBUG_INFO_LN_EX(" ReportCount: %d		OFFSET_FIELD: %x ", channel->ReportCount, FIELD_OFFSET(HIDP_CHANNEL_DESC, ReportCount));
 		}
 		if (Flags & CHANNEL_DUMP_REPORT_BYTE_OFFSET_REALTED)
 		{
-			USB_MON_DEBUG_INFO(" BitLength: %d		OFFSET_FIELD: %x \r\n", channel->BitLength, FIELD_OFFSET(HIDP_CHANNEL_DESC, BitLength));
-			USB_MON_DEBUG_INFO(" ByteEnd: %d			OFFSET_FIELD: %x \r\n", channel->ByteEnd, FIELD_OFFSET(HIDP_CHANNEL_DESC, ByteEnd));
-			USB_MON_DEBUG_INFO(" BitOffset: %d		OFFSET_FIELD: %x \r\n", channel->BitOffset, FIELD_OFFSET(HIDP_CHANNEL_DESC, BitOffset));
-			USB_MON_DEBUG_INFO(" ByteOffset: %d		OFFSET_FIELD: %x \r\n", channel->ByteOffset, FIELD_OFFSET(HIDP_CHANNEL_DESC, ByteOffset));
+			USB_DEBUG_INFO_LN_EX(" BitLength: %d		OFFSET_FIELD: %x ", channel->BitLength, FIELD_OFFSET(HIDP_CHANNEL_DESC, BitLength));
+			USB_DEBUG_INFO_LN_EX(" ByteEnd: %d			OFFSET_FIELD: %x ", channel->ByteEnd, FIELD_OFFSET(HIDP_CHANNEL_DESC, ByteEnd));
+			USB_DEBUG_INFO_LN_EX(" BitOffset: %d		OFFSET_FIELD: %x ", channel->BitOffset, FIELD_OFFSET(HIDP_CHANNEL_DESC, BitOffset));
+			USB_DEBUG_INFO_LN_EX(" ByteOffset: %d		OFFSET_FIELD: %x ", channel->ByteOffset, FIELD_OFFSET(HIDP_CHANNEL_DESC, ByteOffset));
 		}
 		if (Flags & CHANNEL_DUMP_LINK_COL_RELATED)
 		{
-			USB_MON_DEBUG_INFO(" LinkCollection: %x  OFFSET_FIELD: %x \r\n", channel->LinkCollection, FIELD_OFFSET(HIDP_CHANNEL_DESC, LinkCollection));
-			USB_MON_DEBUG_INFO(" LinkUsage: %x		OFFSET_FIELD: %x \r\n", channel->LinkUsage, FIELD_OFFSET(HIDP_CHANNEL_DESC, LinkUsage));
-			USB_MON_DEBUG_INFO(" LinkUsagePage: %x	OFFSET_FIELD: %x \r\n", channel->LinkUsagePage, FIELD_OFFSET(HIDP_CHANNEL_DESC, LinkUsagePage));
+			USB_DEBUG_INFO_LN_EX(" LinkCollection: %x  OFFSET_FIELD: %x ", channel->LinkCollection, FIELD_OFFSET(HIDP_CHANNEL_DESC, LinkCollection));
+			USB_DEBUG_INFO_LN_EX(" LinkUsage: %x		OFFSET_FIELD: %x ", channel->LinkUsage, FIELD_OFFSET(HIDP_CHANNEL_DESC, LinkUsage));
+			USB_DEBUG_INFO_LN_EX(" LinkUsagePage: %x	OFFSET_FIELD: %x ", channel->LinkUsagePage, FIELD_OFFSET(HIDP_CHANNEL_DESC, LinkUsagePage));
 		}
 
 		if (Flags & CHANNEL_DUMP_ATTRIBUTE_RELATED)
 		{
-			USB_MON_DEBUG_INFO(" IsRange: %x \r\n", channel->IsRange);
-			USB_MON_DEBUG_INFO(" IsButton: %x   \r\n", channel->IsButton);
-			USB_MON_DEBUG_INFO(" IsAbsolute: %x \r\n", channel->IsAbsolute);
-			USB_MON_DEBUG_INFO(" IsConst: %x \r\n", channel->IsConst);
-			USB_MON_DEBUG_INFO(" IsAlias: %x \r\n", channel->IsAlias);
-			USB_MON_DEBUG_INFO(" IsDesignatorRange: %x \r\n", channel->IsDesignatorRange);
-			USB_MON_DEBUG_INFO(" IsStringRange: %x \r\n", channel->IsStringRange);
+			USB_DEBUG_INFO_LN_EX(" IsRange: %x ", channel->IsRange);
+			USB_DEBUG_INFO_LN_EX(" IsButton: %x   ", channel->IsButton);
+			USB_DEBUG_INFO_LN_EX(" IsAbsolute: %x ", channel->IsAbsolute);
+			USB_DEBUG_INFO_LN_EX(" IsConst: %x ", channel->IsConst);
+			USB_DEBUG_INFO_LN_EX(" IsAlias: %x ", channel->IsAlias);
+			USB_DEBUG_INFO_LN_EX(" IsDesignatorRange: %x ", channel->IsDesignatorRange);
+			USB_DEBUG_INFO_LN_EX(" IsStringRange: %x ", channel->IsStringRange);
 
 
 			if (!channel->IsButton)
 			{
-				USB_MON_DEBUG_INFO(" Data.LogicalMin: %d	 OFFSET_FIELD: %X \r\n", channel->Data.HasNull, FIELD_OFFSET(HIDP_CHANNEL_DESC, Data.HasNull));
-				USB_MON_DEBUG_INFO(" Data.LogicalMin: %d	 OFFSET_FIELD: %X \r\n", channel->Data.LogicalMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Data.LogicalMin));
-				USB_MON_DEBUG_INFO(" Data.LogicalMax: %d	 OFFSET_FIELD: %X \r\n", channel->Data.LogicalMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Data.LogicalMax));
-				USB_MON_DEBUG_INFO(" Data.PhysicalMax: %d OFFSET_FIELD: %X  \r\n", channel->Data.PhysicalMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Data.PhysicalMin));
-				USB_MON_DEBUG_INFO(" Data.PhysicalMax: %d OFFSET_FIELD: %X  \r\n", channel->Data.PhysicalMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Data.PhysicalMax));
+				USB_DEBUG_INFO_LN_EX(" Data.LogicalMin: %d	 OFFSET_FIELD: %X ", channel->Data.HasNull, FIELD_OFFSET(HIDP_CHANNEL_DESC, Data.HasNull));
+				USB_DEBUG_INFO_LN_EX(" Data.LogicalMin: %d	 OFFSET_FIELD: %X ", channel->Data.LogicalMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Data.LogicalMin));
+				USB_DEBUG_INFO_LN_EX(" Data.LogicalMax: %d	 OFFSET_FIELD: %X ", channel->Data.LogicalMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Data.LogicalMax));
+				USB_DEBUG_INFO_LN_EX(" Data.PhysicalMax: %d OFFSET_FIELD: %X  ", channel->Data.PhysicalMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Data.PhysicalMin));
+				USB_DEBUG_INFO_LN_EX(" Data.PhysicalMax: %d OFFSET_FIELD: %X  ", channel->Data.PhysicalMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Data.PhysicalMax));
 			}
 			if (channel->IsButton)
 			{
-				USB_MON_DEBUG_INFO(" button.LogicalMin %d OFFSET_FIELD: %X  \r\n", channel->button.LogicalMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, button.LogicalMin));
-				USB_MON_DEBUG_INFO(" button.LogicalMax %d OFFSET_FIELD: %X  \r\n", channel->button.LogicalMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, button.LogicalMax));
+				USB_DEBUG_INFO_LN_EX(" button.LogicalMin %d OFFSET_FIELD: %X  ", channel->button.LogicalMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, button.LogicalMin));
+				USB_DEBUG_INFO_LN_EX(" button.LogicalMax %d OFFSET_FIELD: %X  ", channel->button.LogicalMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, button.LogicalMax));
 			}
 
 			if (channel->MoreChannels) {
-				USB_MON_DEBUG_INFO("MoreChannels ");
+				USB_DEBUG_INFO_LN_EX("MoreChannels ");
 			}
 			if (channel->IsConst) {
-				USB_MON_DEBUG_INFO("Const ");
+				USB_DEBUG_INFO_LN_EX("Const ");
 			}
 			if (channel->IsButton) {
-				USB_MON_DEBUG_INFO("Button ");
+				USB_DEBUG_INFO_LN_EX("Button ");
 			}
 			else {
-				USB_MON_DEBUG_INFO("Value ");
+				USB_DEBUG_INFO_LN_EX("Value ");
 			}
 			if (channel->IsAbsolute) {
-				USB_MON_DEBUG_INFO("Absolute ");
+				USB_DEBUG_INFO_LN_EX("Absolute ");
 			}
 			if (channel->IsAlias) {
-				USB_MON_DEBUG_INFO("ALIAS! ");
+				USB_DEBUG_INFO_LN_EX("ALIAS! ");
 			}
 		}
 
-		USB_MON_DEBUG_INFO("\r\n");
+		USB_DEBUG_INFO_LN();
 
 		if (Flags & CHANNEL_DUMP_RANGE_RELATED)
 		{
 			if (channel->IsRange)
 			{
-				USB_MON_DEBUG_INFO(" Range.UsageMin:  %d		   OFFSET_FIELD: %X  \r\n", channel->Range.UsageMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.UsageMin));
-				USB_MON_DEBUG_INFO(" Range.UsageMax:  %d		   OFFSET_FIELD: %X  \r\n", channel->Range.UsageMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.UsageMax));
-				USB_MON_DEBUG_INFO(" Range.DataIndexMax:  %d	   OFFSET_FIELD: %X  \r\n", channel->Range.DataIndexMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.DataIndexMax));
-				USB_MON_DEBUG_INFO(" Range.DataIndexMin: %d	   OFFSET_FIELD: %X  \r\n", channel->Range.DataIndexMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.DataIndexMin));
+				USB_DEBUG_INFO_LN_EX(" Range.UsageMin:  %d		   OFFSET_FIELD: %X  ", channel->Range.UsageMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.UsageMin));
+				USB_DEBUG_INFO_LN_EX(" Range.UsageMax:  %d		   OFFSET_FIELD: %X  ", channel->Range.UsageMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.UsageMax));
+				USB_DEBUG_INFO_LN_EX(" Range.DataIndexMax:  %d	   OFFSET_FIELD: %X  ", channel->Range.DataIndexMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.DataIndexMax));
+				USB_DEBUG_INFO_LN_EX(" Range.DataIndexMin: %d	   OFFSET_FIELD: %X  ", channel->Range.DataIndexMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.DataIndexMin));
 			}
 			else
 			{
-				USB_MON_DEBUG_INFO(" NotRange.Usage:  %x		     OFFSET_FIELD: %X  \r\n", channel->NotRange.Usage, FIELD_OFFSET(HIDP_CHANNEL_DESC, NotRange.Usage));
-				USB_MON_DEBUG_INFO(" NotRange.DataIndex:  %x		 OFFSET_FIELD: %X  \r\n", channel->NotRange.DataIndex, FIELD_OFFSET(HIDP_CHANNEL_DESC, NotRange.DataIndex));
+				USB_DEBUG_INFO_LN_EX(" NotRange.Usage:  %x		     OFFSET_FIELD: %X  ", channel->NotRange.Usage, FIELD_OFFSET(HIDP_CHANNEL_DESC, NotRange.Usage));
+				USB_DEBUG_INFO_LN_EX(" NotRange.DataIndex:  %x		 OFFSET_FIELD: %X  ", channel->NotRange.DataIndex, FIELD_OFFSET(HIDP_CHANNEL_DESC, NotRange.DataIndex));
 			}
 
 			if (channel->IsDesignatorRange)
 			{
-				USB_MON_DEBUG_INFO(" Range.DesignatorMax: %d OFFSET_FIELD: %X  \r\n", channel->Range.DesignatorMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.DesignatorMax));
-				USB_MON_DEBUG_INFO(" Range.DesignatorMin: %d OFFSET_FIELD: %X  \r\n", channel->Range.DesignatorMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.DesignatorMin));
+				USB_DEBUG_INFO_LN_EX(" Range.DesignatorMax: %d OFFSET_FIELD: %X  ", channel->Range.DesignatorMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.DesignatorMax));
+				USB_DEBUG_INFO_LN_EX(" Range.DesignatorMin: %d OFFSET_FIELD: %X  ", channel->Range.DesignatorMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.DesignatorMin));
 			}
 			else
 			{
-				USB_MON_DEBUG_INFO(" Range.DesignatorMax: %d OFFSET_FIELD: %X  \r\n", channel->NotRange.DesignatorIndex, FIELD_OFFSET(HIDP_CHANNEL_DESC, NotRange.DesignatorIndex));
+				USB_DEBUG_INFO_LN_EX(" Range.DesignatorMax: %d OFFSET_FIELD: %X  ", channel->NotRange.DesignatorIndex, FIELD_OFFSET(HIDP_CHANNEL_DESC, NotRange.DesignatorIndex));
 			}
 
 			if (channel->IsStringRange)
 			{
-				USB_MON_DEBUG_INFO(" Range.StringMax: %d	   OFFSET_FIELD: %X  \r\n", channel->Range.StringMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.StringMax));
-				USB_MON_DEBUG_INFO(" Range.StringMin: %d	   OFFSET_FIELD: %X  \r\n", channel->Range.StringMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.StringMin));
+				USB_DEBUG_INFO_LN_EX(" Range.StringMax: %d	   OFFSET_FIELD: %X  ", channel->Range.StringMax, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.StringMax));
+				USB_DEBUG_INFO_LN_EX(" Range.StringMin: %d	   OFFSET_FIELD: %X  ", channel->Range.StringMin, FIELD_OFFSET(HIDP_CHANNEL_DESC, Range.StringMin));
 			}
 			else
 			{
-				USB_MON_DEBUG_INFO(" NotRange.StringIndex:  %d	 OFFSET_FIELD: %X  \r\n", channel->NotRange.StringIndex, FIELD_OFFSET(HIDP_CHANNEL_DESC, NotRange.StringIndex));
+				USB_DEBUG_INFO_LN_EX(" NotRange.StringIndex:  %d	 OFFSET_FIELD: %X  ", channel->NotRange.StringIndex, FIELD_OFFSET(HIDP_CHANNEL_DESC, NotRange.StringIndex));
 			}
 		}
 
@@ -209,11 +209,12 @@ VOID DumpChannel(
 		{
 			for (int z = 0; z < channel->NumGlobalUnknowns; z++)
 			{
-				USB_MON_DEBUG_INFO(" UnknownsToken:  %d	 OFFSET_FIELD: %X  \r\n", channel->GlobalUnknowns[z].Token, FIELD_OFFSET(HIDP_CHANNEL_DESC, GlobalUnknowns));
+				USB_DEBUG_INFO_LN_EX(" UnknownsToken:  %d	 OFFSET_FIELD: %X  ", channel->GlobalUnknowns[z].Token, FIELD_OFFSET(HIDP_CHANNEL_DESC, GlobalUnknowns));
 			}
 		}
 
-		USB_MON_DEBUG_INFO("\r\n");
+		USB_DEBUG_INFO_LN();
+
 		channel++;
 	}
 }
@@ -274,7 +275,7 @@ NTSTATUS ExtractKeyboardData(
 
 	SelectChannel(type, collectionDesc, &selected_channel);
 	
-	USB_MON_DEBUG_INFO("Start: %x End: %x ReportType: %s \r\n", selected_channel.start, selected_channel.end, selected_channel.reportType);
+	USB_DEBUG_INFO_LN_EX("Start: %x End: %x ReportType: %s", selected_channel.start, selected_channel.end, selected_channel.reportType);
 	
 	channel = selected_channel.channel; 
 	for (int k = selected_channel.start; k < selected_channel.end; k++)
@@ -333,7 +334,7 @@ NTSTATUS ExtractMouseData(
 		return status;
 	}
 
-	USB_MON_DEBUG_INFO("Start: %x End: %x ReportType: %s \r\n", selected_channel.start, selected_channel.end, selected_channel.reportType); 
+	USB_DEBUG_INFO_LN_EX("Start: %x End: %x ReportType: %s" , selected_channel.start, selected_channel.end, selected_channel.reportType);
 	channel = selected_channel.channel;
 	for (int k = selected_channel.start; k < selected_channel.end; k++)
 	{

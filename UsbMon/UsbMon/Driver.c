@@ -43,7 +43,7 @@ NTSTATUS DriverEntry(
 { 
 	NTSTATUS					  status = STATUS_UNSUCCESSFUL; 
 	object->DriverUnload			     = DriverUnload;
-	status = InitializeHidPenetrate(USB3);
+	status = InitializeHidPenetrate(USB2);
 	return status;
 } 
 //----------------------------------------------------------------------------------------//

@@ -81,7 +81,7 @@ ULONG RemoveIrpHookCallback(
 	if (hook_obj)
 	{ 
 		DoIrpHook(hook_obj->driver_object, hook_obj->IrpCode, hook_obj->oldFunction, Stop);
-		USB_MON_DEBUG_INFO("RemoveIrpHookCallback Once hook_obj->driver_object: %ws \r\n", hook_obj->driver_object->DriverName.Buffer);
+		USB_DEBUG_INFO_LN_EX("RemoveIrpHookCallback Once hook_obj->driver_object: %ws ", hook_obj->driver_object->DriverName.Buffer);
 		hook_obj = NULL;  
 	}  
 	return CLIST_FINDCB_CTN | CLIST_FINDCB_DEL;
@@ -113,12 +113,12 @@ IRPHOOKOBJ* CreateIrpObject(
 
 	if (!g_IrpHookList)
 	{
-		USB_MON_DEBUG_INFO("Empty Hook Object \r\n"); 
+		USB_DEBUG_INFO_LN_EX("Empty Hook Object \r\n");
 		return NULL;
 	}
 	if (!HookObj)
 	{
-		USB_MON_DEBUG_INFO("Empty Hook Object \r\n");
+		USB_DEBUG_INFO_LN_EX("Empty Hook Object \r\n");
 		return NULL; 
 	}
 
@@ -131,12 +131,12 @@ IRPHOOKOBJ* CreateIrpObject(
  
 	if (!AddToChainListTail(g_IrpHookList->head, HookObj))
 	{
-		USB_MON_DEBUG_INFO("Cannot Add to list \r\n");  
+		USB_DEBUG_INFO_LN_EX("Cannot Add to list ");
 		ExFreePool(HookObj);
 		HookObj = NULL;
 	}
 
-	USB_MON_DEBUG_INFO("IRP List Size: %x with DriverName: %ws \r\n", g_IrpHookList->head->Count, DriverObject->DriverName.Buffer);
+	USB_DEBUG_INFO_LN_EX("IRP List Size: %x with DriverName: %ws ", g_IrpHookList->head->Count, DriverObject->DriverName.Buffer);
 
 	return HookObj;
 }

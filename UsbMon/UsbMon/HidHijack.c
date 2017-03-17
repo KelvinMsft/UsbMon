@@ -348,7 +348,7 @@ LOOKUP_STATUS LookupPendingIrpCallback(
 	{
 		InterlockedExchange64(&pending_irp->IrpStack->Context, pending_irp->oldContext);
 		InterlockedExchange64(&pending_irp->IrpStack->CompletionRoutine, pending_irp->oldRoutine);
-		USB_MON_DEBUG_INFO("RemovePendingIrpCallback Once %I64x \r\n", pending_irp_node);
+		USB_DEBUG_INFO_LN_EX("RemovePendingIrpCallback Once %I64x" , pending_irp_node);
 	}
 	return CLIST_FINDCB_CTN;
 }
@@ -383,14 +383,14 @@ NTSTATUS HandleKeyboardData(
 		return status;
 	}
 
-	USB_MON_DEBUG_INFO("IsClientPdo: %x \r\n", hid_common_extension->isClientPdo);
-	USB_MON_DEBUG_INFO("collectionIndex: %x collectionNum: %x \r\n", pdoExt->collectionIndex, pdoExt->collectionNum);
+	USB_DEBUG_INFO_LN_EX("IsClientPdo: %x ", hid_common_extension->isClientPdo);
+	USB_DEBUG_INFO_LN_EX("collectionIndex: %x collectionNum: %x ", pdoExt->collectionIndex, pdoExt->collectionNum);
 
 	status = ExtractKeyboardData(GetCollectionDesc(pContext, colIndex), reportType, &data);
 
-	USB_MON_DEBUG_INFO("NormalKeyOffset: %X		 Size: %x \r\n", data.KBDDATA.NormalKeyOffset, data.KBDDATA.NormalKeySize);
-	USB_MON_DEBUG_INFO("SpecialKeyOffset: %X	 Size: %x  \r\n", data.KBDDATA.SpecialKeyOffset, data.KBDDATA.SpecialKeySize);
-	USB_MON_DEBUG_INFO("LedKeyOffset: %X		 Size: %x  \r\n", data.KBDDATA.LedKeyOffset, data.KBDDATA.LedKeySize);
+	USB_DEBUG_INFO_LN_EX("NormalKeyOffset: %X		 Size: %x", data.KBDDATA.NormalKeyOffset, data.KBDDATA.NormalKeySize);
+	USB_DEBUG_INFO_LN_EX("SpecialKeyOffset: %X	 Size: %x  ", data.KBDDATA.SpecialKeyOffset, data.KBDDATA.SpecialKeySize);
+	USB_DEBUG_INFO_LN_EX("LedKeyOffset: %X		 Size: %x ", data.KBDDATA.LedKeyOffset, data.KBDDATA.LedKeySize);
 	ULONG totalSize = data.KBDDATA.NormalKeySize + data.KBDDATA.SpecialKeySize + data.KBDDATA.LedKeySize;
 	if (!totalSize)
 	{
@@ -411,27 +411,27 @@ NTSTATUS HandleKeyboardData(
 		RtlMoveMemory(SpecialKey, (PUCHAR)UrbGetTransferBuffer(pContext->urb) + data.KBDDATA.SpecialKeyOffset, data.KBDDATA.SpecialKeySize);
 		RtlMoveMemory(LedKey, (PUCHAR)UrbGetTransferBuffer(pContext->urb) + data.KBDDATA.LedKeyOffset, data.KBDDATA.LedKeySize);
 
-		USB_MON_DEBUG_INFO("Enter: ");
+		USB_DEBUG_INFO_LN_EX("Enter: ");
 
 		for (int i = 0; i < data.KBDDATA.SpecialKeySize; i++)
 		{
-			USB_MON_DEBUG_INFO("%x ", *SpecialKey);
+			USB_NATIVE_DEBUG_INFO("%x ", *SpecialKey);
 			SpecialKey++;
 		}
 
 		for (int i = 0; i < data.KBDDATA.NormalKeySize; i++)
 		{
-			USB_MON_DEBUG_INFO("%x ", *normalKey);
+			USB_NATIVE_DEBUG_INFO("%x ", *normalKey);
 			normalKey++;
 		}
 
 		for (int i = 0; i < data.KBDDATA.LedKeySize; i++)
 		{
-			USB_MON_DEBUG_INFO("%x ", *LedKey);
+			USB_NATIVE_DEBUG_INFO("%x ", *LedKey);
 			LedKey++;
 		}
 
-		USB_MON_DEBUG_INFO("\r\n");
+		USB_DEBUG_INFO_LN();
 
 		ExFreePool(extractor);
 		extractor = NULL;
@@ -454,14 +454,14 @@ NTSTATUS HandleMouseData(
 
 	if (!pContext)
 	{
-		USB_MON_DEBUG_INFO("NULL pContext\r\n");
+		USB_DEBUG_INFO_LN_EX("NULL pContext");
 		status = STATUS_UNSUCCESSFUL;
 		return status;
 	}
 
 	if (!pContext->DeviceObject)
 	{
-		USB_MON_DEBUG_INFO("NULL DeviceObject\r\n");
+		USB_DEBUG_INFO_LN_EX("NULL DeviceObject");
 		status = STATUS_UNSUCCESSFUL;
 		return status;
 	}
@@ -470,7 +470,7 @@ NTSTATUS HandleMouseData(
 
 	if (!hid_common_extension)
 	{
-		USB_MON_DEBUG_INFO("NULL hid_common_extension\r\n");
+		USB_DEBUG_INFO_LN_EX("NULL hid_common_extension");
 		status = STATUS_UNSUCCESSFUL;
 		return status;
 	}
@@ -479,7 +479,7 @@ NTSTATUS HandleMouseData(
  
 	if (!pdoExt)
 	{
-		USB_MON_DEBUG_INFO("NULL pdoExt \r\n");
+		USB_DEBUG_INFO_LN_EX("NULL pdoExt");
 		status = STATUS_UNSUCCESSFUL;
 		return status; 
 	} 
@@ -497,16 +497,17 @@ NTSTATUS HandleMouseData(
 	{
 		status = STATUS_SUCCESS;
 		return status;
-	}
-
-	USB_MON_DEBUG_INFO("collectionIndex: %x collectionNum: %x \r\n", pdoExt->collectionIndex, pdoExt->collectionNum);
+	} 
 
 	status = ExtractMouseData(GetCollectionDesc(pContext, colIndex), reportType, &data);
 
-	USB_MON_DEBUG_INFO("OffsetX: %X		 Size: %x \r\n", data.MOUDATA.OffsetX, data.MOUDATA.XOffsetSize);
-	USB_MON_DEBUG_INFO("OffsetY: %X		 Size: %x  \r\n", data.MOUDATA.OffsetY, data.MOUDATA.YOffsetSize);
-	USB_MON_DEBUG_INFO("OffsetZ: %X		 Size: %x  \r\n", data.MOUDATA.OffsetZ, data.MOUDATA.ZOffsetSize);
-	USB_MON_DEBUG_INFO("OffsetButton: %X Size: %x  \r\n", data.MOUDATA.OffsetButton, data.MOUDATA.BtnOffsetSize);
+	/*
+	USB_DEBUG_INFO_LN_EX("collectionIndex: %x collectionNum: %x", pdoExt->collectionIndex, pdoExt->collectionNum);
+	USB_DEBUG_INFO_LN_EX("OffsetX: %X		 Size: %x" , data.MOUDATA.OffsetX, data.MOUDATA.XOffsetSize);
+	USB_DEBUG_INFO_LN_EX("OffsetY: %X		 Size: %x", data.MOUDATA.OffsetY, data.MOUDATA.YOffsetSize);
+	USB_DEBUG_INFO_LN_EX("OffsetZ: %X		 Size: %x", data.MOUDATA.OffsetZ, data.MOUDATA.ZOffsetSize);
+	USB_DEBUG_INFO_LN_EX("OffsetButton: %X Size: %x ", data.MOUDATA.OffsetButton, data.MOUDATA.BtnOffsetSize);
+	*/
 
 	totalSize = data.MOUDATA.XOffsetSize + data.MOUDATA.YOffsetSize + data.MOUDATA.ZOffsetSize + data.MOUDATA.BtnOffsetSize;
 	if (!totalSize)
@@ -533,11 +534,12 @@ NTSTATUS HandleMouseData(
 		RtlMoveMemory(btn, (PUCHAR)UrbGetTransferBuffer(pContext->urb) + data.MOUDATA.OffsetButton, data.MOUDATA.BtnOffsetSize);
 
 		//TODO: loop the size
-		USB_MON_DEBUG_INFO("X : %d ", *x);
-		USB_MON_DEBUG_INFO("Y : %d ", *y);
-		USB_MON_DEBUG_INFO("Z : %d ", *wheel);
-		USB_MON_DEBUG_INFO("btn: %d \r\n", *btn);
-
+		USB_COMMON_DEBUG_INFO("");
+		USB_NATIVE_DEBUG_INFO("X : %d ", *x);
+		USB_NATIVE_DEBUG_INFO("Y : %d ", *y);
+		USB_NATIVE_DEBUG_INFO("Z : %d ", *wheel);
+		USB_NATIVE_DEBUG_INFO("btn: %d", *btn);
+		USB_DEBUG_INFO_LN();
 		ExFreePool(extractor);
 		extractor = NULL;
 	}
@@ -554,18 +556,16 @@ NTSTATUS  HidUsb_CompletionCallback(
 {
 	HIJACK_CONTEXT*		   pContext = (HIJACK_CONTEXT*)Context;
 	PVOID					context = NULL;
-	IO_COMPLETION_ROUTINE* callback = NULL;
-	WCHAR			DeviceName[256] = { 0 };
-	USB_MON_DEBUG_INFO("Compete\r\n");
+	IO_COMPLETION_ROUTINE* callback = NULL; 
 	if (!pContext)
 	{
-		USB_MON_DEBUG_INFO("EmptyContext");
+		USB_DEBUG_INFO_LN_EX("EmptyContext");
 		return STATUS_UNSUCCESSFUL;
 	}
 
 	if (!pContext->pending_irp)
 	{
-		USB_MON_DEBUG_INFO("Empty pending_irp");
+		USB_DEBUG_INFO_LN_EX("Empty pending_irp");
 		return STATUS_UNSUCCESSFUL;
 	}
 
@@ -582,7 +582,7 @@ NTSTATUS  HidUsb_CompletionCallback(
 		PENDINGIRP* entry = GetRealPendingIrpByIrp(Irp);
 		context = entry->oldContext;
 		callback = entry->oldRoutine;
-		USB_MON_DEBUG_INFO("Safety Call old Routine: %I64x Context: %I64x\r\n", callback, context);
+		USB_DEBUG_INFO_LN_EX("Safety Call old Routine: %I64x Context: %I64x", callback, context);
 	}
 
 	//Rarely call here when driver unloading, Safely call because driver_unload 
@@ -596,46 +596,40 @@ NTSTATUS  HidUsb_CompletionCallback(
 	//If Driver is not unloading , delete it 
 	if (!DelFromChainListByPointer(g_PendingIrpList->head, pContext->pending_irp))
 	{
-		USB_MON_DEBUG_INFO("FATAL: Delete element FAILED \r\n");
+		USB_DEBUG_INFO_LN_EX("FATAL: Delete element FAILED");
 	}
-
-	GetDeviceName(DeviceObject, DeviceName);
-	USB_MON_DEBUG_INFO("DriverName: %ws \r\nDeviceName: %ws Flags: %x \r\n", DeviceObject->DriverObject->DriverName.Buffer, DeviceName, UrbGetTransferFlags(pContext->urb));
-	//USB_MON_DEBUG_INFO("Class: %x Protocol: %x \r\n" , pContext->node->mini_extension->InterfaceDesc->Class, pContext->node->mini_extension->InterfaceDesc->Protocol);
+ 
+ 	DUMP_DEVICE_NAME(pContext->DeviceObject);
 
 	if (UrbIsInputTransfer(pContext->urb))
 	{
-		USB_MON_DEBUG_INFO("Input Data: ");
+		USB_COMMON_DEBUG_INFO("Input Data: ");
 		PUCHAR UrbTransferBuf = (PUCHAR)UrbGetTransferBuffer(pContext->urb);
 
 		for (int i = 0; i < UrbGetTransferLength(pContext->urb); i++)
 		{
-			USB_MON_DEBUG_INFO("%x ", *UrbTransferBuf++);
+			USB_NATIVE_DEBUG_INFO("%x ", *UrbTransferBuf++);
 		}
-		USB_MON_DEBUG_INFO("\r\n");
+		USB_DEBUG_INFO_LN();
 		HandleMouseData(pContext, HidP_Input);
-	//	HandleKeyboardData(pContext, HidP_Input);
 	}
 
 	if (UrbIsOutputTransfer(pContext->urb))
 	{
-		USB_MON_DEBUG_INFO("Output Data: ");
+		USB_COMMON_DEBUG_INFO("Output Data: ");
 		PUCHAR UrbTransferBuf = (PUCHAR)UrbGetTransferBuffer(pContext->urb);
 		for (int i = 0; i < UrbGetTransferLength(pContext->urb); i++)
 		{
-			USB_MON_DEBUG_INFO("%x ", *UrbTransferBuf++);
+			USB_NATIVE_DEBUG_INFO("%x ", *UrbTransferBuf++);
 		}
-		USB_MON_DEBUG_INFO("\r\n");
+		USB_DEBUG_INFO_LN();
 	}
 
 	if (pContext)
 	{
 		ExFreePool(pContext);
 		pContext = NULL;
-	}
-
-	USB_MON_DEBUG_INFO("return old routine \r\n");
-
+	}  
 	return callback(DeviceObject, Irp, context);
 }
 
@@ -666,7 +660,12 @@ NTSTATUS HidUsb_InternalDeviceControl(
 			break;
 		}
 
-		urb = (PURB)irpStack->Parameters.Others.Argument1;
+		urb = (PURB)irpStack->Parameters.Others.Argument1; 
+		if (!urb)
+		{
+			break;
+		}
+
 		if (UrbGetFunction(urb) != URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER)
 		{
 			break;
@@ -674,9 +673,7 @@ NTSTATUS HidUsb_InternalDeviceControl(
 
 		//If Urb pipe handle is used by HID mouse / kbd device. 
 		if (IsHidDevicePipe(g_HidPipeList->head, UrbGetTransferPipeHandle(urb), &node))
-		{
-			USB_MON_DEBUG_INFO("irphooking... IsHidDevicePipe \r\n");
-
+		{ 
 			HIDCLASS_DEVICE_EXTENSION* class_extension = NULL;
 
 			if (!node ||
@@ -727,8 +724,7 @@ NTSTATUS HidUsb_InternalDeviceControl(
 
 				//Completion Routine hook
 				irpStack->Context = hijack;
-				irpStack->CompletionRoutine = HidUsb_CompletionCallback;	
-				USB_MON_DEBUG_INFO("hooked completion routine \r\n");
+				irpStack->CompletionRoutine = HidUsb_CompletionCallback;	 
 			}
 		}
 	} while (0);
@@ -741,8 +737,7 @@ NTSTATUS HidUsb_InternalDeviceControl(
 		{ 
 			return object->oldFunction(DeviceObject, Irp);
 		}
-	}
-
+	} 
 	return g_pDispatchInternalDeviceControl(DeviceObject, Irp);
 }
  
@@ -757,24 +752,24 @@ NTSTATUS InitializeHidPenetrate(
 	status = GetUsbHub(UsbVersion, &pDriverObj);	// iusbhub
 	if (!NT_SUCCESS(status) || !pDriverObj)
 	{
-		USB_MON_DEBUG_INFO("GetUsbHub Error \r\n");
+		USB_DEBUG_INFO_LN_EX("GetUsbHub Error");
 		return status;
 	}
 
 	status = InitHidClientPdoList(&g_HidPipeList, &(ULONG)g_HidPipeListSize);
 	if (!NT_SUCCESS(status) || (!g_HidPipeList && !g_HidPipeListSize))
 	{
-		USB_MON_DEBUG_INFO("No keyboard Or Mouse \r\n");
+		USB_DEBUG_INFO_LN_EX("No keyboard Or Mouse");
 		return status;
 	}
 
-	USB_MON_DEBUG_INFO("Done Init --- Device_object_list: %I64X Head: %I64x Size: %x \r\n", g_HidPipeList, g_HidPipeList->head,g_HidPipeListSize);
+	USB_DEBUG_INFO_LN_EX("Done Init --- Device_object_list: %I64X Head: %I64x Size: %x", g_HidPipeList, g_HidPipeList->head,g_HidPipeListSize);
 
 	//Init Irp Linked-List
 	status = AllocatePendingIrpLinkedList();
 	if (!NT_SUCCESS(status))
 	{
-		USB_MON_DEBUG_INFO("AllocatePendingIrpLinkedList Error \r\n");
+		USB_DEBUG_INFO_LN_EX("AllocatePendingIrpLinkedList Error");
 		FreeHidClientPdoList();
 		return status;
 	} 
@@ -785,7 +780,7 @@ NTSTATUS InitializeHidPenetrate(
 	{
 		FreeHidClientPdoList();
 		FreePendingIrpList();
-		USB_MON_DEBUG_INFO("DoIrpHook Error \r\n");
+		USB_DEBUG_INFO_LN_EX("DoIrpHook Error");
 		status = STATUS_UNSUCCESSFUL;
 		return status;
 	} 
