@@ -4,6 +4,10 @@
 #include <fltKernel.h> 
 #include "local.h"
 
+
+#define HID_USB_DEVICE				 	 L"\\Driver\\hidusb"
+
+
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 Routine Description:
@@ -38,7 +42,7 @@ Return Value:
 		NTSTATUS		 - STATUS_SUCCESS      , if it is Freed
 						 - STATUS_UNSUCCESSFUL , if is can't be freed
 -----------------------------------------------------------------------------------*/
-NTSTATUS FreeHidClientPdoList();
+NTSTATUS UnInitHidSubSystem();
 
  
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -56,9 +60,16 @@ Return Value:
 		NTSTATUS		 - true  , if it initial succesfully
 						 - false , if it initial faile
 -----------------------------------------------------------------------------------*/
-NTSTATUS InitHidClientPdoList(
-	_Out_ PHID_DEVICE_LIST* ClientPdoList,
+NTSTATUS InitHidSubSystem(
 	_Out_ PULONG		ClientPdoListSize
 );
+ 
+NTSTATUS VerifyAndInsertIntoHidList(
+	_In_ PDEVICE_OBJECT DeviceObject
+);
 
+NTSTATUS RemoveNodeFromHidList(
+	_In_ PDEVICE_OBJECT DeviceObject
+); 
+ 
 #endif

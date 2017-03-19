@@ -2,6 +2,7 @@
 #define __IRP_HOOK_HEADER_
 
 #include <fltKernel.h> 
+#include "TList.h"
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////	Types
@@ -13,7 +14,16 @@ typedef enum
 	Stop,
 }Action;
 
-
+#pragma pack (8)
+typedef struct PENDINGIRP
+{
+	PIRP						  Irp;			//Irp
+	PIO_STACK_LOCATION		 IrpStack;			//Old IRP stack
+	PVOID					oldContext;			//Old IRP routine argument
+	IO_COMPLETION_ROUTINE*	oldRoutine;			//Old IRP routine address
+}PENDINGIRP, *PPENDINGIRP;
+#pragma pack()
+ 
 #pragma pack (8)
 typedef struct IRPHOOKOBJ
 {  
@@ -24,9 +34,42 @@ typedef struct IRPHOOKOBJ
 }IRPHOOKOBJ, *PIRPHOOKOBJ;
 #pragma pack() 
 
+ 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////	Implementation
+////	Prototype
 ////
+
+
+//--------------------------------------------------------------------------------------
+//	
+//
+NTSTATUS InsertPendingIrp(
+	_In_ PENDINGIRP* PendingIrp
+);
+
+
+//--------------------------------------------------------------------------------------
+//	
+//
+NTSTATUS RemovePendingIrp(
+	_In_ PENDINGIRP* PendingIrp
+);
+
+
+//--------------------------------------------------------------------------------------
+//	
+//
+NTSTATUS InitIrpHookSystem();
+
+
+
+//--------------------------------------------------------------------------------------
+//	
+//
+NTSTATUS UnInitIrpHookSystem();
+
+
+
 
 //--------------------------------------------------------------------------------------
 //	
@@ -41,7 +84,7 @@ PVOID	DoIrpHook(
 //--------------------------------------------------------------------------------------
 //	
 //
-IRPHOOKOBJ*	CreateIrpObject(
+IRPHOOKOBJ*	CreateIrpHookObject(
 	_In_	PDRIVER_OBJECT driver_object,
 	_In_	ULONG		   IrpCode,
 	_In_	PVOID		   oldFunction,
@@ -59,11 +102,9 @@ IRPHOOKOBJ* GetIrpHookObject(
 //--------------------------------------------------------------------------------------
 //	
 //
-NTSTATUS	RemoveAllIrpObject();
+PENDINGIRP* GetRealPendingIrpByIrp(
+	_In_ PIRP irp
+);
 
-//--------------------------------------------------------------------------------------
-//	
-//
-NTSTATUS	AllocateIrpHookLinkedList();
 
 #endif

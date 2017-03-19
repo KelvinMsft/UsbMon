@@ -1,5 +1,5 @@
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     #include "IrpHook.h"
-#include "TList.h"
+                     
+#include "IrpHook.h"
 #include "CommonUtil.h"
 
 
@@ -7,6 +7,7 @@
 ////	Types
 ////
 ////
+
 typedef struct _IRPHOOK_LIST {
 	TChainListHeader*  head; 
 	ULONG		   RefCount;
@@ -18,34 +19,187 @@ typedef struct SEARCHPARAM
 	ULONG				 IrpCode;
 }SEARCHPARAM, *PSEARCHPARAM;
 
+typedef struct _PENDINGIRP_LIST
+{
+	TChainListHeader*	head;
+	ULONG			RefCount;
+}PENDINGIRPLIST, *PPENDINGIRPLIST;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 ////	Marco
 ////
 ////
 
+#define GetNodeByPTR(ListHead,NodeValue) QueryFromChainListByULONGPTR(ListHead, (ULONG_PTR)NodeValue)
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 ////	Global Variable
 ////
 ////
-IRPHOOKLIST* g_IrpHookList = NULL;
-
-
+IRPHOOKLIST*   	  g_IrpHookList	   = NULL;
+PENDINGIRPLIST*	  g_PendingIrpList = NULL;
+BOOLEAN			  g_IsInit = FALSE;
 ///////////////////////////////////////////////////////////////////////////////////////////////
 ////	Prototype
 ////
 ////
 
 
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Routine Description:
+
+		Lookup Pending IRP callback, in callback, we 
+		recovered the completion hook 
+		 
+Arguments:
+
+		pending_irp_node - Each node inside IRP pending list
+
+		context			 - Not used 
+
+Return Value:
+
+		LOOKUP_STATUS	 - CLIST_FINDCB_CTN, traverse whole 
+						   list
+-------------------------------------------------------*/
+LOOKUP_STATUS	LookupPendingIrpCallback(
+	_In_ PENDINGIRP* pending_irp_node,
+	_In_ PVOID		 context
+); 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 ////	Implementation
 ////
 ////
 ////
- 
- 
+//----------------------------------------------------------------------------------------//
+PENDINGIRPLIST* GetPendingList()
+{
+	return g_PendingIrpList;
+}
+
+
+//----------------------------------------------------------------------------------------//
+PENDINGIRP* GetRealPendingIrpByIrp(PIRP irp)
+{
+	if (!irp || !g_PendingIrpList)
+	{
+		return NULL;
+	}
+	return GetNodeByPTR(g_PendingIrpList->head, irp);
+}
+
+
+//----------------------------------------------------------------------------------------//
+NTSTATUS InsertPendingIrp(
+	PENDINGIRP* PendingIrp
+)
+{
+	NTSTATUS status = STATUS_UNSUCCESSFUL;
+	if (!PendingIrp || !g_PendingIrpList)
+	{
+		return status;
+	}
+	if (AddToChainListTail(g_PendingIrpList->head, PendingIrp))
+	{
+		status = STATUS_SUCCESS;
+	}
+	return status;
+}
+
+//----------------------------------------------------------------------------------------//
+NTSTATUS RemovePendingIrp(
+	PENDINGIRP* PendingIrp
+)
+{
+	NTSTATUS status = STATUS_UNSUCCESSFUL;
+	if (!PendingIrp || !g_PendingIrpList)
+	{
+		return status;
+	}
+	status = DelFromChainListByPointer(g_PendingIrpList->head, PendingIrp);
+	return status;
+}
+
+//----------------------------------------------------------------------------------------//
+NTSTATUS AllocatePendingIrpLinkedList()
+{
+	NTSTATUS status = STATUS_UNSUCCESSFUL;
+	do
+	{
+		if (!g_PendingIrpList)
+		{
+			g_PendingIrpList = (PENDINGIRPLIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(PENDINGIRPLIST), 'kcaj');
+			if (!g_PendingIrpList)
+			{
+				status = STATUS_UNSUCCESSFUL;
+				break;
+			}
+			RtlZeroMemory(g_PendingIrpList, sizeof(PENDINGIRPLIST));
+		}
+
+		if (!g_PendingIrpList->head)
+		{
+			g_PendingIrpList->head = NewChainListHeaderEx(LISTFLAG_SPINLOCK | LISTFLAG_AUTOFREE, NULL, 0);
+			if (!g_PendingIrpList->head)
+			{
+				ExFreePool(g_PendingIrpList);
+				g_PendingIrpList = NULL;
+				status = STATUS_UNSUCCESSFUL;
+				break;
+			}
+			g_PendingIrpList->RefCount = 1;
+		}
+
+		status = STATUS_SUCCESS;
+	} while (FALSE);
+	return status;
+}
+//----------------------------------------------------------------------------------------//
+NTSTATUS FreePendingIrpList()
+{
+	if (g_PendingIrpList)
+	{
+		if (g_PendingIrpList->head)
+		{
+			CHAINLIST_SAFE_FREE(g_PendingIrpList->head);
+		}
+		ExFreePool(g_PendingIrpList);
+		g_PendingIrpList = NULL;
+	}
+}
+
+//-------------------------------------------------------------------------------------------//
+LOOKUP_STATUS LookupPendingIrpCallback(
+	_In_ PENDINGIRP* pending_irp_node,
+	_In_ void*		 context
+)
+{
+	UNREFERENCED_PARAMETER(context);
+
+	NTSTATUS    status = STATUS_UNSUCCESSFUL;
+	PENDINGIRP* pending_irp = pending_irp_node;
+	if (pending_irp)
+	{
+		InterlockedExchange64(&pending_irp->IrpStack->Context, pending_irp->oldContext);
+		InterlockedExchange64(&pending_irp->IrpStack->CompletionRoutine, pending_irp->oldRoutine);
+		USB_DEBUG_INFO_LN_EX("RemovePendingIrpCallback Once %I64x", pending_irp_node);
+	}
+	return CLIST_FINDCB_CTN;
+}
+
+//----------------------------------------------------------------------------------------- 
+NTSTATUS RecoverAllCompletionHook()
+{
+	NTSTATUS						   status = STATUS_UNSUCCESSFUL;
+	if (QueryFromChainListByCallback(g_PendingIrpList->head, LookupPendingIrpCallback, NULL))
+	{
+		status = STATUS_SUCCESS;
+	}
+	return status;
+}
+
 //--------------------------------------------------------------------------------------------//
 ULONG SearchIrpHookObjectCallback(
 	_In_ IRPHOOKOBJ* IrpObject,	
@@ -88,7 +242,7 @@ ULONG RemoveIrpHookCallback(
 }
 
 //--------------------------------------------------------------------------------------------//
-NTSTATUS RemoveAllIrpObject()
+NTSTATUS RecoverAllIrpHook()
 {
 	NTSTATUS    status = STATUS_UNSUCCESSFUL;  
 	if (g_IrpHookList)
@@ -103,7 +257,7 @@ NTSTATUS RemoveAllIrpObject()
 }
  
 //--------------------------------------------------------------------------------------------//
-IRPHOOKOBJ* CreateIrpObject(
+IRPHOOKOBJ* CreateIrpHookObject(
 	_In_ PDRIVER_OBJECT DriverObject,
 	_In_ ULONG IrpCode, 
 	_In_ PVOID oldFunction, 
@@ -128,7 +282,7 @@ IRPHOOKOBJ* CreateIrpObject(
 	HookObj->IrpCode	   = IrpCode;
 	HookObj->newFunction   = newFunction;
 	HookObj->oldFunction   = oldFunction;
- 
+
 	if (!AddToChainListTail(g_IrpHookList->head, HookObj))
 	{
 		USB_DEBUG_INFO_LN_EX("Cannot Add to list ");
@@ -175,39 +329,30 @@ NTSTATUS AllocateIrpHookLinkedList()
 
 //--------------------------------------------------------------------------------------------//
 PVOID DoIrpHook(
-	_In_	  PDRIVER_OBJECT driver_object, 
+	_In_	  PDRIVER_OBJECT DriverObject, 
 	_In_	  ULONG IrpCode, 
 	_In_	  PVOID NewFunction, 
 	_In_  	  Action action
 )
 {
 	PVOID old_irp_function = NULL;
-
-	if (!driver_object || !NewFunction)
+	if (!DriverObject || !NewFunction || !g_IrpHookList || !g_PendingIrpList)
 	{
 		return old_irp_function;
 	}
 
-	if (!g_IrpHookList)
-	{
-		if (!NT_SUCCESS(AllocateIrpHookLinkedList()))
-		{
-			return old_irp_function;
-		}
-	}
-
 	old_irp_function = (DRIVER_DISPATCH*)InterlockedExchange64(
-		(LONG64 volatile *)&driver_object->MajorFunction[IrpCode],
+		(LONG64 volatile *)&DriverObject->MajorFunction[IrpCode],
 		(LONG64)NewFunction
 	);
 
 	if (action == Start && old_irp_function)
 	{
 		//Create Object
-		if (!CreateIrpObject(driver_object, IrpCode, old_irp_function, NewFunction))
+		if (!CreateIrpHookObject(DriverObject, IrpCode, old_irp_function, NewFunction))
 		{
 			//repair hook, if created fail.
-			InterlockedExchange64((LONG64 volatile *)&driver_object->MajorFunction[IrpCode],(LONG64)old_irp_function);
+			InterlockedExchange64((LONG64 volatile *)&DriverObject->MajorFunction[IrpCode],(LONG64)old_irp_function);
 			old_irp_function = NULL;
 		}
 	} 
@@ -215,4 +360,41 @@ PVOID DoIrpHook(
 	return old_irp_function;
 } 
 //--------------------------------------------------------------------------------------------//
+NTSTATUS InitIrpHookSystem()
+{
+	if (!NT_SUCCESS(AllocatePendingIrpLinkedList()))
+	{
+		USB_DEBUG_INFO_LN_EX("AllocatePendingIrpLinkedList Error");
+		return STATUS_UNSUCCESSFUL;	
+	}
+	if (!NT_SUCCESS(AllocateIrpHookLinkedList()))
+	{
+		return STATUS_UNSUCCESSFUL;
+	}
+	g_IsInit = TRUE;
+	return STATUS_SUCCESS;
+}
 
+
+//--------------------------------------------------------------------------------------------//
+NTSTATUS UnInitIrpHookSystem()
+{
+	if (!NT_SUCCESS(RecoverAllIrpHook()))
+	{
+		USB_DEBUG_INFO_LN_EX("AllocatePendingIrpLinkedList Error");
+		return STATUS_UNSUCCESSFUL;
+	}
+
+	//1. Recovery
+	RecoverAllCompletionHook();
+
+	//2. Free Memory
+	if (!NT_SUCCESS(FreePendingIrpList()))
+	{
+		return STATUS_UNSUCCESSFUL;
+	}
+
+	g_IsInit = FALSE;
+
+	return STATUS_SUCCESS;
+}

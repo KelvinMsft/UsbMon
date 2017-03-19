@@ -11,14 +11,6 @@
 //// Types
 ////  
 
-typedef struct PENDINGIRP
-{
-	PIRP						  Irp;			//Irp
-	PIO_STACK_LOCATION		 IrpStack;			//Old IRP stack
-	PVOID					oldContext;			//Old IRP routine argument
-	IO_COMPLETION_ROUTINE*	oldRoutine;			//Old IRP routine address
-}PENDINGIRP, *PPENDINGIRP;
-
 typedef struct HIJACK_CONTEXT
 {
 	PDEVICE_OBJECT		   DeviceObject;		// Hid deivce
@@ -26,15 +18,6 @@ typedef struct HIJACK_CONTEXT
 	HID_DEVICE_NODE*			   node;		// An old context we need 
 	PENDINGIRP*			    pending_irp;		// pending irp node for cancellation
 }HIJACK_CONTEXT, *PHIJACK_CONTEXT;
-
-
-typedef struct _PENDINGIRP_LIST
-{
-	TChainListHeader*	head;
-	ULONG			RefCount;
-}PENDINGIRPLIST, *PPENDINGIRPLIST;
-
- 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 ////	Marco Utilities
@@ -58,19 +41,16 @@ typedef struct _PENDINGIRP_LIST
 #define UrbIsInputTransfer(urb)			 (UrbGetTransferFlags(urb) & (USBD_TRANSFER_DIRECTION_IN ))
 #define UrbIsOutputTransfer(urb)		 (UrbGetTransferFlags(urb) & (USBD_TRANSFER_DIRECTION_OUT | USBD_DEFAULT_PIPE_TRANSFER))
 
-#define GetNodeByPTR(ListHead,NodeValue) QueryFromChainListByULONGPTR(ListHead, (ULONG_PTR)NodeValue);	  
-#define GetRealPendingIrpByIrp(irp)		 GetNodeByPTR(g_PendingIrpList->head, irp)
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 ////	Global Variable
 ////
 ////
-DRIVER_DISPATCH*  g_pDispatchInternalDeviceControl = NULL;
-volatile LONG	  g_HidPipeListSize				   = 0;
+DRIVER_DISPATCH*  g_HidPnpHandler = NULL;
+DRIVER_DISPATCH*  g_UsbHubInternalDeviceControl = NULL;
 BOOLEAN			  g_bUnloaded					   = FALSE;
-PENDINGIRPLIST*	  g_PendingIrpList			   = NULL;
-PHID_DEVICE_LIST  g_HidPipeList					   = NULL;
 
+extern PHID_DEVICE_LIST g_HidClientPdoList;
  
 /////////////////////////////////////////////////////////////////////////////////////////////// 
 //// Prototype
@@ -118,50 +98,7 @@ Return Value:
 -------------------------------------------------------*/
 NTSTATUS		FreePendingIrpList();
 
-
-/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-Routine Description:
-
-		Lookup Pending IRP callback, in callback, we 
-		recovered the completion hook 
-		 
-Arguments:
-
-		pending_irp_node - Each node inside IRP pending list
-
-		context			 - Not used 
-
-Return Value:
-
-		LOOKUP_STATUS	 - CLIST_FINDCB_CTN, traverse whole 
-						   list
--------------------------------------------------------*/
-LOOKUP_STATUS	LookupPendingIrpCallback(
-	_In_ PENDINGIRP* pending_irp_node,
-	_In_ PVOID		 context
-); 
   
-/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-Routine Description:
-
-		Remove Pending IRP Linked-List for saving any
-		IRP we hooked, and set a Lookup callback
-		(LookupPendingIrpCallback)
-
-Arguments:
-
-		No
-
-Return Value:
-
-	NTSTATUS	- STATUS_SUCCESS if recover successfully
-				- STATUS_UNSUCCESSFUL if failed
--------------------------------------------------------*/
-NTSTATUS		RecoverAllPendingIrp();
-
-
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 Routine Description:
@@ -287,83 +224,7 @@ NTSTATUS UnInitializeHidPenetrate();
 //// 
 //// 
 
-//----------------------------------------------------------------------------------------//
-NTSTATUS AllocatePendingIrpLinkedList()
-{
-	NTSTATUS status = STATUS_UNSUCCESSFUL;
-	do
-	{
-		if (!g_PendingIrpList)
-		{
-			g_PendingIrpList = (PENDINGIRPLIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(PENDINGIRPLIST), 'kcaj');
-			if (!g_PendingIrpList)
-			{
-				status = STATUS_UNSUCCESSFUL;
-				break;
-			} 
-			RtlZeroMemory(g_PendingIrpList, sizeof(PENDINGIRPLIST));
-		} 
-
-		if (!g_PendingIrpList->head)
-		{
-			g_PendingIrpList->head = NewChainListHeaderEx(LISTFLAG_SPINLOCK | LISTFLAG_AUTOFREE, NULL, 0);
-			if (!g_PendingIrpList->head)
-			{
-				ExFreePool(g_PendingIrpList);
-				g_PendingIrpList = NULL;
-				status = STATUS_UNSUCCESSFUL;
-				break;
-			}
-			g_PendingIrpList->RefCount = 1;
-		}
-
-		status = STATUS_SUCCESS; 
-	}while (FALSE);
-	return status; 
-}
-//----------------------------------------------------------------------------------------//
-NTSTATUS FreePendingIrpList()
-{
-	if (g_PendingIrpList)
-	{
-		if (g_PendingIrpList->head)
-		{
-			CHAINLIST_SAFE_FREE(g_PendingIrpList->head);
-		}
-		ExFreePool(g_PendingIrpList);
-		g_PendingIrpList = NULL;
-	}
-}
-
-//-------------------------------------------------------------------------------------------//
-LOOKUP_STATUS LookupPendingIrpCallback(
-	_In_ PENDINGIRP* pending_irp_node,
-	_In_ void*		 context
-)
-{
-	UNREFERENCED_PARAMETER(context);
-
-	NTSTATUS    status = STATUS_UNSUCCESSFUL;
-	PENDINGIRP* pending_irp = pending_irp_node;
-	if (pending_irp)
-	{
-		InterlockedExchange64(&pending_irp->IrpStack->Context, pending_irp->oldContext);
-		InterlockedExchange64(&pending_irp->IrpStack->CompletionRoutine, pending_irp->oldRoutine);
-		USB_DEBUG_INFO_LN_EX("RemovePendingIrpCallback Once %I64x" , pending_irp_node);
-	}
-	return CLIST_FINDCB_CTN;
-}
-
-//----------------------------------------------------------------------------------------- 
-NTSTATUS RecoverAllPendingIrp()
-{
-	NTSTATUS						   status = STATUS_UNSUCCESSFUL;
-	if (QueryFromChainListByCallback(g_PendingIrpList->head, LookupPendingIrpCallback, NULL))
-	{
-		status = STATUS_SUCCESS;
-	}
-	return status;
-}
+ 
  
 //----------------------------------------------------------------------------------------//
 NTSTATUS HandleKeyboardData(
@@ -589,7 +450,7 @@ NTSTATUS HandleMouseData(
 	return status;
 }
  
- 
+//-------------------------------------------------------------------------------------------------//
 NTSTATUS  HidUsb_CompletionCallback(
 	_In_     PDEVICE_OBJECT DeviceObject,			 
 	_In_     PIRP           Irp,
@@ -618,7 +479,7 @@ NTSTATUS  HidUsb_CompletionCallback(
 		return STATUS_UNSUCCESSFUL;
 	}
 
-	// Completion func has been called when driver unloading.
+	// Completion func is called when driver unloading.
 	if (g_bUnloaded)
 	{
 		PENDINGIRP* entry = GetRealPendingIrpByIrp(Irp);
@@ -636,7 +497,7 @@ NTSTATUS  HidUsb_CompletionCallback(
 	}
 
 	//If Driver is not unloading , delete it 
-	if (!DelFromChainListByPointer(g_PendingIrpList->head, pContext->pending_irp))
+	if (!RemovePendingIrp(pContext->pending_irp))
 	{
 		USB_DEBUG_INFO_LN_EX("FATAL: Delete element FAILED");
 	}
@@ -679,7 +540,7 @@ NTSTATUS  HidUsb_CompletionCallback(
 
 
 //----------------------------------------------------------------------------------------//
-NTSTATUS HidUsb_InternalDeviceControl(
+NTSTATUS UsbHubInternalDeviceControl(
 	_Inout_ struct _DEVICE_OBJECT *DeviceObject,
 	_Inout_ struct _IRP           *Irp
 )
@@ -692,7 +553,7 @@ NTSTATUS HidUsb_InternalDeviceControl(
 		PENDINGIRP*		  new_entry = NULL;
 		PHID_DEVICE_NODE	   node = NULL;
 
-		if (!g_HidPipeList)
+		if (!g_HidClientPdoList)
 		{ 
 			break;
 		}
@@ -715,7 +576,7 @@ NTSTATUS HidUsb_InternalDeviceControl(
 		}  
 
 		//If Urb pipe handle is used by HID mouse / kbd device. 
-		if (IsHidDevicePipe(g_HidPipeList->head, UrbGetTransferPipeHandle(urb), &node))
+		if (IsHidDevicePipe(g_HidClientPdoList->head, UrbGetTransferPipeHandle(urb), &node))
 		{ 
 			HIDCLASS_DEVICE_EXTENSION* class_extension = NULL;
 
@@ -757,8 +618,8 @@ NTSTATUS HidUsb_InternalDeviceControl(
 				new_entry->oldRoutine = irpStack->CompletionRoutine;
 				new_entry->oldContext = irpStack->Context;
 				new_entry->IrpStack = irpStack;
-				AddToChainListTail(g_PendingIrpList->head, new_entry);
-		
+				InsertPendingIrp(new_entry);
+
 				//Fake Context for Completion Routine
 				hijack->DeviceObject = node->device_object;		//USBHUB device
 				hijack->urb = urb;
@@ -781,52 +642,112 @@ NTSTATUS HidUsb_InternalDeviceControl(
 			return object->oldFunction(DeviceObject, Irp);
 		}
 	} 
-	return g_pDispatchInternalDeviceControl(DeviceObject, Irp);
 }
- 
+//--------------------------------------------------------------------------------------------//
+NTSTATUS HidUsbPnpIrpHandler(
+	_Inout_ struct _DEVICE_OBJECT *DeviceObject,
+	_Inout_ struct _IRP           *Irp
+)
+{
+	PIO_STACK_LOCATION irpStack;
+	WCHAR* DeviceName[256] = { 0 };
+	GetDeviceName(DeviceObject, DeviceName);
+	USB_DEBUG_INFO_LN_EX("Pdo Name: %ws ", DeviceName);
+	do
+	{
+		HIDCLASS_DEVICE_EXTENSION* ClassExt = (HIDCLASS_DEVICE_EXTENSION*)DeviceObject->DeviceExtension;
+		if (ClassExt->isClientPdo)
+		{
+			USB_DEBUG_INFO_LN_EX("IsClientPdo: %x", ClassExt->isClientPdo);
+
+			irpStack = IoGetCurrentIrpStackLocation(Irp);
+			if (irpStack->MinorFunction == IRP_MN_REMOVE_DEVICE)
+			{
+				RemoveNodeFromHidList(DeviceObject);
+				USB_DEBUG_INFO_LN_EX("REMOVE Device ");
+			}
+
+			if (irpStack->MinorFunction == IRP_MN_START_DEVICE)
+			{
+				USB_DEBUG_INFO_LN_EX("Add Device");
+				VerifyAndInsertIntoHidList(DeviceObject);
+			}
+		}
+	} while (FALSE);
+
+	IRPHOOKOBJ* HookObj = GetIrpHookObject(DeviceObject->DriverObject, IRP_MJ_PNP);
+	if (HookObj)
+	{
+		if (HookObj->oldFunction)
+		{
+			return HookObj->oldFunction(DeviceObject, Irp);
+		}
+	}
+}
 //----------------------------------------------------------------------------------------//
 NTSTATUS InitializeHidPenetrate(
 	_In_ USB_HUB_VERSION UsbVersion
 )
 {
-	PDRIVER_OBJECT			  pDriverObj = NULL;
-	NTSTATUS status = STATUS_UNSUCCESSFUL;
-
-	status = GetUsbHub(UsbVersion, &pDriverObj);	// iusbhub
-	if (!NT_SUCCESS(status) || !pDriverObj)
+	PDRIVER_OBJECT			  pHubDriverObj = NULL;
+	PDRIVER_OBJECT			  pHidDriverObj = NULL;
+	NTSTATUS						 status = STATUS_UNSUCCESSFUL;
+	ULONG						   ListSize = 0;
+	status = GetDriverObjectByName(HID_USB_DEVICE, &pHidDriverObj);
+	if (!NT_SUCCESS(status) || !pHidDriverObj)
 	{
 		USB_DEBUG_INFO_LN_EX("GetUsbHub Error");
 		return status;
 	}
 
-	status = InitHidClientPdoList(&g_HidPipeList, &(ULONG)g_HidPipeListSize);
-	if (!NT_SUCCESS(status) || (!g_HidPipeList && !g_HidPipeListSize))
+	status = GetUsbHub(UsbVersion, &pHubDriverObj);	// iusbhub
+	if (!NT_SUCCESS(status) || !pHubDriverObj)
+	{
+		USB_DEBUG_INFO_LN_EX("GetUsbHub Error");
+		return status;
+	}
+
+	status = InitHidSubSystem(&ListSize);
+	if (!NT_SUCCESS(status) || !ListSize)
 	{
 		USB_DEBUG_INFO_LN_EX("No keyboard Or Mouse");
 		return status;
 	}
 
-	USB_DEBUG_INFO_LN_EX("Done Init --- Device_object_list: %I64X Head: %I64x Size: %x", g_HidPipeList, g_HidPipeList->head,g_HidPipeListSize);
+	USB_DEBUG_INFO_LN_EX("HID SubSystem Initalization Successfully list size: %x ", ListSize);   
 
-	//Init Irp Linked-List
-	status = AllocatePendingIrpLinkedList();
+	status = InitIrpHookSystem();
 	if (!NT_SUCCESS(status))
 	{
-		USB_DEBUG_INFO_LN_EX("AllocatePendingIrpLinkedList Error");
-		FreeHidClientPdoList();
 		return status;
-	} 
+	}
+	
+	USB_DEBUG_INFO_LN_EX("IRP Hook SubSystem Initalization Successfully");
+
+	g_HidPnpHandler = (PDRIVER_DISPATCH)DoIrpHook(pHidDriverObj, IRP_MJ_PNP, HidUsbPnpIrpHandler, Start);
+	if (!g_HidPnpHandler)
+	{
+		UnInitIrpHookSystem();
+		UnInitHidSubSystem();
+		USB_DEBUG_INFO_LN_EX("DoIrpHook Error ");
+		status = STATUS_UNSUCCESSFUL;
+		return status;
+	}
+
+	USB_DEBUG_INFO_LN_EX("IRP Hooked PnP");
 
 	//Do Irp Hook for URB transmit
-	g_pDispatchInternalDeviceControl = (PDRIVER_DISPATCH)DoIrpHook(pDriverObj, IRP_MJ_INTERNAL_DEVICE_CONTROL, HidUsb_InternalDeviceControl, Start);
-	if (!g_pDispatchInternalDeviceControl)
-	{
-		FreeHidClientPdoList();
-		FreePendingIrpList();
+	g_UsbHubInternalDeviceControl = (PDRIVER_DISPATCH)DoIrpHook(pHubDriverObj, IRP_MJ_INTERNAL_DEVICE_CONTROL, UsbHubInternalDeviceControl, Start);
+	if (!g_UsbHubInternalDeviceControl)
+	{	
+		UnInitIrpHookSystem();
+		UnInitHidSubSystem();
 		USB_DEBUG_INFO_LN_EX("DoIrpHook Error");
 		status = STATUS_UNSUCCESSFUL;
 		return status;
 	} 
+
+	USB_DEBUG_INFO_LN_EX("IRP Hooked Internal Device Control");
 }
 
 //----------------------------------------------------------------------------------------//
@@ -834,13 +755,6 @@ NTSTATUS UnInitializeHidPenetrate()
 {
 	g_bUnloaded = TRUE;
 
-	//Repair all Irp hook
-	RemoveAllIrpObject();
-
-	//Repair all completion hook
-	RecoverAllPendingIrp();
-
-	FreePendingIrpList();
-
-	FreeHidClientPdoList();
+	UnInitIrpHookSystem();
+	UnInitHidSubSystem();
 }
