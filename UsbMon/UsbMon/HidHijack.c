@@ -349,18 +349,21 @@ NTSTATUS HandleMouseData(
 
 	if (!IsSafeNode(pContext))
 	{
+		USB_DEBUG_INFO_LN_EX("NULL IsSafeNode"); 
 		status = STATUS_UNSUCCESSFUL;
 		return status;
 	}
 
 	if (!IsPredefinedPage(pContext, colIndex))
 	{
+		USB_DEBUG_INFO_LN_EX("NULL IsPredefinedPage");
 		status = STATUS_UNSUCCESSFUL;
 		return status;
 	}
  
-	if (IsDesktopUsagePage(pContext, colIndex))
+	if (!IsDesktopUsagePage(pContext, colIndex))
 	{
+		USB_DEBUG_INFO_LN_EX("NULL IsDesktopUsagePage");
 		status = STATUS_UNSUCCESSFUL;
 		return status;
 	}
@@ -497,36 +500,24 @@ NTSTATUS  HidUsb_CompletionCallback(
 	}
 
 	//If Driver is not unloading , delete it 
-	if (!RemovePendingIrp(pContext->pending_irp))
+	if (!NT_SUCCESS(RemovePendingIrp(pContext->pending_irp)))
 	{
 		USB_DEBUG_INFO_LN_EX("FATAL: Delete element FAILED");
 	}
  
- 	DUMP_DEVICE_NAME(pContext->DeviceObject);
+ 	 DUMP_DEVICE_NAME(pContext->DeviceObject);
 
 	if (UrbIsInputTransfer(pContext->urb))
-	{
-		USB_COMMON_DEBUG_INFO("Input Data: ");
-		PUCHAR UrbTransferBuf = (PUCHAR)UrbGetTransferBuffer(pContext->urb);
-		if (NT_SUCCESS(HandleMouseData(pContext, HidP_Input)))
+	{ 
+		if (!NT_SUCCESS(HandleMouseData(pContext, HidP_Input)))
 		{
-			for (int i = 0; i < UrbGetTransferLength(pContext->urb); i++)
-			{
-				USB_NATIVE_DEBUG_INFO("%x ", *UrbTransferBuf++);
-			}
-			USB_DEBUG_INFO_LN();
+ 
 		}
 	}
 
 	if (UrbIsOutputTransfer(pContext->urb))
 	{
-		USB_COMMON_DEBUG_INFO("Output Data: ");
-		PUCHAR UrbTransferBuf = (PUCHAR)UrbGetTransferBuffer(pContext->urb);
-		for (int i = 0; i < UrbGetTransferLength(pContext->urb); i++)
-		{
-			USB_NATIVE_DEBUG_INFO("%x ", *UrbTransferBuf++);
-		}
-		USB_DEBUG_INFO_LN();
+		USB_COMMON_DEBUG_INFO("Output Data "); 
 	}
 
 	if (pContext)

@@ -118,7 +118,10 @@ NTSTATUS RemovePendingIrp(
 	{
 		return status;
 	}
-	status = DelFromChainListByPointer(g_PendingIrpList->head, PendingIrp);
+	if (DelFromChainListByPointer(g_PendingIrpList->head, PendingIrp))
+	{
+		status = STATUS_SUCCESS;
+	}
 	return status;
 }
 
