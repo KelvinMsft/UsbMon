@@ -21,7 +21,7 @@ Revision History:
 #ifndef _HIDPARSE_H
 #define _HIDPARSE_H
 
-#include <fltKernel.h>
+ 
 #include "hidtoken.h"
 
 #define HIDP_POOL_TAG (ULONG) 'PdiH'

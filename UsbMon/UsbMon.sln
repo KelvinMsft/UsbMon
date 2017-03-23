@@ -5,6 +5,8 @@ VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UsbMon", "UsbMon\UsbMon.vcxproj", "{7E68057F-E333-4F45-8C91-7E280838FF63}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "VTxRing3", "VTxRing3\VTxRing3.vcxproj", "{C5036DB1-D9D6-45F1-BFC9-720975850C7A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -25,6 +27,14 @@ Global
 		{7E68057F-E333-4F45-8C91-7E280838FF63}.Release|x86.ActiveCfg = Release|Win32
 		{7E68057F-E333-4F45-8C91-7E280838FF63}.Release|x86.Build.0 = Release|Win32
 		{7E68057F-E333-4F45-8C91-7E280838FF63}.Release|x86.Deploy.0 = Release|Win32
+		{C5036DB1-D9D6-45F1-BFC9-720975850C7A}.Debug|x64.ActiveCfg = Debug|x64
+		{C5036DB1-D9D6-45F1-BFC9-720975850C7A}.Debug|x64.Build.0 = Debug|x64
+		{C5036DB1-D9D6-45F1-BFC9-720975850C7A}.Debug|x86.ActiveCfg = Debug|Win32
+		{C5036DB1-D9D6-45F1-BFC9-720975850C7A}.Debug|x86.Build.0 = Debug|Win32
+		{C5036DB1-D9D6-45F1-BFC9-720975850C7A}.Release|x64.ActiveCfg = Release|x64
+		{C5036DB1-D9D6-45F1-BFC9-720975850C7A}.Release|x64.Build.0 = Release|x64
+		{C5036DB1-D9D6-45F1-BFC9-720975850C7A}.Release|x86.ActiveCfg = Release|Win32
+		{C5036DB1-D9D6-45F1-BFC9-720975850C7A}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

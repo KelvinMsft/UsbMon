@@ -1,7 +1,5 @@
-                     
-#include "IrpHook.h"
-#include "CommonUtil.h"
 
+#include "IrpHook.h" 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 ////	Types
@@ -9,7 +7,7 @@
 ////
 
 typedef struct _IRPHOOK_LIST {
-	TChainListHeader*  head; 
+	TChainListHeader*  head;
 	ULONG		   RefCount;
 }IRPHOOKLIST, *PIRPHOOKLIST;
 
@@ -36,9 +34,11 @@ typedef struct _PENDINGIRP_LIST
 ////	Global Variable
 ////
 ////
-IRPHOOKLIST*   	  g_IrpHookList	   = NULL;
+IRPHOOKLIST*   	  g_IrpHookList = NULL;
 PENDINGIRPLIST*	  g_PendingIrpList = NULL;
 BOOLEAN			  g_IsInit = FALSE;
+
+
 ///////////////////////////////////////////////////////////////////////////////////////////////
 ////	Prototype
 ////
@@ -49,24 +49,24 @@ BOOLEAN			  g_IsInit = FALSE;
 
 Routine Description:
 
-		Lookup Pending IRP callback, in callback, we 
-		recovered the completion hook 
-		 
+Lookup Pending IRP callback, in callback, we
+recovered the completion hook
+
 Arguments:
 
-		pending_irp_node - Each node inside IRP pending list
+pending_irp_node - Each node inside IRP pending list
 
-		context			 - Not used 
+context			 - Not used
 
 Return Value:
 
-		LOOKUP_STATUS	 - CLIST_FINDCB_CTN, traverse whole 
-						   list
+LOOKUP_STATUS	 - CLIST_FINDCB_CTN, traverse whole
+list
 -------------------------------------------------------*/
 LOOKUP_STATUS	LookupPendingIrpCallback(
 	_In_ PENDINGIRP* pending_irp_node,
 	_In_ PVOID		 context
-); 
+);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 ////	Implementation
@@ -93,7 +93,7 @@ PENDINGIRP* GetRealPendingIrpByIrp(PIRP irp)
 
 //----------------------------------------------------------------------------------------//
 NTSTATUS InsertPendingIrp(
-	PENDINGIRP* PendingIrp
+	_In_ PENDINGIRP* PendingIrp
 )
 {
 	NTSTATUS status = STATUS_UNSUCCESSFUL;
@@ -110,7 +110,7 @@ NTSTATUS InsertPendingIrp(
 
 //----------------------------------------------------------------------------------------//
 NTSTATUS RemovePendingIrp(
-	PENDINGIRP* PendingIrp
+	_In_ PENDINGIRP* PendingIrp
 )
 {
 	NTSTATUS status = STATUS_UNSUCCESSFUL;
@@ -179,7 +179,7 @@ LOOKUP_STATUS LookupPendingIrpCallback(
 	_In_ void*		 context
 )
 {
-	UNREFERENCED_PARAMETER(context);
+
 
 	NTSTATUS    status = STATUS_UNSUCCESSFUL;
 	PENDINGIRP* pending_irp = pending_irp_node;
@@ -205,27 +205,27 @@ NTSTATUS RecoverAllCompletionHook()
 
 //--------------------------------------------------------------------------------------------//
 ULONG SearchIrpHookObjectCallback(
-	_In_ IRPHOOKOBJ* IrpObject,	
+	_In_ IRPHOOKOBJ* IrpObject,
 	_In_ void* Context
 )
 {
 	SEARCHPARAM* param = (SEARCHPARAM*)Context;
 	if (IrpObject->driver_object == param->driver_object && IrpObject->IrpCode == param->IrpCode)
-	{	
+	{
 		return CLIST_FINDCB_RET;
 	}
 	return CLIST_FINDCB_CTN;
 }
 //--------------------------------------------------------------------------------------------//
 IRPHOOKOBJ* GetIrpHookObject(
-	_In_ PDRIVER_OBJECT driver_object, 
+	_In_ PDRIVER_OBJECT driver_object,
 	_In_ ULONG IrpCode)
 {
 	SEARCHPARAM param = { 0 };
 	param.driver_object = driver_object;
 	param.IrpCode = IrpCode;
-	return QueryFromChainListByCallback(g_IrpHookList->head, SearchIrpHookObjectCallback, &param); 
-} 
+	return QueryFromChainListByCallback(g_IrpHookList->head, SearchIrpHookObjectCallback, &param);
+}
 
 //--------------------------------------------------------------------------------------------//
 ULONG RemoveIrpHookCallback(
@@ -233,39 +233,39 @@ ULONG RemoveIrpHookCallback(
 	_In_ void* Context
 )
 {
-	UNREFERENCED_PARAMETER(Context); 
- 	IRPHOOKOBJ* hook_obj = IrpObject;
+
+	IRPHOOKOBJ* hook_obj = IrpObject;
 	if (hook_obj)
-	{ 
+	{
 		DoIrpHook(hook_obj->driver_object, hook_obj->IrpCode, hook_obj->oldFunction, Stop);
 		USB_DEBUG_INFO_LN_EX("RemoveIrpHookCallback Once hook_obj->driver_object: %ws ", hook_obj->driver_object->DriverName.Buffer);
-		hook_obj = NULL;  
-	}  
+		hook_obj = NULL;
+	}
 	return CLIST_FINDCB_CTN | CLIST_FINDCB_DEL;
 }
 
 //--------------------------------------------------------------------------------------------//
 NTSTATUS RecoverAllIrpHook()
 {
-	NTSTATUS    status = STATUS_UNSUCCESSFUL;  
+	NTSTATUS    status = STATUS_UNSUCCESSFUL;
 	if (g_IrpHookList)
-	{ 
-		QueryFromChainListByCallback(g_IrpHookList->head, RemoveIrpHookCallback, NULL); 
+	{
+		QueryFromChainListByCallback(g_IrpHookList->head, RemoveIrpHookCallback, NULL);
 		ExFreePool(g_IrpHookList);
-		g_IrpHookList = NULL; 
+		g_IrpHookList = NULL;
 		status = STATUS_SUCCESS;
 	}
 
 	return status;
 }
- 
+
 //--------------------------------------------------------------------------------------------//
 IRPHOOKOBJ* CreateIrpHookObject(
 	_In_ PDRIVER_OBJECT DriverObject,
-	_In_ ULONG IrpCode, 
-	_In_ PVOID oldFunction, 
+	_In_ ULONG IrpCode,
+	_In_ PVOID oldFunction,
 	_In_ PVOID newFunction)
-{ 
+{
 	IRPHOOKOBJ* HookObj = (IRPHOOKOBJ*)ExAllocatePoolWithTag(NonPagedPool, sizeof(IRPHOOKOBJ), 'opri');
 
 	if (!g_IrpHookList)
@@ -276,15 +276,15 @@ IRPHOOKOBJ* CreateIrpHookObject(
 	if (!HookObj)
 	{
 		USB_DEBUG_INFO_LN_EX("Empty Hook Object \r\n");
-		return NULL; 
+		return NULL;
 	}
 
 	RtlZeroMemory(HookObj, sizeof(IRPHOOKOBJ));
 
 	HookObj->driver_object = DriverObject;
-	HookObj->IrpCode	   = IrpCode;
-	HookObj->newFunction   = newFunction;
-	HookObj->oldFunction   = oldFunction;
+	HookObj->IrpCode = IrpCode;
+	HookObj->newFunction = newFunction;
+	HookObj->oldFunction = oldFunction;
 
 	if (!AddToChainListTail(g_IrpHookList->head, HookObj))
 	{
@@ -309,7 +309,7 @@ NTSTATUS AllocateIrpHookLinkedList()
 			if (!g_IrpHookList)
 			{
 				status = STATUS_UNSUCCESSFUL;
-				break; 
+				break;
 			}
 			RtlZeroMemory(g_IrpHookList, sizeof(IRPHOOKLIST));
 		}
@@ -328,13 +328,13 @@ NTSTATUS AllocateIrpHookLinkedList()
 		status = STATUS_SUCCESS;
 	} while (FALSE);
 	return status;
-} 
+}
 
 //--------------------------------------------------------------------------------------------//
 PVOID DoIrpHook(
-	_In_	  PDRIVER_OBJECT DriverObject, 
-	_In_	  ULONG IrpCode, 
-	_In_	  PVOID NewFunction, 
+	_In_	  PDRIVER_OBJECT DriverObject,
+	_In_	  ULONG IrpCode,
+	_In_	  PVOID NewFunction,
 	_In_  	  Action action
 )
 {
@@ -355,20 +355,20 @@ PVOID DoIrpHook(
 		if (!CreateIrpHookObject(DriverObject, IrpCode, old_irp_function, NewFunction))
 		{
 			//repair hook, if created fail.
-			InterlockedExchange64((LONG64 volatile *)&DriverObject->MajorFunction[IrpCode],(LONG64)old_irp_function);
+			InterlockedExchange64((LONG64 volatile *)&DriverObject->MajorFunction[IrpCode], (LONG64)old_irp_function);
 			old_irp_function = NULL;
 		}
-	} 
+	}
 
 	return old_irp_function;
-} 
+}
 //--------------------------------------------------------------------------------------------//
 NTSTATUS InitIrpHookSystem()
 {
 	if (!NT_SUCCESS(AllocatePendingIrpLinkedList()))
 	{
 		USB_DEBUG_INFO_LN_EX("AllocatePendingIrpLinkedList Error");
-		return STATUS_UNSUCCESSFUL;	
+		return STATUS_UNSUCCESSFUL;
 	}
 	if (!NT_SUCCESS(AllocateIrpHookLinkedList()))
 	{

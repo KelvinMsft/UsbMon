@@ -1,7 +1,6 @@
 #ifndef __HIJACK_HEADER__
 #define __HIJACK_HEADER__ 
-
-#include<fltKernel.h>
+#include <ntddk.h> 
 #include "UsbUtil.h"
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -50,5 +49,11 @@ Return Value:
 
 	-------------------------------------------------------*/
 NTSTATUS UnInitializeHidPenetrate();
+
+
+NTSTATUS MapUsbDataToUserAddressSpace(
+	ULONG64* mapped_addr,
+	HANDLE hEvent
+);
 
 #endif

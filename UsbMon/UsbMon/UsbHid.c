@@ -1,17 +1,17 @@
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    #include "UsbHid.h"
-#include "UsbUtil.h" 
-#include "WinParse.h"
-#include "ReportUtil.h"  
-#include "wdmguid.h"
+#include "UsbHid.h"
+#include "UsbUtil.h"  
+#include "Winparse.h"
+#include "ReportUtil.h"   
 #include "IrpHook.h"
 
 #define HIDP_MAX_UNKNOWN_ITEMS 4
- 
- 
+
+
 /////////////////////////////////////////////////////////////////////////////////////////////// 
 //// Global/Extern Variable 
 //// 
-HID_DEVICE_LIST*    g_HidClientPdoList = NULL; 
+HID_DEVICE_LIST*    g_HidClientPdoList = NULL;
+BOOLEAN				g_IsHidModuleInit = FALSE;
 
 /////////////////////////////////////////////////////////////////////////////////////////////// 
 //// Marco
@@ -19,7 +19,7 @@ HID_DEVICE_LIST*    g_HidClientPdoList = NULL;
 #define ARRAY_SIZE						 100
 #define HIDP_PREPARSED_DATA_SIGNATURE1	 'PdiH'
 #define HIDP_PREPARSED_DATA_SIGNATURE2   'RDK '
-  
+
 
 /////////////////////////////////////////////////////////////////////////////////////////////// 
 //// Prototype
@@ -29,34 +29,13 @@ HID_DEVICE_LIST*    g_HidClientPdoList = NULL;
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 Routine Description:
-		1. look up a pipe in pipe list
-		  
+See a detail in UsbHid.h
+
 Arguments:
-		Data			 - pointer of PHID_DEVICE_NODE, see detail in PHID_DEVICE_NODE
-						   declaration.
+See a detail in UsbHid.h
 
-		Context			 - pointer of Pipe Handle From Urb.
-		 
-Return Value:	
-		NTSTATUS		 - true  , if it initial succesfully.
-						 - false , if it initial faile.
-
------------------------------------------------------------------------------------*/
-LOOKUP_STATUS LookupPipeHandleCallback(
-	_In_ PHID_DEVICE_NODE Data,
-	_In_ void* Context
-);
-
-/*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 
-
-Routine Description:
-		See a detail in UsbHid.h
-		  
-Arguments:
-		See a detail in UsbHid.h
-		 
-Return Value:	
-		See a detail in UsbHid.h
+Return Value:
+See a detail in UsbHid.h
 
 -----------------------------------------------------------------------------------*/
 BOOLEAN IsHidDevicePipe(
@@ -68,17 +47,17 @@ BOOLEAN IsHidDevicePipe(
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 Routine Description:
-		Core function it translates a report descriptor into a human-readable structure
+Core function it translates a report descriptor into a human-readable structure
 
 Arguments:
 
-		HidClassExtension	- HidClassExtension, which is shared by all hid mini-driver  
-		
-		AllReport			- Get all pointer from it device
+HidClassExtension	- HidClassExtension, which is shared by all hid mini-driver
+
+AllReport			- Get all pointer from it device
 
 Return Value:
-		NTSTATUS			- STATUS_SUCCESS				, if translate success
-							- STATUS_UNSUCCESSFUL or others	, if translate error
+NTSTATUS			- STATUS_SUCCESS				, if translate success
+- STATUS_UNSUCCESSFUL or others	, if translate error
 -----------------------------------------------------------------------------------*/
 NTSTATUS GetParsedReport(
 	_In_  HIDCLASS_DEVICE_EXTENSION* HidClassExtension,
@@ -88,17 +67,17 @@ NTSTATUS GetParsedReport(
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 Routine Description:
-		Create a device node for when it is a Hid Client Pdo
+Create a device node for when it is a Hid Client Pdo
 
 Arguments:
 
-		DeviceObject			- Hid Device Object (Hid Client Pdo)
-		
-		MiniExtension			- MiniExtension stored in ClassExtension
+DeviceObject			- Hid Device Object (Hid Client Pdo)
+
+MiniExtension			- MiniExtension stored in ClassExtension
 
 Return Value:
-		HID_DEVICE_NODE			- Created Node, if created success
-								- NULL		  , if failed			
+HID_DEVICE_NODE			- Created Node, if created success
+- NULL		  , if failed
 -----------------------------------------------------------------------------------*/
 HID_DEVICE_NODE* CreateHidDeviceNode(
 	_In_ PDEVICE_OBJECT DeviceObject,
@@ -110,19 +89,19 @@ HID_DEVICE_NODE* CreateHidDeviceNode(
 
 Routine Description:
 
-		Deteremine a device objects if it is a Client PDO for Keyboard / Mouse.
-		set a MiniExtension and return TRUE. Otherwise, FALSE
-		For More Information between Cient PDO and class FDO See Doc.
+Deteremine a device objects if it is a Client PDO for Keyboard / Mouse.
+set a MiniExtension and return TRUE. Otherwise, FALSE
+For More Information between Cient PDO and class FDO, See Doc/ README.txt.
 
 Arguments:
 
-		DeviceObject			- Hid Device Object (Hid Client Pdo, created by )
-		
-		MiniExtension			- MiniExtension stored in ClassExtension
+DeviceObject			- Hid Device Object (Hid Client Pdo, created by )
+
+MiniExtension			- MiniExtension stored in ClassExtension
 
 Return Value:
-		NTSTATUS			- STATUS_SUCCESS				, if translate success
-							- STATUS_UNSUCCESSFUL or others	, if translate error
+NTSTATUS			- STATUS_SUCCESS				, if translate success
+- STATUS_UNSUCCESSFUL or others	, if translate error
 
 -----------------------------------------------------------------------------------*/
 BOOLEAN  IsHidTypeDevice(
@@ -133,22 +112,22 @@ BOOLEAN  IsHidTypeDevice(
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 Routine Description:
-		- Verify Hid Device Object, just simply call VerifyDevice by walk through
-		  each device object in the HID device object stack.
+- Verify Hid Device Object, just simply call VerifyAndInsertIntoHidList and
+walk through each device object in the HID device object stack.
 
 Arguments:
 
-		DriverObject			- Hid Driver Object
-		
-		ClientPdoCount			- Total of Client Pdo 		
+DriverObject			- Hid Driver Object
+
+ClientPdoCount			- Total of Client Pdo
 
 Return Value:
-		NTSTATUS			- STATUS_SUCCESS				, if translate success
-							- STATUS_UNSUCCESSFUL or others	, if translate error
+NTSTATUS			- STATUS_SUCCESS				, if translate success
+- STATUS_UNSUCCESSFUL or others	, if translate error
 
 -----------------------------------------------------------------------------------*/
 NTSTATUS VerifyAllHidDevice(
-	_In_  PDRIVER_OBJECT DriverObject, 
+	_In_  PDRIVER_OBJECT DriverObject,
 	_Out_  ULONG*		ClientPdoCount
 );
 
@@ -156,17 +135,17 @@ NTSTATUS VerifyAllHidDevice(
 
 Routine Description:
 
-		Init Pdo List, basically get a Hid Driver Object and call VerifyHidDeviceObject.
+Init Pdo List, basically get a Hid Driver Object and call VerifyHidDeviceObject.
 
 Arguments:
 
-		ListSize			- Size of List
+ListSize			- Size of List
 
 Return Value:
-		NTSTATUS			- STATUS_SUCCESS				, if translate success
-							- STATUS_UNSUCCESSFUL or others	, if translate error
+NTSTATUS			- STATUS_SUCCESS				, if translate success
+- STATUS_UNSUCCESSFUL or others	, if translate error
 
------------------------------------------------------------------------------------*/ 
+-----------------------------------------------------------------------------------*/
 NTSTATUS InitClientPdoList(
 	_Out_ PULONG ListSize
 );
@@ -175,15 +154,15 @@ NTSTATUS InitClientPdoList(
 
 Routine Description:
 
-		Allocate Pdo List memory
+Allocate Pdo List memory
 
 Arguments:
 
-		No
+No
 
 Return Value:
-		NTSTATUS			- STATUS_SUCCESS				, if alloc success
-							- STATUS_UNSUCCESSFUL or others	, if alloc error
+NTSTATUS			- STATUS_SUCCESS				, if alloc success
+- STATUS_UNSUCCESSFUL or others	, if alloc error
 
 -----------------------------------------------------------------------------------*/
 NTSTATUS AllocateClientPdoList();
@@ -192,38 +171,16 @@ NTSTATUS AllocateClientPdoList();
 
 Routine Description:
 
-		Interface for Init a Hid Client Pdo List
+Free Hid Client Pdo List
 
 Arguments:
 
-		ClientPdoList			- As name said
-		
-		ClientPdoListSize		- As name said
-
-Return Value:
-		NTSTATUS			- STATUS_SUCCESS				, if Initial success
-							- STATUS_UNSUCCESSFUL or others	, if Initial error
-
------------------------------------------------------------------------------------*/
-NTSTATUS GetHidClientPdoList(
-	_Out_ PHID_DEVICE_LIST* ClientPdoList,
-	_Out_ PULONG ClientPdoListSize
-);
-
-/*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-Routine Description:
-
-		Free Hid Client Pdo List
-
-Arguments:
-
-		No
+No
 
 Return Value:
 
-		NTSTATUS			- STATUS_SUCCESS				, if translate success
-							- STATUS_UNSUCCESSFUL or others	, if translate error
+NTSTATUS			- STATUS_SUCCESS				, if translate success
+- STATUS_UNSUCCESSFUL or others	, if translate error
 
 -----------------------------------------------------------------------------------*/
 NTSTATUS FreeHidClientPdoList();
@@ -232,43 +189,22 @@ NTSTATUS FreeHidClientPdoList();
 
 Routine Description:
 
-		Monitor IRP IRP_MN_REMOVE_DEVICE AND IRP_MN_START_DEVICE Event
+Verify a Device is it hid device and add it into linked list
 
 Arguments:
 
-		No
+DeviceObject		- Device to be verify
 
 Return Value:
 
-		NTSTATUS			- STATUS_SUCCESS				, if translate success
-							- STATUS_UNSUCCESSFUL or others	, if translate error
-
------------------------------------------------------------------------------------*/
-NTSTATUS HidUsbPnpIrpHandler(
-	_Inout_ struct _DEVICE_OBJECT *DeviceObject,
-	_Inout_ struct _IRP           *Irp
-);
-
-
-/*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-Routine Description:
-
-		Verify a Device is it hid device and add it into linked list
-
-Arguments:
-
-		DeviceObject		- Device to be verify
-
-Return Value:
-
-		NTSTATUS			- STATUS_SUCCESS				, if verify device success
-							- STATUS_UNSUCCESSFUL or others	, if verify device error
+NTSTATUS			- STATUS_SUCCESS				, if verify device success
+- STATUS_UNSUCCESSFUL or others	, if verify device error
 
 -----------------------------------------------------------------------------------*/
 NTSTATUS VerifyDevice(
-	_In_  PDEVICE_OBJECT DeviceObject, 
+	_In_  PDEVICE_OBJECT DeviceObject,
 	_Out_ PHID_DEVICE_NODE* Node);
+
 
 /////////////////////////////////////////////////////////////////////////////////////////////// 
 //// Implementation
@@ -287,11 +223,12 @@ ULONG SearchHidNodeCallback(
 	}
 	return CLIST_FINDCB_CTN;
 }
+
 //--------------------------------------------------------------------------------------------//
-PHID_DEVICE_NODE GetHidNode(
+PHID_DEVICE_NODE GetHidNodeByDeviceObjct(
 	_In_ PDEVICE_OBJECT DeviceObject
 )
-{ 
+{
 	return QueryFromChainListByCallback(g_HidClientPdoList->head, SearchHidNodeCallback, DeviceObject);
 }
 
@@ -300,18 +237,30 @@ NTSTATUS VerifyAndInsertIntoHidList(
 	_In_ PDEVICE_OBJECT DeviceObject
 )
 {
+	HID_DEVICE_NODE* node = NULL;
 	NTSTATUS status = STATUS_UNSUCCESSFUL;
+
 	if (!DeviceObject || !g_HidClientPdoList)
 	{
 		return status;
 	}
 
-	HID_DEVICE_NODE* node = NULL;
 	status = VerifyDevice(DeviceObject, &node);
 
-	if (NT_SUCCESS(status) && node)
+	if (!NT_SUCCESS(status))
 	{
-		AddToChainListTail(g_HidClientPdoList->head, node);
+		return status;
+	}
+
+	if (!node)
+	{
+		status = STATUS_UNSUCCESSFUL;
+		return status;
+	}
+
+	if (AddToChainListTail(g_HidClientPdoList->head, node))
+	{
+		status = STATUS_SUCCESS;
 		g_HidClientPdoList->currentSize++;
 	}
 
@@ -323,16 +272,24 @@ NTSTATUS RemoveNodeFromHidList(
 	_In_ PDEVICE_OBJECT DeviceObject
 )
 {
+	PHID_DEVICE_NODE node = NULL;
 	NTSTATUS status = STATUS_UNSUCCESSFUL;
 	if (!DeviceObject || !g_HidClientPdoList)
 	{
 		return status;
 	}
+	node = GetHidNodeByDeviceObjct(DeviceObject);
+	if (!node)
+	{
+		return status;
+	}
 
-	DelFromChainListByPointer(g_HidClientPdoList->head, GetHidNode(DeviceObject));
-	g_HidClientPdoList->currentSize--;
+	if (DelFromChainListByPointer(g_HidClientPdoList->head, node))
+	{
+		status = STATUS_SUCCESS;
+		g_HidClientPdoList->currentSize--;
+	}
 
-	status = STATUS_SUCCESS;
 	return status;
 }
 
@@ -342,6 +299,11 @@ LOOKUP_STATUS LookupPipeHandleCallback(
 	void* Context
 )
 {
+	NTSTATUS								   status = STATUS_UNSUCCESSFUL;
+	USBD_PIPE_HANDLE				PipeHandleFromUrb = NULL;
+	USBD_PIPE_INFORMATION*	 PipeHandleFromWhiteLists = NULL;
+	ULONG								NumberOfPipes = NULL;
+	ULONG 										   i = 0;
 	if (!Data || !Context)
 	{
 		USB_DEBUG_INFO_LN_EX("Empty Data / Context");
@@ -362,12 +324,10 @@ LOOKUP_STATUS LookupPipeHandleCallback(
 		USB_DEBUG_INFO_LN_EX("Empty Pipes");
 		return CLIST_FINDCB_CTN;
 	}
+	PipeHandleFromUrb = Context;
+	PipeHandleFromWhiteLists = Data->mini_extension->InterfaceDesc->Pipes;
+	NumberOfPipes = Data->mini_extension->InterfaceDesc->NumberOfPipes;
 
-	NTSTATUS								   status = STATUS_UNSUCCESSFUL;
-	USBD_PIPE_HANDLE				PipeHandleFromUrb = Context;
-	USBD_PIPE_INFORMATION*	 PipeHandleFromWhiteLists = Data->mini_extension->InterfaceDesc->Pipes;
-	ULONG								NumberOfPipes = Data->mini_extension->InterfaceDesc->NumberOfPipes;
-	ULONG i;
 	for (i = 0; i < NumberOfPipes; i++)
 	{
 		if (PipeHandleFromUrb == PipeHandleFromWhiteLists[i].PipeHandle)
@@ -409,7 +369,7 @@ NTSTATUS GetParsedReport(
 )
 {
 	PDO_EXTENSION* pdoExt = NULL;
-	FDO_EXTENSION* fdoExt = NULL; 
+	FDO_EXTENSION* fdoExt = NULL;
 	HIDCLASS_DEVICE_EXTENSION* addr = NULL;
 	WCHAR name[256] = { 0 };
 	HIDP_DEVICE_DESC hid_device_desc = { 0 };
@@ -461,7 +421,7 @@ NTSTATUS GetParsedReport(
 	} while (FALSE);
 
 	return status;
-} 
+}
 
 //-------------------------------------------------------------------------------------------//
 HID_DEVICE_NODE* CreateHidDeviceNode(
@@ -483,34 +443,34 @@ HID_DEVICE_NODE* CreateHidDeviceNode(
 	}
 
 	RtlZeroMemory(node, sizeof(HID_DEVICE_NODE));
-	node->device_object  = DeviceObject;
+	node->device_object = DeviceObject;
 	node->mini_extension = MiniExtension;
-	RtlMoveMemory(&node->parsedReport , ParsedReport, sizeof(HIDP_DEVICE_DESC));
+	RtlMoveMemory(&node->parsedReport, ParsedReport, sizeof(HIDP_DEVICE_DESC));
 
 	return node;
-} 
+}
 //---------------------------------------------------------------------------------------------------------//
 NTSTATUS VerifyDevice(
-	_In_  PDEVICE_OBJECT DeviceObject, 
+	_In_  PDEVICE_OBJECT DeviceObject,
 	_Out_ PHID_DEVICE_NODE* Node)
 {
 	HIDP_DEVICE_DESC* ParsedReport = NULL;
-	NTSTATUS status = STATUS_UNSUCCESSFUL; 
+	NTSTATUS status = STATUS_UNSUCCESSFUL;
 	PHID_USB_DEVICE_EXTENSION MiniExtension = NULL;
 	HID_DEVICE_NODE* node = NULL;
 	do {
 
 		if (!DeviceObject || !g_HidClientPdoList)
 		{
-			status = STATUS_UNSUCCESSFUL; 
+			status = STATUS_UNSUCCESSFUL;
 			break;
-		} 
+		}
 
 		if (!IsHidTypeDevice(DeviceObject, &MiniExtension))
-		{ 
+		{
 			if (!MiniExtension)
-			{ 
-				status = STATUS_UNSUCCESSFUL; 
+			{
+				status = STATUS_UNSUCCESSFUL;
 				break;
 			}
 		}
@@ -519,7 +479,7 @@ NTSTATUS VerifyDevice(
 		if (!ParsedReport)
 		{
 			USB_DEBUG_INFO_LN_EX("Empty report");
-			status = STATUS_UNSUCCESSFUL; 
+			status = STATUS_UNSUCCESSFUL;
 			break;
 		}
 
@@ -529,7 +489,7 @@ NTSTATUS VerifyDevice(
 			USB_DEBUG_INFO_LN_EX("GetParsedReport Failed");
 			break;
 		}
-		
+
 		node = CreateHidDeviceNode(DeviceObject, MiniExtension, ParsedReport);
 		if (!node)
 		{
@@ -540,7 +500,7 @@ NTSTATUS VerifyDevice(
 
 		*Node = node;
 		status = STATUS_SUCCESS;
-		 
+
 	} while (FALSE);
 
 	if (ParsedReport)
@@ -549,7 +509,7 @@ NTSTATUS VerifyDevice(
 		ParsedReport = NULL;
 	}
 
-	return status; 
+	return status;
 }
 //---------------------------------------------------------------------------------------------------------//
 BOOLEAN  IsHidTypeDevice(
@@ -557,10 +517,10 @@ BOOLEAN  IsHidTypeDevice(
 	_Out_ PHID_USB_DEVICE_EXTENSION*      MiniExtension
 )
 {
-	HID_USB_DEVICE_EXTENSION*  pMiniExtension   = NULL;
-	HIDCLASS_DEVICE_EXTENSION* pClassExtension  = NULL;
+	HID_USB_DEVICE_EXTENSION*  pMiniExtension = NULL;
+	HIDCLASS_DEVICE_EXTENSION* pClassExtension = NULL;
 	WCHAR						DeviceName[256] = { 0 };
-	BOOLEAN			 					   ret  = FALSE; 
+	BOOLEAN			 					   ret = FALSE;
 	do
 	{
 		if (!DeviceObject)
@@ -575,7 +535,7 @@ BOOLEAN  IsHidTypeDevice(
 		{
 			USB_DEBUG_INFO_LN_EX("Empty pClassExtension");
 			ret = FALSE;
-			break; 
+			break;
 		}
 
 		//USB_MON_DEBUG_INFO("Extension_common: %I64X sizeof: %x \r\n", hid_common_extension, sizeof(HID_USB_DEVICE_EXTENSION));
@@ -584,7 +544,7 @@ BOOLEAN  IsHidTypeDevice(
 		{
 			USB_DEBUG_INFO_LN_EX("Empty pMiniExtension");
 			ret = FALSE;
-			break; 
+			break;
 		}
 
 		//DumpHidMiniDriverExtension(hid_common_extension); 
@@ -595,16 +555,16 @@ BOOLEAN  IsHidTypeDevice(
 			USB_DEBUG_INFO_LN_EX("is not ClientPdo");
 			*MiniExtension = NULL;
 			ret = FALSE;
-			break; 
+			break;
 		}
 
 		if (pMiniExtension->InterfaceDesc->Class == 3 &&			//HidClass Device
 			(pMiniExtension->InterfaceDesc->Protocol == 1 ||		//Keyboard
-			 pMiniExtension->InterfaceDesc->Protocol == 2 ||		//Mouse
-			 pMiniExtension->InterfaceDesc->Protocol == 0))
+				pMiniExtension->InterfaceDesc->Protocol == 2 ||		//Mouse
+				pMiniExtension->InterfaceDesc->Protocol == 0))
 		{
 			GetDeviceName(DeviceObject, DeviceName);
-			
+
 			USB_DEBUG_INFO_LN_EX("----------------------------------------------------------------------------------------------------");
 			USB_DEBUG_INFO_LN_EX("hid_common_extension: %I64x", pClassExtension);
 			USB_DEBUG_INFO_LN_EX("DeviceObj: %I64X  DriverName: %ws DeviceName: %ws", DeviceObject, DeviceObject->DriverObject->DriverName.Buffer, DeviceName);
@@ -612,8 +572,8 @@ BOOLEAN  IsHidTypeDevice(
 			USB_DEBUG_INFO_LN_EX("----------------------------------------------------------------------------------------------------");
 
 			*MiniExtension = pMiniExtension;
-			ret =  TRUE;
-			break; 
+			ret = TRUE;
+			break;
 		}
 
 	} while (FALSE);
@@ -638,7 +598,7 @@ NTSTATUS VerifyAllHidDevice(
 	DeviceObject = DriverObject->DeviceObject;
 	while (DeviceObject)
 	{
-		if(NT_SUCCESS(VerifyAndInsertIntoHidList(DeviceObject)))
+		if (NT_SUCCESS(VerifyAndInsertIntoHidList(DeviceObject)))
 		{
 			HidClientPdoCount++;
 		}
@@ -675,12 +635,12 @@ NTSTATUS InitClientPdoList(
 			USB_DEBUG_INFO_LN_EX("Get Drv Obj Error");
 			status = STATUS_UNSUCCESSFUL;
 			break;
-		} 
+		}
 
 		if (!HidDriverObj)
 		{
 			USB_DEBUG_INFO_LN_EX("Empty DrvObj");
-			status = STATUS_UNSUCCESSFUL; 
+			status = STATUS_UNSUCCESSFUL;
 			break;
 		}
 
@@ -688,11 +648,11 @@ NTSTATUS InitClientPdoList(
 		{
 			USB_DEBUG_INFO_LN_EX("VerifyHidDeviceObject Error");
 			status = STATUS_UNSUCCESSFUL;
-			break; 
-		}  
+			break;
+		}
 
 	} while (FALSE);
-	
+
 	return status;
 }
 //----------------------------------------------------------------------------------------------------------//
@@ -703,14 +663,14 @@ NTSTATUS AllocateClientPdoList()
 	{
 		if (!g_HidClientPdoList)
 		{
-			g_HidClientPdoList = (HID_DEVICE_LIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(HID_DEVICE_LIST), 'ldih');	
+			g_HidClientPdoList = (HID_DEVICE_LIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(HID_DEVICE_LIST), 'ldih');
 			if (!g_HidClientPdoList)
 			{
- 				status = STATUS_UNSUCCESSFUL;
+				status = STATUS_UNSUCCESSFUL;
 				break;
 			}
 			RtlZeroMemory(g_HidClientPdoList, sizeof(HID_DEVICE_LIST));
-		} 
+		}
 		if (!g_HidClientPdoList->head)
 		{
 			g_HidClientPdoList->head = NewChainListHeaderEx(LISTFLAG_SPINLOCK | LISTFLAG_AUTOFREE, NULL, 0);
@@ -725,21 +685,45 @@ NTSTATUS AllocateClientPdoList()
 		status = STATUS_SUCCESS;
 	} while (0);
 	return status;
-} 
+}
 //----------------------------------------------------------------------------------------------------------//
 NTSTATUS UnInitHidSubSystem()
 {
-	FreeHidClientPdoList();
+	NTSTATUS status = STATUS_UNSUCCESSFUL;
+	if (!g_IsHidModuleInit)
+	{
+		USB_DEBUG_INFO_LN_EX("Module Already Free");
+		return status;
+	}
+
+	status = FreeHidClientPdoList();
+
+	if (!NT_SUCCESS(status))
+	{
+		return status;
+	}	
+
+	g_IsHidModuleInit = FALSE;
+	status = STATUS_SUCCESS;
+	return status;
 }
 
 //----------------------------------------------------------------------------------------------------------//
-NTSTATUS InitHidSubSystem(PULONG ClientPdoListSize)
+NTSTATUS InitHidSubSystem(
+	_Out_ PULONG ClientPdoListSize)
 {
- 	PDRIVER_OBJECT	    pDriverObj = NULL;
+	PDRIVER_OBJECT	    pDriverObj = NULL;
 	ULONG			  current_size = 0;
 	NTSTATUS			status = STATUS_UNSUCCESSFUL;
 
-	do {   
+	do {
+		if (g_IsHidModuleInit)
+		{
+			USB_DEBUG_INFO_LN_EX("Module Already Init");
+			status = STATUS_SUCCESS;
+			break;
+		}
+
 		if (!NT_SUCCESS(AllocateClientPdoList()))
 		{
 			USB_DEBUG_INFO_LN_EX("Create List Error");
@@ -754,13 +738,13 @@ NTSTATUS InitHidSubSystem(PULONG ClientPdoListSize)
 			status = STATUS_UNSUCCESSFUL;
 			break;
 		}
-		 
+
 		if (g_HidClientPdoList)
 		{
-			g_HidClientPdoList->RefCount = 1; 
+			g_HidClientPdoList->RefCount = 1;
 			USB_DEBUG_INFO_LN_EX("Create Success list: %I64x size: %x", g_HidClientPdoList, current_size);
+			g_IsHidModuleInit = TRUE;
 			status = STATUS_SUCCESS;
-
 			break;
 		}
 	} while (FALSE);
@@ -770,8 +754,9 @@ NTSTATUS InitHidSubSystem(PULONG ClientPdoListSize)
 //---------------------------------------------------------------------------------------------------------//
 NTSTATUS FreeHidClientPdoList()
 {
-	NTSTATUS status = STATUS_SUCCESS;
+	NTSTATUS status = STATUS_UNSUCCESSFUL;
 	//Free White List
+
 	if (g_HidClientPdoList)
 	{
 		if (g_HidClientPdoList->head)
@@ -780,9 +765,10 @@ NTSTATUS FreeHidClientPdoList()
 		}
 		ExFreePool(g_HidClientPdoList);
 		g_HidClientPdoList = NULL;
+		status = STATUS_SUCCESS;
 	}
 
 	return status;
-} 
+}
 
 //---------------------------------------------------------------------------------------------------------//

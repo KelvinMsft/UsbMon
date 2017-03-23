@@ -35,7 +35,7 @@ extern NTSTATUS ObReferenceObjectByName(
 //// Implementation
 //// 
 //----------------------------------------------------------------------------------------//
-NTSTATUS KeSleep(LONG msec)
+NTSTATUS KernelSleep(LONG msec)
 {
 	LARGE_INTEGER my_interval;
 	my_interval.QuadPart = DELAY_ONE_MILLISECOND;
@@ -102,7 +102,7 @@ NTSTATUS USBSymLinkToPath(PUNICODE_STRING pusSymLink, PUNICODE_STRING pusDosPath
 	// Create symbolic link path
 	usSymLinkPath.Length = 0;
 	usSymLinkPath.MaximumLength = pusSymLink->MaximumLength + 8;
-	usSymLinkPath.Buffer = ExAllocatePool(NonPagedPool, usSymLinkPath.MaximumLength);
+	usSymLinkPath.Buffer = ExAllocatePoolWithTag(NonPagedPool, usSymLinkPath.MaximumLength, 'symp');
 	RtlAppendUnicodeToString(&usSymLinkPath, L"\\??\\");
 	RtlAppendUnicodeStringToString(&usSymLinkPath, pusSymLink);
 

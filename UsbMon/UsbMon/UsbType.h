@@ -4,9 +4,6 @@
 #include <fltKernel.h> 
 #include "Hidport.h"
 #include "usb.h" 
-#include "hubbusif.h"
-#include "usbbusif.h" 
-#include "Usbioctl.h"
 #include "TList.h"
 #include "hidpddi.h"
  
@@ -31,8 +28,7 @@ typedef struct _HID_USB_DEVICE_EXTENSION {
 	PIO_WORKITEM                    ResetWorkItem;
 	HID_DESCRIPTOR				    HidDescriptor;  
 	PDEVICE_OBJECT                  functionalDeviceObject;
-}HID_USB_DEVICE_EXTENSION, *PHID_USB_DEVICE_EXTENSION;
-static_assert(sizeof(HID_USB_DEVICE_EXTENSION) == 0x68, "Size Check");
+}HID_USB_DEVICE_EXTENSION, *PHID_USB_DEVICE_EXTENSION; 
 
 
 typedef struct _HID_DEVICE_NODE

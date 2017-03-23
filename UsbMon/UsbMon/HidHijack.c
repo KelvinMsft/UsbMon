@@ -2,10 +2,11 @@
 #include "UsbUtil.h" 
 #include "UsbHid.h" 
 #include "IrpHook.h"
+#include "Usbioctl.h"
 #include "ReportUtil.h"
- 
+
 #pragma warning (disable : 4100) 
- 
+
 
 /////////////////////////////////////////////////////////////////////////////////////////////// 
 //// Types
@@ -18,6 +19,26 @@ typedef struct HIJACK_CONTEXT
 	HID_DEVICE_NODE*			   node;		// An old context we need 
 	PENDINGIRP*			    pending_irp;		// pending irp node for cancellation
 }HIJACK_CONTEXT, *PHIJACK_CONTEXT;
+
+/*
+multi-process struct
+*/
+typedef struct _USERPROCESS_INFO
+{
+	PEPROCESS proc;
+	PVOID     mapped_user_addr;
+	PMDL      mdl;
+}USERPROCESSINFO, *PUSERPROCESSINFO;
+
+typedef struct _USER_MOUDATA
+{
+	CHAR x;
+	CHAR y;
+	CHAR z;
+	CHAR Click;
+	BOOLEAN IsAbsolute;
+}USERMOUDATA, *PUSERDATA;
+
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 ////	Marco Utilities
@@ -48,10 +69,13 @@ typedef struct HIJACK_CONTEXT
 ////
 DRIVER_DISPATCH*  g_HidPnpHandler = NULL;
 DRIVER_DISPATCH*  g_UsbHubInternalDeviceControl = NULL;
-BOOLEAN			  g_bUnloaded					   = FALSE;
+BOOLEAN			  g_bUnloaded = FALSE;
+USERPROCESSINFO   g_ProcessInfo = { 0 };
+PKEVENT			  g_pEvent = NULL;
+USERMOUDATA*	  g_mou_data = NULL;
 
 extern PHID_DEVICE_LIST g_HidClientPdoList;
- 
+
 /////////////////////////////////////////////////////////////////////////////////////////////// 
 //// Prototype
 //// 
@@ -61,66 +85,66 @@ extern PHID_DEVICE_LIST g_HidClientPdoList;
 
 Routine Description:
 
-		 Allocated Pending IRP Linked-List memory 
-		 for saving any IRP-related information
+Allocated Pending IRP Linked-List memory
+for saving any IRP-related information
 
 Arguments:
-		
-		No
+
+No
 
 Return Value:
 
-		NTSTATUS	- STATUS_SUCCESS if initial successfully
+NTSTATUS	- STATUS_SUCCESS if initial successfully
 
-					- STATUS_UNSUCCESSFUL if failed
+- STATUS_UNSUCCESSFUL if failed
 
 -------------------------------------------------------*/
 NTSTATUS		AllocatePendingIrpLinkedList();
 
- 
+
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 Routine Description:
 
-		Free Pending IRP list memory and each node
+Free Pending IRP list memory and each node
 
 Arguments:
 
-		No
+No
 
 Return Value:
 
-		NTSTATUS	- STATUS_SUCCESS if Free Memory 
-					  successfully
+NTSTATUS	- STATUS_SUCCESS if Free Memory
+successfully
 
-					- STATUS_UNSUCCESSFUL if failed
+- STATUS_UNSUCCESSFUL if failed
 
 -------------------------------------------------------*/
 NTSTATUS		FreePendingIrpList();
 
-  
+
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 Routine Description:
 
-		Handling And Extract data from keyboard URB 
+Handling And Extract data from keyboard URB
 
 Arguments:
 
-		pContext	- Hijack Context included all we need 
-					  see HIJACK_CONTEXT declaration.
+pContext	- Hijack Context included all we need
+see HIJACK_CONTEXT declaration.
 
-		reportType	- Hid Report Type 
-						-	HidP_Input,
-						-	HidP_Output,
-						-	HidP_Feature
+reportType	- Hid Report Type
+-	HidP_Input,
+-	HidP_Output,
+-	HidP_Feature
 Return Value:
 
-		NTSTATUS	- STATUS_SUCCESS if Handle successfully
-					- STATUS_UNSUCCESSFUL if failed
+NTSTATUS	- STATUS_SUCCESS if Handle successfully
+- STATUS_UNSUCCESSFUL if failed
 -------------------------------------------------------*/
 NTSTATUS HandleKeyboardData(
-	_In_ HIJACK_CONTEXT* pContext, 
+	_In_ HIJACK_CONTEXT* pContext,
 	_In_ HIDP_REPORT_TYPE reportType
 );
 
@@ -129,75 +153,75 @@ NTSTATUS HandleKeyboardData(
 
 Routine Description:
 
-		Handling And Extract data from mouse URB 
+Handling And Extract data from mouse URB
 
 Arguments:
 
-		pContext	- Hijack Context included all we need
-					  see HIJACK_CONTEXT declaration.
+pContext	- Hijack Context included all we need
+see HIJACK_CONTEXT declaration.
 
-		reportType	- Hid Report Type
-						-	HidP_Input,
-						-	HidP_Output,
-						-	HidP_Feature
+reportType	- Hid Report Type
+-	HidP_Input,
+-	HidP_Output,
+-	HidP_Feature
 Return Value:
 
-		NTSTATUS	- STATUS_SUCCESS if Handle successfully
-					- STATUS_UNSUCCESSFUL if failed
+NTSTATUS	- STATUS_SUCCESS if Handle successfully
+- STATUS_UNSUCCESSFUL if failed
 -------------------------------------------------------*/
 NTSTATUS HandleMouseData(
-	_In_ HIJACK_CONTEXT* pContext, 
+	_In_ HIJACK_CONTEXT* pContext,
 	_In_ HIDP_REPORT_TYPE reportType
-); 
+);
 
 
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 Routine Description:
 
-		- Proxy Function of USB Hub of Internal Control Irp
-		- It intercept all internal IOCTL ,
-		I.e. IOCTL_INTERNAL_USB_SUBMIT_URB -> URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER 
-			1. Check is it mouse / keyboard
-			2. Save a IRP Context (included old IRP completion function)
-			3. Hook Completion of IRP
-			4. Insert into Pending IRP List
+- Proxy Function of USB Hub of Internal Control Irp
+- It intercept all internal IOCTL ,
+I.e. IOCTL_INTERNAL_USB_SUBMIT_URB -> URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER
+1. Check is it mouse / keyboard
+2. Save a IRP Context (included old IRP completion function)
+3. Hook Completion of IRP
+4. Insert into Pending IRP List
 
 Arguments:
 
-		DeviceObject - USB Hub Device Object, iusb3hub , usbhub ,... etc
-		Irp			 - IRP come from upper level
+DeviceObject - USB Hub Device Object, iusb3hub , usbhub ,... etc
+Irp			 - IRP come from upper level
 
 Return Value:
 
-		NTSTATUS	 - STATUS_UNSUCCESSFUL   , If failed of any one of argument check.
-					 - STATUS_XXXXXXXXXXXX   , Depended on IRP Handler
+NTSTATUS	 - STATUS_UNSUCCESSFUL   , If failed of any one of argument check.
+- STATUS_XXXXXXXXXXXX   , Depended on IRP Handler
 
 -----------------------------------------------------------------------------------*/
 NTSTATUS HidUsb_InternalDeviceControl(
 	_Inout_ struct _DEVICE_OBJECT *DeviceObject,
 	_Inout_ struct _IRP           *Irp
-); 
+);
 
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 Routine Description:
 
-		- Proxy Function of Hid URB IRP Completion
-		- Extract Data by specific report format
-		- call old IRP completion
+- Proxy Function of Hid URB IRP Completion
+- Extract Data by specific report format
+- call old IRP completion
 
 Arguments:
 
-		DeviceObject - Hid Device Object , Class Driver-Created Device Object , 
-					   device named - HID000000X, a FDO of HidUsb(HidClass)
+DeviceObject - Hid Device Object , Class Driver-Created Device Object ,
+device named - HID000000X, a FDO of HidUsb(HidClass)
 
-		Irp			 - IRP of the original request
+Irp			 - IRP of the original request
 
 Return Value:
 
-		NTSTATUS	 - STATUS_UNSUCCESSFUL   , If failed of any one of argument check.
-					   STATUS_XXXXXXXXXXXX   , Depended on old completion
+NTSTATUS	 - STATUS_UNSUCCESSFUL   , If failed of any one of argument check.
+STATUS_XXXXXXXXXXXX   , Depended on old completion
 -----------------------------------------------------------------------------------*/
 NTSTATUS  HidUsb_CompletionCallback(
 	_In_     PDEVICE_OBJECT DeviceObject,
@@ -214,8 +238,8 @@ NTSTATUS InitializeHidPenetrate(
 NTSTATUS UnInitializeHidPenetrate();
 
 #ifdef ALLOC_PRAGMA
-	#pragma alloc_text(PAGE, InitializeHidPenetrate) 
-	#pragma alloc_text(PAGE, UnInitializeHidPenetrate)  
+#pragma alloc_text(PAGE, InitializeHidPenetrate) 
+#pragma alloc_text(PAGE, UnInitializeHidPenetrate)  
 #endif
 
 
@@ -224,11 +248,11 @@ NTSTATUS UnInitializeHidPenetrate();
 //// 
 //// 
 
- 
- 
+
+
 //----------------------------------------------------------------------------------------//
 NTSTATUS HandleKeyboardData(
-	_In_ HIJACK_CONTEXT* pContext, 
+	_In_ HIJACK_CONTEXT* pContext,
 	_In_ HIDP_REPORT_TYPE reportType
 )
 {
@@ -237,6 +261,8 @@ NTSTATUS HandleKeyboardData(
 	EXTRACTDATA								   data = { 0 };
 	NTSTATUS								 status = STATUS_UNSUCCESSFUL;
 	ULONG								   colIndex = pdoExt->collectionIndex - 1;
+	ULONG 								  totalSize = 0;
+	char* extractor = NULL;
 	//Top-Collection == Mouse && Usage Page == Desktop
 	if (!IsKeyboardUsage(pContext, colIndex) ||
 		!IsDesktopUsagePage(pContext, colIndex))
@@ -253,16 +279,17 @@ NTSTATUS HandleKeyboardData(
 	USB_DEBUG_INFO_LN_EX("NormalKeyOffset: %X		 Size: %x", data.KBDDATA.NormalKeyOffset, data.KBDDATA.NormalKeySize);
 	USB_DEBUG_INFO_LN_EX("SpecialKeyOffset: %X	 Size: %x  ", data.KBDDATA.SpecialKeyOffset, data.KBDDATA.SpecialKeySize);
 	USB_DEBUG_INFO_LN_EX("LedKeyOffset: %X		 Size: %x ", data.KBDDATA.LedKeyOffset, data.KBDDATA.LedKeySize);
-	ULONG totalSize = data.KBDDATA.NormalKeySize + data.KBDDATA.SpecialKeySize + data.KBDDATA.LedKeySize;
+	totalSize = data.KBDDATA.NormalKeySize + data.KBDDATA.SpecialKeySize + data.KBDDATA.LedKeySize;
 	if (!totalSize)
 	{
 		status = STATUS_SUCCESS;
 		return status;
 	}
 
-	char* extractor = ExAllocatePool(NonPagedPool, totalSize);
+	extractor = ExAllocatePoolWithTag(NonPagedPool, totalSize, 'extr');
 	if (extractor)
 	{
+		int i = 0;
 		char* normalKey = extractor;
 		char* LedKey = extractor + data.KBDDATA.NormalKeySize;
 		char* SpecialKey = extractor + data.KBDDATA.NormalKeySize + data.KBDDATA.LedKeySize;
@@ -275,19 +302,19 @@ NTSTATUS HandleKeyboardData(
 
 		USB_DEBUG_INFO_LN_EX("Enter: ");
 
-		for (int i = 0; i < data.KBDDATA.SpecialKeySize; i++)
+		for (i = 0; i < data.KBDDATA.SpecialKeySize; i++)
 		{
 			USB_NATIVE_DEBUG_INFO("%x ", *SpecialKey);
 			SpecialKey++;
 		}
 
-		for (int i = 0; i < data.KBDDATA.NormalKeySize; i++)
+		for (i = 0; i < data.KBDDATA.NormalKeySize; i++)
 		{
 			USB_NATIVE_DEBUG_INFO("%x ", *normalKey);
 			normalKey++;
 		}
 
-		for (int i = 0; i < data.KBDDATA.LedKeySize; i++)
+		for (i = 0; i < data.KBDDATA.LedKeySize; i++)
 		{
 			USB_NATIVE_DEBUG_INFO("%x ", *LedKey);
 			LedKey++;
@@ -314,7 +341,8 @@ NTSTATUS HandleMouseData(
 	ULONG								   colIndex = 0;
 	ULONG								  totalSize = 0;
 	BOOLEAN								    IsMouse = FALSE;
-	BOOLEAN								    IsKbd   = FALSE;
+	BOOLEAN								    IsKbd = FALSE;
+	char* 								extractor = NULL;
 	if (!pContext)
 	{
 		USB_DEBUG_INFO_LN_EX("NULL pContext");
@@ -349,7 +377,7 @@ NTSTATUS HandleMouseData(
 
 	if (!IsSafeNode(pContext))
 	{
-		USB_DEBUG_INFO_LN_EX("NULL IsSafeNode"); 
+		USB_DEBUG_INFO_LN_EX("NULL IsSafeNode");
 		status = STATUS_UNSUCCESSFUL;
 		return status;
 	}
@@ -360,7 +388,7 @@ NTSTATUS HandleMouseData(
 		status = STATUS_UNSUCCESSFUL;
 		return status;
 	}
- 
+
 	if (!IsDesktopUsagePage(pContext, colIndex))
 	{
 		USB_DEBUG_INFO_LN_EX("NULL IsDesktopUsagePage");
@@ -390,8 +418,8 @@ NTSTATUS HandleMouseData(
 		IsKbd = TRUE;
 	}
 
-	 DUMP_DEVICE_NAME(pContext->DeviceObject);
-	 USB_DEBUG_INFO_LN_EX("ColIndex: %x \r\n", colIndex);
+	//DUMP_DEVICE_NAME(pContext->DeviceObject);
+	USB_DEBUG_INFO_LN_EX("ColIndex: %x \r\n", colIndex);
 	if (!totalSize)
 	{
 		USB_DEBUG_INFO_LN_EX("Cannot Get Moudata \r\n");
@@ -399,7 +427,7 @@ NTSTATUS HandleMouseData(
 		return status;
 	}
 
-	char* extractor = ExAllocatePool(NonPagedPool, totalSize);
+	extractor = ExAllocatePool(NonPagedPool, totalSize);
 	if (extractor && IsMouse)
 	{
 		char* x = extractor;
@@ -428,18 +456,19 @@ NTSTATUS HandleMouseData(
 	}
 
 	if (extractor && IsKbd)
-	{ 
+	{
+		int i = 0;
 		char* SpecialKey = extractor;
 		char* NormalKey = extractor + data.KBDDATA.NormalKeySize;
-	
+
 		RtlZeroMemory(extractor, totalSize);
 		RtlMoveMemory(SpecialKey, (PUCHAR)UrbGetTransferBuffer(pContext->urb) + data.KBDDATA.SpecialKeyOffset, data.KBDDATA.SpecialKeySize);
-		RtlMoveMemory(NormalKey,(PUCHAR)UrbGetTransferBuffer(pContext->urb) + data.KBDDATA.NormalKeyOffset, data.KBDDATA.NormalKeySize);
-		for (int i = 0; i < data.KBDDATA.NormalKeySize; i++)
+		RtlMoveMemory(NormalKey, (PUCHAR)UrbGetTransferBuffer(pContext->urb) + data.KBDDATA.NormalKeyOffset, data.KBDDATA.NormalKeySize);
+		for (i = 0; i < data.KBDDATA.NormalKeySize; i++)
 		{
 			USB_NATIVE_DEBUG_INFO("%x ", NormalKey++);
 		}
-		for (int i = 0; i < data.KBDDATA.SpecialKeySize; i++)
+		for (i = 0; i < data.KBDDATA.SpecialKeySize; i++)
 		{
 			USB_NATIVE_DEBUG_INFO("%x ", SpecialKey++);
 		}
@@ -452,17 +481,17 @@ NTSTATUS HandleMouseData(
 
 	return status;
 }
- 
+
 //-------------------------------------------------------------------------------------------------//
 NTSTATUS  HidUsb_CompletionCallback(
-	_In_     PDEVICE_OBJECT DeviceObject,			 
+	_In_     PDEVICE_OBJECT DeviceObject,
 	_In_     PIRP           Irp,
 	_In_	 PVOID          Context
 )
 {
 	HIJACK_CONTEXT*		   pContext = (HIJACK_CONTEXT*)Context;
 	PVOID					context = NULL;
-	IO_COMPLETION_ROUTINE* callback = NULL; 
+	IO_COMPLETION_ROUTINE* callback = NULL;
 	if (!pContext)
 	{
 		USB_DEBUG_INFO_LN_EX("EmptyContext");
@@ -475,7 +504,7 @@ NTSTATUS  HidUsb_CompletionCallback(
 		return STATUS_UNSUCCESSFUL;
 	}
 
-	context  = pContext->pending_irp->oldContext;
+	context = pContext->pending_irp->oldContext;
 	callback = pContext->pending_irp->oldRoutine;
 	if (!context || !callback)
 	{
@@ -504,27 +533,26 @@ NTSTATUS  HidUsb_CompletionCallback(
 	{
 		USB_DEBUG_INFO_LN_EX("FATAL: Delete element FAILED");
 	}
- 
- 	 DUMP_DEVICE_NAME(pContext->DeviceObject);
+
 
 	if (UrbIsInputTransfer(pContext->urb))
-	{ 
+	{
 		if (!NT_SUCCESS(HandleMouseData(pContext, HidP_Input)))
 		{
- 
+
 		}
 	}
 
 	if (UrbIsOutputTransfer(pContext->urb))
 	{
-		USB_COMMON_DEBUG_INFO("Output Data "); 
+		USB_COMMON_DEBUG_INFO("Output Data ");
 	}
 
 	if (pContext)
 	{
 		ExFreePool(pContext);
 		pContext = NULL;
-	}  
+	}
 	return callback(DeviceObject, Irp, context);
 }
 
@@ -536,6 +564,7 @@ NTSTATUS UsbHubInternalDeviceControl(
 	_Inout_ struct _IRP           *Irp
 )
 {
+	IRPHOOKOBJ*	 	 HookObject = NULL;
 	do
 	{
 		HIJACK_CONTEXT*		 hijack = NULL;
@@ -545,7 +574,7 @@ NTSTATUS UsbHubInternalDeviceControl(
 		PHID_DEVICE_NODE	   node = NULL;
 
 		if (!g_HidClientPdoList)
-		{ 
+		{
 			break;
 		}
 
@@ -555,7 +584,7 @@ NTSTATUS UsbHubInternalDeviceControl(
 			break;
 		}
 
-		urb = (PURB)irpStack->Parameters.Others.Argument1; 
+		urb = (PURB)irpStack->Parameters.Others.Argument1;
 		if (!urb)
 		{
 			break;
@@ -564,11 +593,11 @@ NTSTATUS UsbHubInternalDeviceControl(
 		if (UrbGetFunction(urb) != URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER)
 		{
 			break;
-		}  
+		}
 
 		//If Urb pipe handle is used by HID mouse / kbd device. 
 		if (IsHidDevicePipe(g_HidClientPdoList->head, UrbGetTransferPipeHandle(urb), &node))
-		{ 
+		{
 			HIDCLASS_DEVICE_EXTENSION* class_extension = NULL;
 
 			if (!node ||
@@ -577,9 +606,9 @@ NTSTATUS UsbHubInternalDeviceControl(
 				continue;
 			}
 
-			class_extension = (HIDCLASS_DEVICE_EXTENSION*)node->device_object->DeviceExtension; 
+			class_extension = (HIDCLASS_DEVICE_EXTENSION*)node->device_object->DeviceExtension;
 			if (!class_extension->isClientPdo)
-			{	
+			{
 				//if FDO (HID_000000x), then next
 				continue;
 			}
@@ -619,20 +648,20 @@ NTSTATUS UsbHubInternalDeviceControl(
 
 				//Completion Routine hook
 				irpStack->Context = hijack;
-				irpStack->CompletionRoutine = HidUsb_CompletionCallback;	 
+				irpStack->CompletionRoutine = HidUsb_CompletionCallback;
 			}
 		}
 	} while (0);
 
 
-	IRPHOOKOBJ* object = GetIrpHookObject(DeviceObject->DriverObject, IRP_MJ_INTERNAL_DEVICE_CONTROL);
-	if (object)
+	HookObject = GetIrpHookObject(DeviceObject->DriverObject, IRP_MJ_INTERNAL_DEVICE_CONTROL);
+	if (HookObject)
 	{
-		if (object->oldFunction)
-		{ 
-			return object->oldFunction(DeviceObject, Irp);
+		if (HookObject->oldFunction)
+		{
+			return HookObject->oldFunction(DeviceObject, Irp);
 		}
-	} 
+	}
 }
 //--------------------------------------------------------------------------------------------//
 NTSTATUS HidUsbPnpIrpHandler(
@@ -640,10 +669,14 @@ NTSTATUS HidUsbPnpIrpHandler(
 	_Inout_ struct _IRP           *Irp
 )
 {
+	IRPHOOKOBJ* HookObject = NULL;
 	PIO_STACK_LOCATION irpStack;
+
 	WCHAR* DeviceName[256] = { 0 };
 	GetDeviceName(DeviceObject, DeviceName);
+
 	USB_DEBUG_INFO_LN_EX("Pdo Name: %ws ", DeviceName);
+
 	do
 	{
 		HIDCLASS_DEVICE_EXTENSION* ClassExt = (HIDCLASS_DEVICE_EXTENSION*)DeviceObject->DeviceExtension;
@@ -666,14 +699,129 @@ NTSTATUS HidUsbPnpIrpHandler(
 		}
 	} while (FALSE);
 
-	IRPHOOKOBJ* HookObj = GetIrpHookObject(DeviceObject->DriverObject, IRP_MJ_PNP);
-	if (HookObj)
+	HookObject = GetIrpHookObject(DeviceObject->DriverObject, IRP_MJ_PNP);
+	if (HookObject)
 	{
-		if (HookObj->oldFunction)
+		if (HookObject->oldFunction)
 		{
-			return HookObj->oldFunction(DeviceObject, Irp);
+			return HookObject->oldFunction(DeviceObject, Irp);
 		}
 	}
+}
+//---------------------------------------------------------------------------------------------------------------------------------------------- 
+void* MapNonpagedMemToSpace(void* base, ULONG size, PMDL* Lpmdl, KPROCESSOR_MODE  AccessMode, ULONG Protect)
+{
+	PMDL	 		Mdl = NULL;
+	void*			ret = NULL;
+
+	if (Lpmdl)
+	{
+		*Lpmdl = NULL;
+	}
+
+	Mdl = IoAllocateMdl(base, size, FALSE, FALSE, NULL);
+	if (Mdl)
+	{
+
+		MmBuildMdlForNonPagedPool(Mdl);
+		 
+		ret = MmMapLockedPagesSpecifyCache(Mdl, AccessMode, MmCached, NULL, FALSE, NormalPagePriority);
+		 
+		if (ret == NULL)
+		{
+			IoFreeMdl(Mdl);
+			return NULL;
+		}
+		 
+		if (Lpmdl)
+		{
+			*Lpmdl = Mdl;
+		}
+	}
+	return ret;
+}
+
+//----------------------------------------------------------------------------------------------------------------------------------------------
+NTSTATUS MappingUsbMemory(
+	void* 	 source,
+	ULONG 	 length,
+	ULONG64* mapped_user_address
+)
+{
+	PEPROCESS proc = PsGetCurrentProcess();
+
+	if (!mapped_user_address ||
+		!source ||
+		!length)
+	{
+
+		return STATUS_INVALID_PARAMETER;
+	}
+	//存在结构体代表游戏进程已经启动 
+	//是否已經映射過
+	if (g_ProcessInfo.mapped_user_addr)
+	{
+		*mapped_user_address = (ULONG64)g_ProcessInfo.mapped_user_addr;
+	}
+	else
+	{
+		g_ProcessInfo.mdl = NULL;
+		g_ProcessInfo.mapped_user_addr = MapNonpagedMemToSpace(source, length, &g_ProcessInfo.mdl, UserMode, 0);
+
+		if (!g_ProcessInfo.mapped_user_addr)
+		{
+			return STATUS_INSUFFICIENT_RESOURCES;
+		}
+
+		*mapped_user_address = (ULONG64)g_ProcessInfo.mapped_user_addr;
+
+		USB_DEBUG_INFO_LN_EX("*mapped_user_address %I64X %I64X \r\n ", *mapped_user_address, g_ProcessInfo.mapped_user_addr);
+	}
+
+	return STATUS_SUCCESS;
+}
+//--------------------------------------------------------------------------------------------------------------------------------------------------
+NTSTATUS MapUsbDataToUserAddressSpace(
+	ULONG64* mapped_addr,
+	HANDLE hEvent
+)
+{ 
+	ULONG64 user_mode_addr = 0;
+
+	OBJECT_HANDLE_INFORMATION objHandleInfo = { 0 };
+	if (!mapped_addr)
+	{
+		USB_DEBUG_INFO_LN_EX("MapUsbDataToUserAddressSpace STATUS_INVALID_PARAMETER");
+		return STATUS_INVALID_PARAMETER;
+	}
+
+	if (!hEvent)
+	{
+		USB_DEBUG_INFO_LN_EX("MapUsbDataToUserAddressSpace STATUS_INVALID_PARAMETER2");
+		return STATUS_INVALID_PARAMETER;
+	}
+
+	if (!NT_SUCCESS(ObReferenceObjectByHandle(hEvent, SYNCHRONIZE, *ExEventObjectType, KernelMode, (PVOID *)&g_pEvent, &objHandleInfo)))
+	{
+		USB_DEBUG_INFO_LN_EX("MapUsbDataToUserAddressSpace STATUS_INVALID_PARAMETER3");
+		return STATUS_INVALID_PARAMETER;
+	}
+
+	if (g_ProcessInfo.mapped_user_addr)
+	{
+		*mapped_addr = g_ProcessInfo.mapped_user_addr;
+		USB_DEBUG_INFO_LN_EX("MapUsbDataToUserAddressSpace Successfully");
+		return STATUS_SUCCESS;
+	}
+
+	if (NT_SUCCESS(MappingUsbMemory(g_mou_data, PAGE_SIZE, &g_ProcessInfo.mapped_user_addr)))
+	{
+		*mapped_addr = g_ProcessInfo.mapped_user_addr;
+		USB_DEBUG_INFO_LN_EX("MapUsbDataToUserAddressSpace Successfully");
+		return STATUS_SUCCESS;
+	}
+	USB_DEBUG_INFO_LN_EX("MapUsbDataToUserAddressSpace UnSuccessfully");
+	return STATUS_UNSUCCESSFUL;
 }
 //----------------------------------------------------------------------------------------//
 NTSTATUS InitializeHidPenetrate(
@@ -684,6 +832,7 @@ NTSTATUS InitializeHidPenetrate(
 	PDRIVER_OBJECT			  pHidDriverObj = NULL;
 	NTSTATUS						 status = STATUS_UNSUCCESSFUL;
 	ULONG						   ListSize = 0;
+
 	status = GetDriverObjectByName(HID_USB_DEVICE, &pHidDriverObj);
 	if (!NT_SUCCESS(status) || !pHidDriverObj)
 	{
@@ -698,6 +847,16 @@ NTSTATUS InitializeHidPenetrate(
 		return status;
 	}
 
+	if (!g_mou_data)
+	{
+		g_mou_data = ExAllocatePoolWithTag(NonPagedPool, sizeof(USERMOUDATA), 'enep');
+		if (!g_mou_data)
+		{
+			status = STATUS_UNSUCCESSFUL;
+			return status;
+		}
+	}
+
 	status = InitHidSubSystem(&ListSize);
 	if (!NT_SUCCESS(status) || !ListSize)
 	{
@@ -705,14 +864,14 @@ NTSTATUS InitializeHidPenetrate(
 		return status;
 	}
 
-	USB_DEBUG_INFO_LN_EX("HID SubSystem Initalization Successfully list size: %x ", ListSize);   
+	USB_DEBUG_INFO_LN_EX("HID SubSystem Initalization Successfully list size: %x ", ListSize);
 
 	status = InitIrpHookSystem();
 	if (!NT_SUCCESS(status))
 	{
 		return status;
 	}
-	
+
 	USB_DEBUG_INFO_LN_EX("IRP Hook SubSystem Initalization Successfully");
 
 	g_HidPnpHandler = (PDRIVER_DISPATCH)DoIrpHook(pHidDriverObj, IRP_MJ_PNP, HidUsbPnpIrpHandler, Start);
@@ -730,13 +889,13 @@ NTSTATUS InitializeHidPenetrate(
 	//Do Irp Hook for URB transmit
 	g_UsbHubInternalDeviceControl = (PDRIVER_DISPATCH)DoIrpHook(pHubDriverObj, IRP_MJ_INTERNAL_DEVICE_CONTROL, UsbHubInternalDeviceControl, Start);
 	if (!g_UsbHubInternalDeviceControl)
-	{	
+	{
 		UnInitIrpHookSystem();
 		UnInitHidSubSystem();
 		USB_DEBUG_INFO_LN_EX("DoIrpHook Error");
 		status = STATUS_UNSUCCESSFUL;
 		return status;
-	} 
+	}
 
 	USB_DEBUG_INFO_LN_EX("IRP Hooked Internal Device Control");
 }
@@ -744,8 +903,39 @@ NTSTATUS InitializeHidPenetrate(
 //----------------------------------------------------------------------------------------//
 NTSTATUS UnInitializeHidPenetrate()
 {
+	NTSTATUS status;
 	g_bUnloaded = TRUE;
+	if (g_mou_data)
+	{
+		ExFreePool(g_mou_data);
+		g_mou_data = NULL;
+	}
+	 
+	status = UnInitIrpHookSystem();
+	if (!NT_SUCCESS(status))
+	{
+		return status;
+	}
 
-	UnInitIrpHookSystem();
-	UnInitHidSubSystem();
+	status = UnInitHidSubSystem();	
+	if (!NT_SUCCESS(status))
+	{
+		return status;
+	}
+
+	if (g_pEvent)
+	{
+		ObDereferenceObject(g_pEvent);
+		g_pEvent = NULL;  
+	} 
+
+	if (g_ProcessInfo.mdl && g_ProcessInfo.mapped_user_addr)
+	{
+		MmUnmapLockedPages(g_ProcessInfo.mapped_user_addr, g_ProcessInfo.mdl);
+		IoFreeMdl(g_ProcessInfo.mdl);
+	}
+	  
+	RtlZeroMemory(&g_ProcessInfo, sizeof(USERPROCESSINFO));  
+
+	return STATUS_SUCCESS;
 }

@@ -36,20 +36,23 @@ extern NTSTATUS ObReferenceObjectByName(
 //----------------------------------------------------------------------------------------//
 VOID PrintAllHidDriverName()
 {
-	WCHAR* Usbhub = GetUsbHubDriverNameByVersion(USB);
+	WCHAR* Usbhub = NULL;
+
+
+	Usbhub = GetUsbHubDriverNameByVersion(USB);
 	USB_DEBUG_INFO_LN_EX("Usb Hub: %ws ", Usbhub);
 
-	WCHAR* Usbhub2 = GetUsbHubDriverNameByVersion(USB2);
-	USB_DEBUG_INFO_LN_EX("Usb Hub2: %ws ", Usbhub2);
+	Usbhub = GetUsbHubDriverNameByVersion(USB2);
+	USB_DEBUG_INFO_LN_EX("Usb Hub2: %ws ", Usbhub);
 
-	WCHAR* Usbhub3 = GetUsbHubDriverNameByVersion(USB3);
-	USB_DEBUG_INFO_LN_EX("Usb Hub3: %ws ", Usbhub3);
+	Usbhub = GetUsbHubDriverNameByVersion(USB3);
+	USB_DEBUG_INFO_LN_EX("Usb Hub3: %ws ", Usbhub);
 
-	WCHAR* Usbhub_new = GetUsbHubDriverNameByVersion(USB3_NEW);
-	USB_DEBUG_INFO_LN_EX("Usb Hub3_w8 above: %ws", Usbhub_new);
+	Usbhub = GetUsbHubDriverNameByVersion(USB3_NEW);
+	USB_DEBUG_INFO_LN_EX("Usb Hub3_w8 above: %ws", Usbhub);
 
-	WCHAR* Usb_ccgp = GetUsbHubDriverNameByVersion(USB_COMPOSITE);
-	USB_DEBUG_INFO_LN_EX("Usb CCGP: %ws ", Usb_ccgp);
+	Usbhub = GetUsbHubDriverNameByVersion(USB_COMPOSITE);
+	USB_DEBUG_INFO_LN_EX("Usb CCGP: %ws ", Usbhub);
 
 }
 
@@ -80,7 +83,7 @@ WCHAR* GetUsbHubDriverNameByVersion(
 
 //----------------------------------------------------------------------------------------//
 NTSTATUS GetUsbHub(
-	_In_ USB_HUB_VERSION usb_hub_version, 
+	_In_ USB_HUB_VERSION usb_hub_version,
 	_Out_ PDRIVER_OBJECT* pDriverObj
 )
 {
@@ -107,11 +110,13 @@ NTSTATUS GetUsbHub(
 
 
 void DumpHidExtension(
-	_In_ HID_DEVICE_EXTENSION* hid_common_extension, 
+	_In_ HID_DEVICE_EXTENSION* hid_common_extension,
 	_In_ HID_USB_DEVICE_EXTENSION* mini_extension
 )
 {
-	ULONG i = 0; 
+	ULONG i = 0;
+	HID_DESCRIPTOR* hid_desc = NULL;
+
 	USB_DEBUG_INFO_LN_EX("-----------------------------------------------------------------------------\r\n");
 	USB_DEBUG_INFO_LN_EX(" --->PhysicalDeviceObject: %I64X \r\n", hid_common_extension->PhysicalDeviceObject);
 	USB_DEBUG_INFO_LN_EX(" --->DriverObject: %I64X \r\n", hid_common_extension->PhysicalDeviceObject->DriverObject);
@@ -135,20 +140,20 @@ void DumpHidExtension(
 	USB_DEBUG_INFO_LN_EX("		--->Length: %I64X \r\n", mini_extension->InterfaceDesc->Length);
 	USB_DEBUG_INFO_LN_EX("		--->AlternateSetting: %I64X \r\n\r\n", mini_extension->InterfaceDesc->AlternateSetting);
 
- 	for (i = 0; i < mini_extension->InterfaceDesc->NumberOfPipes; i++)
+	for (i = 0; i < mini_extension->InterfaceDesc->NumberOfPipes; i++)
 	{
 		USBD_PIPE_INFORMATION* Pipe_Information = &mini_extension->InterfaceDesc->Pipes[i];
-		USB_DEBUG_INFO_LN_EX("  --->Pipe id: %x Information: %I64X ",i, Pipe_Information);
-		USB_DEBUG_INFO_LN_EX("		--->PipeHandle: %I64X ", Pipe_Information->PipeHandle); 
-		USB_DEBUG_INFO_LN_EX("		--->PipeAddress: %I64X ", Pipe_Information->EndpointAddress); 
+		USB_DEBUG_INFO_LN_EX("  --->Pipe id: %x Information: %I64X ", i, Pipe_Information);
+		USB_DEBUG_INFO_LN_EX("		--->PipeHandle: %I64X ", Pipe_Information->PipeHandle);
+		USB_DEBUG_INFO_LN_EX("		--->PipeAddress: %I64X ", Pipe_Information->EndpointAddress);
 		USB_DEBUG_INFO_LN_EX("		--->PipeInterval: %I64X ", Pipe_Information->Interval);
 		USB_DEBUG_INFO_LN_EX("		--->PipeInterval: %I64X ", Pipe_Information->MaximumPacketSize);
 		USB_DEBUG_INFO_LN_EX("		--->PipeInterval: %I64X ", Pipe_Information->MaximumTransferSize);
 	}
 
 
-	HID_DESCRIPTOR* hid_desc = &(mini_extension)->HidDescriptor; 
-	 
+	hid_desc = &(mini_extension)->HidDescriptor;
+
 	USB_DEBUG_INFO_LN_EX("  --->HidDescriptor: %IX ", &hid_desc);
 	USB_DEBUG_INFO_LN_EX("		--->bcdHID: %X ", hid_desc->bcdHID);
 	USB_DEBUG_INFO_LN_EX("		--->bCountry: %X ", hid_desc->bCountry);
@@ -196,14 +201,15 @@ VOID DumpUrb(
 
 	switch (urb_header.Function)
 	{
-#if (NTDDI_VERSION >= NTDDI_WIN8)
-	case URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL:
+		/*
+		#if (NTDDI_VERSION >= NTDDI_WIN8)
+		case URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL:
 		break;
-	case URB_FUNCTION_OPEN_STATIC_STREAMS:
+		case URB_FUNCTION_OPEN_STATIC_STREAMS:
 		break;
-	case URB_FUNCTION_CLOSE_STATIC_STREAMS:
+		case URB_FUNCTION_CLOSE_STATIC_STREAMS:
 		break;
-#endif
+		#endif*/
 	case URB_FUNCTION_SELECT_CONFIGURATION:
 		break;
 	case URB_FUNCTION_SELECT_INTERFACE:

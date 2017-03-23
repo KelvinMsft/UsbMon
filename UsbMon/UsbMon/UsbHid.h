@@ -2,6 +2,7 @@
 #define __USB_HID_HEADER__ 
 
 #include <fltKernel.h> 
+#include "CommonUtil.h"
 #include "local.h"
 
 
@@ -31,13 +32,11 @@ BOOLEAN  IsHidDevicePipe(
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 Routine Description:
-		Free Client Pdo List, and each node
+		UnInitialize Hid Sub System, Simply free the list
 
 Arguments:
-		TChainListHeader - list of HID device pipe
-		handle			 - handle of HID device pipe 
-		node			 - output node
-		 
+ 		 No 
+
 Return Value:	
 		NTSTATUS		 - STATUS_SUCCESS      , if it is Freed
 						 - STATUS_UNSUCCESSFUL , if is can't be freed
@@ -48,13 +47,12 @@ NTSTATUS UnInitHidSubSystem();
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 Routine Description:
-		1. Allocate Client Pdo List needed memory
-		2. Init Client Pdo List by getting all of client PDO
+		Initialize Hid Sub System, Simply free the list
+			1. Allocate Client Pdo List memory
+			2. Init Client Pdo List by getting all of client PDO
 	 
 Arguments:
-		TChainListHeader - list of HID device pipe
-		handle			 - handle of HID device pipe 
-		node			 - output node
+		 ULONG			 - Size of List 
 		 
 Return Value:	
 		NTSTATUS		 - true  , if it initial succesfully
@@ -64,10 +62,39 @@ NTSTATUS InitHidSubSystem(
 	_Out_ PULONG		ClientPdoListSize
 );
  
+
+
+/*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Routine Description:
+		1. To verify a Device Object, determine is it that hid type we need to catch up 
+		2. If verify success, Insert Node into a list
+	 
+Arguments:
+		PDEVICE_OBJECT	 - Pointer of Deivce object that is going to be identified
+		 
+Return Value:	
+		NTSTATUS		 - STATUS_SUCCESS	   , if it is hid device and Insert succesfully
+						 - STATUS_UNSUCCESSFUL , if it is hid device and unsuccessfully
+-----------------------------------------------------------------------------------*/
 NTSTATUS VerifyAndInsertIntoHidList(
 	_In_ PDEVICE_OBJECT DeviceObject
 );
 
+
+/*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Routine Description:
+		1. Remove a node for the device object in the internal list
+	 
+Arguments:
+		PDEVICE_OBJECT	 - Pointer of Deivce object that is going to be removed
+
+		 
+Return Value:	
+		NTSTATUS		 - STATUS_SUCCESS	   , if it Remove succesfully
+						 - STATUS_UNSUCCESSFUL , if it Remove unsuccessfully
+-----------------------------------------------------------------------------------*/
 NTSTATUS RemoveNodeFromHidList(
 	_In_ PDEVICE_OBJECT DeviceObject
 ); 

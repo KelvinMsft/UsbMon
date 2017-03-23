@@ -1,8 +1,6 @@
-#include <fltKernel.h>
-#include "ReportUtil.h"
-#include "CommonUtil.h"
-#include "WinParse.h"
-#include "UsbType.h"
+
+#include "ReportUtil.h" 
+#include "WinParse.h" 
 
 typedef struct _SELECTED_CHANNEL
 {
@@ -16,8 +14,10 @@ typedef struct _SELECTED_CHANNEL
 VOID DumpReport(
 	_In_ HIDP_DEVICE_DESC* report)
 {
+	int i = 0;
+	PHIDP_REPORT_IDS      reportDesc = NULL;
 	PHIDP_COLLECTION_DESC collectionDesc = &report->CollectionDesc[0];
-	for (int i = 0; i < report->CollectionDescLength; i++)
+	for (i = 0; i < report->CollectionDescLength; i++)
 	{
 		ASSERT(collectionDesc->PreparsedData->Signature1 == HIDP_PREPARSED_DATA_SIGNATURE1);
 		ASSERT(collectionDesc->PreparsedData->Signature2 == HIDP_PREPARSED_DATA_SIGNATURE2);
@@ -44,8 +44,8 @@ VOID DumpReport(
 		collectionDesc++;
 	}
 
-	PHIDP_REPORT_IDS      reportDesc = &report->ReportIDs[0];
-	for (int i = 0; i < report->ReportIDsLength; i++)
+	reportDesc = &report->ReportIDs[0];
+	for (i = 0; i < report->ReportIDsLength; i++)
 	{
 		USB_DEBUG_INFO_LN_EX("*******************************************************");
 		USB_DEBUG_INFO_LN_EX("[Report] ReportID: %xh ", reportDesc->ReportID);
@@ -60,19 +60,21 @@ VOID DumpReport(
 
 //------------------------------------------------------------------------------------------------------------------------------//
 VOID DumpChannel(
-	_In_ PHIDP_COLLECTION_DESC collectionDesc, 
-	_In_ HIDP_REPORT_TYPE type, 
+	_In_ PHIDP_COLLECTION_DESC collectionDesc,
+	_In_ HIDP_REPORT_TYPE type,
 	_In_ ULONG Flags)
 {
+	int k = 0;
+	HIDP_CHANNEL_DESC* channel = NULL;
+	ULONG start = 0;
+	ULONG end = 0;
+	CHAR* reportType = NULL;
+
 	if (!collectionDesc)
 	{
 		return;
 	}
 
-	HIDP_CHANNEL_DESC*            channel = NULL;
-	ULONG start = 0;
-	ULONG end = 0;
-	CHAR* reportType = NULL;
 	switch (type)
 	{
 	case HidP_Input:
@@ -98,7 +100,7 @@ VOID DumpChannel(
 		break;
 	}
 
-	for (int k = start; k < end; k++)
+	for (k = start; k < end; k++)
 	{
 		USB_DEBUG_INFO_LN_EX("+++++++++++++++++++++++ %s +++++++++++++++++++++", reportType);
 		if (Flags & CHANNEL_DUMP_REPORT_REALTED)
@@ -207,7 +209,8 @@ VOID DumpChannel(
 
 		if (channel->NumGlobalUnknowns)
 		{
-			for (int z = 0; z < channel->NumGlobalUnknowns; z++)
+			int z = 0;
+			for (z = 0; z < channel->NumGlobalUnknowns; z++)
 			{
 				USB_DEBUG_INFO_LN_EX(" UnknownsToken:  %d	 OFFSET_FIELD: %X  ", channel->GlobalUnknowns[z].Token, FIELD_OFFSET(HIDP_CHANNEL_DESC, GlobalUnknowns));
 			}
@@ -220,7 +223,7 @@ VOID DumpChannel(
 }
 //------------------------------------------------------------------------------------------------------------------------------//
 NTSTATUS SelectChannel(
-	_In_ HIDP_REPORT_TYPE				type,	
+	_In_ HIDP_REPORT_TYPE				type,
 	_In_ PHIDP_COLLECTION_DESC	collectionDesc,
 	_Out_ SELETEDCHANNEL*       selectedChannel
 )
@@ -236,7 +239,7 @@ NTSTATUS SelectChannel(
 		selectedChannel->channel = &collectionDesc->PreparsedData->Data[collectionDesc->PreparsedData->Input.Offset];
 		selectedChannel->start = collectionDesc->PreparsedData->Input.Offset;
 		selectedChannel->end = collectionDesc->PreparsedData->Input.Index;
-		strncpy(selectedChannel->reportType , "Input Report", sizeof("Input Report"));
+		strncpy(selectedChannel->reportType, "Input Report", sizeof("Input Report"));
 		break;
 	case HidP_Output:
 		selectedChannel->channel = &collectionDesc->PreparsedData->Data[collectionDesc->PreparsedData->Output.Offset];
@@ -248,7 +251,7 @@ NTSTATUS SelectChannel(
 		selectedChannel->channel = &collectionDesc->PreparsedData->Data[collectionDesc->PreparsedData->Feature.Offset];
 		selectedChannel->start = collectionDesc->PreparsedData->Feature.Offset;
 		selectedChannel->end = collectionDesc->PreparsedData->Feature.Index;
-		strncpy(selectedChannel->reportType , "Feature Report", sizeof("Feature Report"));
+		strncpy(selectedChannel->reportType, "Feature Report", sizeof("Feature Report"));
 		break;
 	default:
 		break;
@@ -266,7 +269,7 @@ NTSTATUS ExtractKeyboardData(
 	HIDP_CHANNEL_DESC*            channel = NULL;
 	SELETEDCHANNEL			     selected_channel = { 0 };
 	NTSTATUS status = STATUS_SUCCESS;
-
+	int k = 0;
 	if (!collectionDesc || !ExtractedData)
 	{
 		status = STATUS_UNSUCCESSFUL;
@@ -274,59 +277,59 @@ NTSTATUS ExtractKeyboardData(
 	}
 
 	SelectChannel(type, collectionDesc, &selected_channel);
-	
+
 	USB_DEBUG_INFO_LN_EX("Start: %x End: %x ReportType: %s", selected_channel.start, selected_channel.end, selected_channel.reportType);
-	
-	channel = selected_channel.channel; 
-	for (int k = selected_channel.start; k < selected_channel.end; k++)
-	{ 
+
+	channel = selected_channel.channel;
+	for (k = selected_channel.start; k < selected_channel.end; k++)
+	{
 		switch (channel->UsagePage)
 		{
 			//Output use
-			case HID_LEDS:
+		case HID_LEDS:
+		{
+			ExtractedData->KBDDATA.LedKeyOffset = channel->ByteOffset - 1;
+			ExtractedData->KBDDATA.LedKeySize = channel->ByteEnd - channel->ByteOffset;
+		}
+		break;
+		case HID_KEYBOARD_OR_KEYPAD:
+		{
+			if (channel->Range.UsageMax == 0xFF)
 			{
-				ExtractedData->KBDDATA.LedKeyOffset = channel->ByteOffset - 1;
-				ExtractedData->KBDDATA.LedKeySize = channel->ByteEnd - channel->ByteOffset;
+				ExtractedData->KBDDATA.NormalKeyOffset = channel->ByteOffset - 1;
+				ExtractedData->KBDDATA.NormalKeySize = channel->ByteEnd - channel->ByteOffset;
 			}
-				break;
-			case HID_KEYBOARD_OR_KEYPAD:
+			else
 			{
-				if (channel->Range.UsageMax == 0xFF)
-				{
-					ExtractedData->KBDDATA.NormalKeyOffset = channel->ByteOffset - 1;
-					ExtractedData->KBDDATA.NormalKeySize = channel->ByteEnd - channel->ByteOffset;
-				}
-				else
-				{
-					ExtractedData->KBDDATA.SpecialKeyOffset = channel->ByteOffset - 1;
-					ExtractedData->KBDDATA.SpecialKeySize = channel->ByteEnd - channel->ByteOffset;
-				}
-			} 
-				break;
-			default:
-				USB_MON_COMMON_DBG_BREAK();
-				break;
+				ExtractedData->KBDDATA.SpecialKeyOffset = channel->ByteOffset - 1;
+				ExtractedData->KBDDATA.SpecialKeySize = channel->ByteEnd - channel->ByteOffset;
+			}
+		}
+		break;
+		default:
+			USB_MON_COMMON_DBG_BREAK();
+			break;
 		}
 		ExtractedData->MOUDATA.IsAbsolute = channel->IsAbsolute;
 		channel++;
-	} 
+	}
 	return status;
 }
 
 //------------------------------------------------------------------------------------------------------------------------------//
 NTSTATUS ExtractMouseData(
-	_In_	 PHIDP_COLLECTION_DESC collectionDesc, 
-	_In_	 HIDP_REPORT_TYPE type, 
+	_In_	 PHIDP_COLLECTION_DESC collectionDesc,
+	_In_	 HIDP_REPORT_TYPE type,
 	_Inout_  EXTRACTDATA* ExtractedData)
 {
 	HIDP_CHANNEL_DESC*            channel = NULL;
 	SELETEDCHANNEL			     selected_channel = { 0 };
 	NTSTATUS status = STATUS_SUCCESS;
-
+	int k = 0;
 	if (!collectionDesc || !ExtractedData)
 	{
 		status = STATUS_UNSUCCESSFUL;
-		return status; 
+		return status;
 	}
 
 	if (!NT_SUCCESS(SelectChannel(type, collectionDesc, &selected_channel)))
@@ -335,9 +338,9 @@ NTSTATUS ExtractMouseData(
 		return status;
 	}
 
-	USB_DEBUG_INFO_LN_EX("Start: %x End: %x ReportType: %s" , selected_channel.start, selected_channel.end, selected_channel.reportType);
+	USB_DEBUG_INFO_LN_EX("Start: %x End: %x ReportType: %s", selected_channel.start, selected_channel.end, selected_channel.reportType);
 	channel = selected_channel.channel;
-	for (int k = selected_channel.start; k < selected_channel.end; k++)
+	for (k = selected_channel.start; k < selected_channel.end; k++)
 	{
 		if (channel->IsButton)
 		{
@@ -346,8 +349,8 @@ NTSTATUS ExtractMouseData(
 				ExtractedData->MOUDATA.OffsetButton = channel->ByteOffset - 1;
 				ExtractedData->MOUDATA.BtnOffsetSize = channel->ByteEnd - channel->ByteOffset;
 			}
-		} 
-		else 
+		}
+		else
 		{
 			if (!channel->IsRange)
 			{

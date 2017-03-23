@@ -2,7 +2,8 @@
 #define __IRP_HOOK_HEADER_
 
 #include <fltKernel.h> 
-#include "TList.h"
+#include "CommonUtil.h"
+#include "Tlist.h"
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////	Types
@@ -23,10 +24,10 @@ typedef struct PENDINGIRP
 	IO_COMPLETION_ROUTINE*	oldRoutine;			//Old IRP routine address
 }PENDINGIRP, *PPENDINGIRP;
 #pragma pack()
- 
+
 #pragma pack (8)
 typedef struct IRPHOOKOBJ
-{  
+{
 	PDRIVER_OBJECT driver_object;
 	ULONG				 IrpCode;
 	PDRIVER_DISPATCH oldFunction;
@@ -34,7 +35,7 @@ typedef struct IRPHOOKOBJ
 }IRPHOOKOBJ, *PIRPHOOKOBJ;
 #pragma pack() 
 
- 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////	Prototype
 ////
@@ -75,9 +76,9 @@ NTSTATUS UnInitIrpHookSystem();
 //	
 //
 PVOID	DoIrpHook(
-	_In_		PDRIVER_OBJECT	driver_object, 
-	_In_		ULONG			IrpCode, 
-	_In_		PVOID			NewFunction,  
+	_In_		PDRIVER_OBJECT	driver_object,
+	_In_		ULONG			IrpCode,
+	_In_		PVOID			NewFunction,
 	_In_		Action			action
 );
 
