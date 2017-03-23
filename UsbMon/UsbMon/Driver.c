@@ -15,6 +15,8 @@
 ////	Global Variable
 ////
 //// 
+PDEVICE_OBJECT				g_DeviceObject = NULL;
+
  
 /////////////////////////////////////////////////////////////////////////////////////////////// 
 ////	Prototype
@@ -167,6 +169,18 @@ NTSTATUS UsbMonDeviceCtrlRoutine(
 
 	return  status;
 }
+
+//--------------------------------------------------------------------------------------//
+NTSTATUS DeleteDevice()
+{
+	UNICODE_STRING		dosDeviceName;
+	NTSTATUS			status;
+
+	RtlInitUnicodeString(&dosDeviceName, USBMON_DOS_DEVICE_NAME_W);
+	status = IoDeleteSymbolicLink(&dosDeviceName);
+	IoDeleteDevice(g_DeviceObject);
+	return status;
+}
 //--------------------------------------------------------------------------------------//
 NTSTATUS CreateDevice(PDRIVER_OBJECT DriverObject, PDEVICE_OBJECT* DeviceObject)
 {
@@ -219,16 +233,16 @@ VOID DriverUnload(
 { 
 	UNREFERENCED_PARAMETER(DriverObject);
 	UnInitializeHidPenetrate();
+	DeleteDevice();
 	return;
 } 
-
 //----------------------------------------------------------------------------------------//
 NTSTATUS DriverEntry(
 	_In_ PDRIVER_OBJECT object, 
 	_In_ PUNICODE_STRING String)
 { 
 	NTSTATUS						  status = STATUS_UNSUCCESSFUL; 
-	PDEVICE_OBJECT				DeviceObject = NULL; 
+
 
 	status = InitializeHidPenetrate(USB2);
 	if (!NT_SUCCESS(status))
@@ -237,7 +251,7 @@ NTSTATUS DriverEntry(
 		return status;
 	}	
 	
-	status = CreateDevice(object, &DeviceObject);
+	status = CreateDevice(object, &g_DeviceObject);
 	if (!NT_SUCCESS(status))
 	{
 		USB_COMMON_DEBUG_INFO("CreateDevice Error ");  
