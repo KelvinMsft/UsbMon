@@ -61,7 +61,7 @@ NTSTATUS DispatchUsbInternalCtrl(
 	IN ULONG IoControlCode,
 	IN PIO_STATUS_BLOCK pIoStatus)
 {	
-	HANDLE hEvent = (HANDLE)InputBuffer;
+	HANDLE hEvent = *(HANDLE*)InputBuffer;
 	ULONG64 user_mode_addr = 0;
 	PEPROCESS  hiddenProc;
 	NTSTATUS	 status = STATUS_UNSUCCESSFUL;
@@ -133,8 +133,8 @@ NTSTATUS UsbMonDeviceCtrlRoutine(
 	outputBufferLength = pIrpStack->Parameters.DeviceIoControl.OutputBufferLength;
 	ioControlCode = pIrpStack->Parameters.DeviceIoControl.IoControlCode;
 
+	DbgPrintEx(0, 0, "MajorFunc :%x \n", pIrpStack->MajorFunction );
 
-	DbgPrintEx(0, 0, "start %X IOCTL_USB_MAPPING_START:%x \n", ioControlCode, IOCTL_USB_MAPPING_START);
 
 	switch (pIrpStack->MajorFunction)
 	{
@@ -151,6 +151,9 @@ NTSTATUS UsbMonDeviceCtrlRoutine(
 		break;
 
 	case IRP_MJ_DEVICE_CONTROL: 
+
+		DbgPrintEx(0, 0, "IRP_MJ_DEVICE_CONTROL: %X IOCTL_USB_MAPPING_START:%x \n", ioControlCode, IOCTL_USB_MAPPING_START);
+
 		DispatchUsbInternalCtrl(inputBuffer,
 			inputBufferLength,
 			outputBuffer,
