@@ -341,8 +341,7 @@ NTSTATUS HandleMouseData(
 	ULONG								   colIndex = 0;
 	ULONG								  totalSize = 0;
 	BOOLEAN								    IsMouse = FALSE;
-	BOOLEAN								    IsKbd = FALSE;
-	char* 								extractor = NULL;
+	BOOLEAN								    IsKbd = FALSE; 
 	if (!pContext)
 	{
 		USB_DEBUG_INFO_LN_EX("NULL pContext");
@@ -426,57 +425,23 @@ NTSTATUS HandleMouseData(
 		status = STATUS_UNSUCCESSFUL;
 		return status;
 	}
-
-	extractor = ExAllocatePool(NonPagedPool, totalSize);
-	if (extractor && IsMouse)
-	{
-		char* x = extractor;
-		char* y = extractor + data.MOUDATA.XOffsetSize;
-		char* wheel = extractor + data.MOUDATA.XOffsetSize + data.MOUDATA.YOffsetSize;
-		char* btn = extractor + data.MOUDATA.XOffsetSize + data.MOUDATA.YOffsetSize + data.MOUDATA.ZOffsetSize;
-
-		RtlZeroMemory(extractor, totalSize);
-		RtlMoveMemory(x, (PUCHAR)UrbGetTransferBuffer(pContext->urb) + data.MOUDATA.OffsetX, data.MOUDATA.XOffsetSize);
-		RtlMoveMemory(y, (PUCHAR)UrbGetTransferBuffer(pContext->urb) + data.MOUDATA.OffsetY, data.MOUDATA.YOffsetSize);
-		RtlMoveMemory(wheel, (PUCHAR)UrbGetTransferBuffer(pContext->urb) + data.MOUDATA.OffsetZ, data.MOUDATA.ZOffsetSize);
-		//Left  = 1
-		//Right = 2
-		//Wheel = 3 
-		RtlMoveMemory(btn, (PUCHAR)UrbGetTransferBuffer(pContext->urb) + data.MOUDATA.OffsetButton, data.MOUDATA.BtnOffsetSize);
-
-		//TODO: loop the size
-		USB_COMMON_DEBUG_INFO("");
-		USB_NATIVE_DEBUG_INFO("X : %d ", *x);
-		USB_NATIVE_DEBUG_INFO("Y : %d ", *y);
-		USB_NATIVE_DEBUG_INFO("Z : %d ", *wheel);
-		USB_NATIVE_DEBUG_INFO("btn: %d", *btn);
-		USB_DEBUG_INFO_LN();
-		ExFreePool(extractor);
-		extractor = NULL;
+	 
+	if (IsMouse && g_mou_data)
+	{ 
+		g_mou_data->x = *(PCHAR)((PCHAR)UrbGetTransferBuffer(pContext->urb) + data.MOUDATA.OffsetX);
+		g_mou_data->y = *(PCHAR)((PCHAR)UrbGetTransferBuffer(pContext->urb) + data.MOUDATA.OffsetY);
+		g_mou_data->z = *(PCHAR)((PCHAR)UrbGetTransferBuffer(pContext->urb) + data.MOUDATA.OffsetZ);
+		g_mou_data->Click = *(PCHAR)((PCHAR)UrbGetTransferBuffer(pContext->urb) + data.MOUDATA.OffsetButton); 
+		g_mou_data->IsAbsolute = *(PCHAR)((PUCHAR)UrbGetTransferBuffer(pContext->urb) + data.MOUDATA.IsAbsolute);
 	}
 
-	if (extractor && IsKbd)
-	{
-		int i = 0;
-		char* SpecialKey = extractor;
-		char* NormalKey = extractor + data.KBDDATA.NormalKeySize;
+	 
+	USB_NATIVE_DEBUG_INFO("g_pEvent: %I64x", g_pEvent);
 
-		RtlZeroMemory(extractor, totalSize);
-		RtlMoveMemory(SpecialKey, (PUCHAR)UrbGetTransferBuffer(pContext->urb) + data.KBDDATA.SpecialKeyOffset, data.KBDDATA.SpecialKeySize);
-		RtlMoveMemory(NormalKey, (PUCHAR)UrbGetTransferBuffer(pContext->urb) + data.KBDDATA.NormalKeyOffset, data.KBDDATA.NormalKeySize);
-		for (i = 0; i < data.KBDDATA.NormalKeySize; i++)
-		{
-			USB_NATIVE_DEBUG_INFO("%x ", NormalKey++);
-		}
-		for (i = 0; i < data.KBDDATA.SpecialKeySize; i++)
-		{
-			USB_NATIVE_DEBUG_INFO("%x ", SpecialKey++);
-		}
-		USB_DEBUG_INFO_LN();
-		ExFreePool(extractor);
-		extractor = NULL;
+	if (g_pEvent)
+	{ 
+		KeSetEvent(g_pEvent,0,FALSE);
 	}
-
 
 
 	return status;
@@ -757,10 +722,10 @@ NTSTATUS MappingUsbMemory(
 
 		return STATUS_INVALID_PARAMETER;
 	}
-	//存在结构体代表游戏进程已经启动 
-	//是否已經映射過
+
 	if (g_ProcessInfo.mapped_user_addr)
 	{
+		USB_DEBUG_INFO_LN_EX("Mapped Memory \r\n ");
 		*mapped_user_address = (ULONG64)g_ProcessInfo.mapped_user_addr;
 	}
 	else
@@ -770,6 +735,8 @@ NTSTATUS MappingUsbMemory(
 
 		if (!g_ProcessInfo.mapped_user_addr)
 		{
+			USB_DEBUG_INFO_LN_EX("Cannot Mapping Memory \r\n ");
+
 			return STATUS_INSUFFICIENT_RESOURCES;
 		}
 

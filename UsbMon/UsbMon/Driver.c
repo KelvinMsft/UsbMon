@@ -247,7 +247,7 @@ NTSTATUS DriverEntry(
 	NTSTATUS						  status = STATUS_UNSUCCESSFUL; 
 
 
-	status = InitializeHidPenetrate(USB2);
+	status = InitializeHidPenetrate(USB3);
 	if (!NT_SUCCESS(status))
 	{
 		USB_COMMON_DEBUG_INFO("Init Pene System Error ");
