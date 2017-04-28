@@ -3,27 +3,46 @@
 #include "Winparse.h"
 #include "ReportUtil.h"   
 #include "IrpHook.h"
-
+#include "UsbType.h"
 #define HIDP_MAX_UNKNOWN_ITEMS 4
 
 
-/////////////////////////////////////////////////////////////////////////////////////////////// 
-//// Global/Extern Variable 
+/////////////////////////////////////////////////////////////////////////////////////
+//// Type
 //// 
-HID_DEVICE_LIST*    g_HidClientPdoList = NULL;
-BOOLEAN				g_IsHidModuleInit = FALSE;
 
-/////////////////////////////////////////////////////////////////////////////////////////////// 
+typedef struct _PARAM
+{
+	BOOLEAN 					 Ret;
+	USBD_PIPE_HANDLE	  PipeHandle;
+}PARAM, *PPARAM;
+
+typedef struct _HASH_TABLE
+{
+	ULONG_PTR ID;
+	PVOID	  Value;
+}HASHTABLE, *PHASHTABLE;
+
+/////////////////////////////////////////////////////////////////////////////////////
 //// Marco
 //// 
 #define ARRAY_SIZE						 100
 #define HIDP_PREPARSED_DATA_SIGNATURE1	 'PdiH'
 #define HIDP_PREPARSED_DATA_SIGNATURE2   'RDK '
+#define  HASHSIZE 0x10000
 
+/////////////////////////////////////////////////////////////////////////////////////
+//// Global/Extern Variable 
+//// 
+HID_DEVICE_LIST*    g_HidClientPdoList = NULL;
+BOOLEAN				g_IsHidModuleInit = FALSE;
+HASHTABLE 			g_HidDevicePipeHashTable[HASHSIZE] = { 0 };
 
-/////////////////////////////////////////////////////////////////////////////////////////////// 
+extern USERCONFIGEX* g_UserCfgEx;
+/////////////////////////////////////////////////////////////////////////////////////
 //// Prototype
 //// 
+
 
 
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -210,6 +229,53 @@ NTSTATUS VerifyDevice(
 //// Implementation
 ////
 
+
+//----------------------------------------------------------------------------------------//
+ULONG GetIndexByID(ULONG_PTR ID)
+{
+	return ID % HASHSIZE;
+}
+//----------------------------------------------------------------------------------------//
+void ClearHashById(ULONG_PTR ID)
+{
+	ULONG Index = GetIndexByID(ID);
+	g_HidDevicePipeHashTable[Index].ID = 0;
+	g_HidDevicePipeHashTable[Index].Value = NULL;
+	USB_DEBUG_INFO_LN_EX("Clear - Index: %x Id: %I64x ", Index, ID);
+}
+
+//----------------------------------------------------------------------------------------//
+void SetHash(ULONG_PTR ID, PVOID lpNode)
+{
+	ULONG Index = GetIndexByID(ID);
+	g_HidDevicePipeHashTable[Index].ID = ID;
+	g_HidDevicePipeHashTable[Index].Value = lpNode;
+	USB_DEBUG_INFO_LN_EX("Add - Index: %x Id: %I64x ", Index, ID);
+}
+
+//----------------------------------------------------------------------------------------//
+BOOLEAN GetHashIndexById(ULONG_PTR ID, PHID_DEVICE_NODE* lpNode)
+{
+	ULONG_PTR Index = GetIndexByID(ID);
+	if (g_HidDevicePipeHashTable[Index].ID == ID)
+	{
+		*lpNode = (PHID_DEVICE_NODE)g_HidDevicePipeHashTable[Index].Value;
+		return TRUE;
+	}
+	return FALSE;
+}
+//--------------------------------------------------------------------------------------------//
+VOID ClearPipeHandleHashByHidNode(PHID_DEVICE_NODE HidNode)
+{
+	ULONG i = 0;
+	USBD_PIPE_INFORMATION* PipeHandleFromWhiteLists = HidNode->mini_extension->InterfaceDesc->Pipes;
+	ULONG 	NumberOfPipes = HidNode->mini_extension->InterfaceDesc->NumberOfPipes;
+	for (i = 0; i < NumberOfPipes; i++)
+	{
+		USB_DEBUG_INFO_LN_EX("ppHandle: %I64x", PipeHandleFromWhiteLists[i].PipeHandle);
+		ClearHashById((ULONG_PTR)PipeHandleFromWhiteLists[i].PipeHandle);
+	}
+}
 //--------------------------------------------------------------------------------------------//
 ULONG SearchHidNodeCallback(
 	_In_ PHID_DEVICE_NODE HidNode,
@@ -225,10 +291,11 @@ ULONG SearchHidNodeCallback(
 }
 
 //--------------------------------------------------------------------------------------------//
-PHID_DEVICE_NODE GetHidNodeByDeviceObjct(
+PHID_DEVICE_NODE GetHidNodeByDeviceObject(
 	_In_ PDEVICE_OBJECT DeviceObject
 )
 {
+	USB_DEBUG_INFO_LN_EX("GetHidNodeByDeviceObject");
 	return QueryFromChainListByCallback(g_HidClientPdoList->head, SearchHidNodeCallback, DeviceObject);
 }
 
@@ -278,11 +345,13 @@ NTSTATUS RemoveNodeFromHidList(
 	{
 		return status;
 	}
-	node = GetHidNodeByDeviceObjct(DeviceObject);
+	node = GetHidNodeByDeviceObject(DeviceObject);
 	if (!node)
 	{
 		return status;
 	}
+
+	ClearPipeHandleHashByHidNode(node);
 
 	if (DelFromChainListByPointer(g_HidClientPdoList->head, node))
 	{
@@ -296,13 +365,13 @@ NTSTATUS RemoveNodeFromHidList(
 //----------------------------------------------------------------------------------------//
 LOOKUP_STATUS LookupPipeHandleCallback(
 	PHID_DEVICE_NODE Data,
-	void* Context
+	PARAM* Context
 )
 {
 	NTSTATUS								   status = STATUS_UNSUCCESSFUL;
 	USBD_PIPE_HANDLE				PipeHandleFromUrb = NULL;
 	USBD_PIPE_INFORMATION*	 PipeHandleFromWhiteLists = NULL;
-	ULONG								NumberOfPipes = NULL;
+	ULONG								NumberOfPipes = 0;
 	ULONG 										   i = 0;
 	if (!Data || !Context)
 	{
@@ -324,7 +393,8 @@ LOOKUP_STATUS LookupPipeHandleCallback(
 		USB_DEBUG_INFO_LN_EX("Empty Pipes");
 		return CLIST_FINDCB_CTN;
 	}
-	PipeHandleFromUrb = Context;
+
+	PipeHandleFromUrb = Context->PipeHandle;
 	PipeHandleFromWhiteLists = Data->mini_extension->InterfaceDesc->Pipes;
 	NumberOfPipes = Data->mini_extension->InterfaceDesc->NumberOfPipes;
 
@@ -333,6 +403,7 @@ LOOKUP_STATUS LookupPipeHandleCallback(
 		if (PipeHandleFromUrb == PipeHandleFromWhiteLists[i].PipeHandle)
 		{
 			status = STATUS_SUCCESS;
+			Context->Ret = TRUE;
 			break;
 		}
 	}
@@ -344,22 +415,39 @@ LOOKUP_STATUS LookupPipeHandleCallback(
 	return CLIST_FINDCB_RET;
 }
 
+
+
 //----------------------------------------------------------------------------------------// 
 BOOLEAN IsHidDevicePipe(
-	_In_ TChainListHeader* PipeListHeader,
-	_In_ USBD_PIPE_HANDLE  PipeHandle,
-	_Out_ PHID_DEVICE_NODE*		node
+	_In_ TChainListHeader* 		PipeListHeader,
+	_In_ USBD_PIPE_HANDLE  		PipeHandle,
+	_Out_ PHID_DEVICE_NODE*		lpNode
 )
 {
-	BOOLEAN exist = FALSE;
-	*node = QueryFromChainListByCallback(PipeListHeader, LookupPipeHandleCallback, PipeHandle);
-
-	if (*node)
+	PHID_DEVICE_NODE Node = NULL;
+	if (GetHashIndexById((ULONG_PTR)PipeHandle, &Node))
 	{
-		exist = TRUE;
+		USB_DEBUG_INFO_LN_EX("Get Value By Hash ");
+		*lpNode = Node;
+		return TRUE;
 	}
-
-	return exist;
+	else
+	{
+		PARAM params = { FALSE , PipeHandle };
+		Node = QueryFromChainListByCallback(PipeListHeader, LookupPipeHandleCallback, &params);
+		if (Node && params.Ret)
+		{
+			*lpNode = Node;
+			SetHash((ULONG_PTR)PipeHandle, Node);
+			return TRUE;
+		}
+		else
+		{
+			*lpNode = NULL;
+			SetHash((ULONG_PTR)PipeHandle, NULL);
+		}
+	}
+	return FALSE;
 }
 
 //----------------------------------------------------------------------------------------------------------//
@@ -445,6 +533,7 @@ HID_DEVICE_NODE* CreateHidDeviceNode(
 	RtlZeroMemory(node, sizeof(HID_DEVICE_NODE));
 	node->device_object = DeviceObject;
 	node->mini_extension = MiniExtension;
+	node->InputExtractData = NULL;
 	RtlMoveMemory(&node->parsedReport, ParsedReport, sizeof(HIDP_DEVICE_DESC));
 
 	return node;
@@ -468,11 +557,9 @@ NTSTATUS VerifyDevice(
 
 		if (!IsHidTypeDevice(DeviceObject, &MiniExtension))
 		{
-			if (!MiniExtension)
-			{
-				status = STATUS_UNSUCCESSFUL;
-				break;
-			}
+			USB_DEBUG_INFO_LN_EX("IsHidTypeDevice");
+			status = STATUS_UNSUCCESSFUL;
+			break;
 		}
 
 		ParsedReport = (HIDP_DEVICE_DESC*)ExAllocatePoolWithTag(NonPagedPool, sizeof(HIDP_DEVICE_DESC), 'csed');
@@ -558,10 +645,13 @@ BOOLEAN  IsHidTypeDevice(
 			break;
 		}
 
+		if (!g_UserCfgEx)
+		{
+
+		}
+		//pMiniExtension->InterfaceDesc->Protocol == 1 &&  ||		//Keyboard
 		if (pMiniExtension->InterfaceDesc->Class == 3 &&			//HidClass Device
-			(pMiniExtension->InterfaceDesc->Protocol == 1 ||		//Keyboard
-				pMiniExtension->InterfaceDesc->Protocol == 2 ||		//Mouse
-				pMiniExtension->InterfaceDesc->Protocol == 0))
+			pMiniExtension->InterfaceDesc->Protocol == 2)//Mouse
 		{
 			GetDeviceName(DeviceObject, DeviceName);
 
@@ -600,6 +690,9 @@ NTSTATUS VerifyAllHidDevice(
 	{
 		if (NT_SUCCESS(VerifyAndInsertIntoHidList(DeviceObject)))
 		{
+			WCHAR DeviceObjectName[256] = { 0 };
+			GetDeviceName(DeviceObject, DeviceObjectName);
+			USB_DEBUG_INFO_LN_EX("DeviceObject: %ws", DeviceObjectName);
 			HidClientPdoCount++;
 		}
 		DeviceObject = DeviceObject->NextDevice;
@@ -609,8 +702,9 @@ NTSTATUS VerifyAllHidDevice(
 	{
 		*ClientPdoCount = HidClientPdoCount;
 		status = STATUS_SUCCESS;
-	}
+	} 
 
+	USB_DEBUG_INFO_LN_EX("HidClientPdoCount: %x", HidClientPdoCount);
 	return status;
 }
 //----------------------------------------------------------------------------------------------------------//
@@ -656,6 +750,19 @@ NTSTATUS InitClientPdoList(
 	return status;
 }
 //----------------------------------------------------------------------------------------------------------//
+ULONG   __fastcall FreeHidNodeCallback(PHID_DEVICE_NODE Header, ULONG Act)
+{
+	if (Act == CLIST_ACTION_FREE)
+	{
+		if (Header->InputExtractData)
+		{
+			ExFreePool(Header->InputExtractData);
+			Header->InputExtractData = NULL;
+		}
+	}
+	return 0;
+}
+//----------------------------------------------------------------------------------------------------------//
 NTSTATUS AllocateClientPdoList()
 {
 	NTSTATUS status = STATUS_UNSUCCESSFUL;
@@ -673,7 +780,7 @@ NTSTATUS AllocateClientPdoList()
 		}
 		if (!g_HidClientPdoList->head)
 		{
-			g_HidClientPdoList->head = NewChainListHeaderEx(LISTFLAG_SPINLOCK | LISTFLAG_AUTOFREE, NULL, 0);
+			g_HidClientPdoList->head = NewChainListHeaderEx(LISTFLAG_SPINLOCK | LISTFLAG_AUTOFREE, FreeHidNodeCallback, 0);
 			if (!g_HidClientPdoList->head)
 			{
 				ExFreePool(g_HidClientPdoList);
@@ -698,13 +805,11 @@ NTSTATUS UnInitHidSubSystem()
 
 	status = FreeHidClientPdoList();
 
-	if (!NT_SUCCESS(status))
+	if (NT_SUCCESS(status))
 	{
-		return status;
-	}	
+		g_IsHidModuleInit = FALSE;
+	}
 
-	g_IsHidModuleInit = FALSE;
-	status = STATUS_SUCCESS;
 	return status;
 }
 
@@ -713,14 +818,13 @@ NTSTATUS InitHidSubSystem(
 	_Out_ PULONG ClientPdoListSize)
 {
 	PDRIVER_OBJECT	    pDriverObj = NULL;
-	ULONG			  current_size = 0;
 	NTSTATUS			status = STATUS_UNSUCCESSFUL;
 
 	do {
 		if (g_IsHidModuleInit)
 		{
 			USB_DEBUG_INFO_LN_EX("Module Already Init");
-			status = STATUS_SUCCESS;
+			status = STATUS_UNSUCCESSFUL;
 			break;
 		}
 
@@ -742,7 +846,7 @@ NTSTATUS InitHidSubSystem(
 		if (g_HidClientPdoList)
 		{
 			g_HidClientPdoList->RefCount = 1;
-			USB_DEBUG_INFO_LN_EX("Create Success list: %I64x size: %x", g_HidClientPdoList, current_size);
+			USB_DEBUG_INFO_LN_EX("Create Success list: %I64x ", g_HidClientPdoList);
 			g_IsHidModuleInit = TRUE;
 			status = STATUS_SUCCESS;
 			break;

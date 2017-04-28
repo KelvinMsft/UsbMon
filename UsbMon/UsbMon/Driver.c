@@ -239,6 +239,7 @@ VOID DriverUnload(
 	DeleteDevice();
 	return;
 } 
+
 //----------------------------------------------------------------------------------------//
 NTSTATUS DriverEntry(
 	_In_ PDRIVER_OBJECT object, 
@@ -247,19 +248,7 @@ NTSTATUS DriverEntry(
 	NTSTATUS						  status = STATUS_UNSUCCESSFUL; 
 
 
-	status = InitializeHidPenetrate(USB3);
-	if (!NT_SUCCESS(status))
-	{
-		USB_COMMON_DEBUG_INFO("Init Pene System Error ");
-		return status;
-	}	
-	
-	status = CreateDevice(object, &g_DeviceObject);
-	if (!NT_SUCCESS(status))
-	{
-		USB_COMMON_DEBUG_INFO("CreateDevice Error ");  
-		return status;
-	}
+	InitializeHidPenetrate();
 
 	object->DriverUnload			     = DriverUnload;
 	return status;

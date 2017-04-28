@@ -1,5 +1,7 @@
 #ifndef __HIJACK_HEADER__
 #define __HIJACK_HEADER__ 
+
+
 #include <ntddk.h> 
 #include "UsbUtil.h"
 
@@ -23,9 +25,7 @@ Return Value:
 				- STATUS_UNSUCCESSFUL if failed
 
 -------------------------------------------------------*/
-NTSTATUS InitializeHidPenetrate(
-	_In_ USB_HUB_VERSION UsbVersion
-);
+NTSTATUS InitializeHidPenetrate();
 
 
   
@@ -51,9 +51,81 @@ Return Value:
 NTSTATUS UnInitializeHidPenetrate();
 
 
-NTSTATUS MapUsbDataToUserAddressSpace(
-	ULONG64* mapped_addr,
-	HANDLE hEvent
+
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Routine Description:
+
+	- MapUsbDataToUserAddressSpace
+		1.	Mapped the mouse / keyboard data struct to 
+			user mode address space.
+			
+		2.  Once structure is updated, Set Event object 
+		
+Arguments:
+
+	  UserModeConfigEx - Pointer to the User Mode Config struct with 
+						 mapped address
+	
+	  Size			   - size of struct
+	  
+Return Value:	
+
+	  NTSTATUS	- STATUS_SUCCESS if initial successed
+				- STATUS_UNSUCCESSFIL if initial failed
+
+	-------------------------------------------------------*/
+NTSTATUS MapUsbDataToUserAddressSpace( 
+	_Inout_  	USERCONFIGEX*     UserModeConfigEx,
+	_In_		ULONG			  Size
 );
 
+
+/*-----------------------------------------------------
+Routine Description:
+	-	OnProcessExitToUsbSystem
+		
+Arguments:
+
+	PEPROCESS   - Pointer of exiting's process
+		
+Return Value:
+
+	  NTSTATUS	- STATUS_SUCCESS if initial successed
+				- STATUS_UNSUCCESSFIL if initial failed
+-----------------------------------------------------*/ 
+NTSTATUS OnProcessExitToUsbSystem(
+	_In_ PEPROCESS eProcess
+);
+	
+	
+	
+
+/*-----------------------------------------------------
+Routine Description:
+
+	- UsbPenerateConfigInit
+			1. Config Init
+Arguments:
+		
+	No 
+	
+Return Value:
+
+	  NTSTATUS	- STATUS_SUCCESS if initial successed
+				- STATUS_UNSUCCESSFIL if initial failed
+-----------------------------------------------------*/
+NTSTATUS UsbPenerateConfigInit();
+
+
+NTSTATUS InitializeHidPenetrate();
+
+
+///////////////////////////////////////////////////////
+//// Types
+ 
+
+///////////////////////////////////////////////////////
+//// Marcos and Utilies
+ 
 #endif

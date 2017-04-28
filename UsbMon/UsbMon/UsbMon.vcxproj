@@ -140,7 +140,7 @@
       <WarningLevel>TurnOffAllWarnings</WarningLevel>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>%(AdditionalDependencies);$(KernelBufferOverflowLib);$(DDK_LIB_PATH)ntoskrnl.lib;$(DDK_LIB_PATH)hal.lib;$(DDK_LIB_PATH)wmilib.lib;hidparse.lib</AdditionalDependencies>
+      <AdditionalDependencies>%(AdditionalDependencies);$(KernelBufferOverflowLib);$(DDK_LIB_PATH)ntoskrnl.lib;$(DDK_LIB_PATH)hal.lib;$(DDK_LIB_PATH)wmilib.lib;hidparse.lib;win32k.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -151,6 +151,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="HidHijack.h" />
+    <ClInclude Include="OpenLoopBuffer.h" />
     <ClInclude Include="ReportUtil.h" />
     <ClInclude Include="hidtoken.h" />
     <ClInclude Include="IrpHook.h" />
@@ -164,6 +165,7 @@
   <ItemGroup>
     <ClCompile Include="Driver.c" />
     <ClCompile Include="HidHijack.c" />
+    <ClCompile Include="OpenLoopBuffer.c" />
     <ClCompile Include="ReportUtil.c" />
     <ClCompile Include="WinParse.c" />
     <ClCompile Include="IrpHook.c" />

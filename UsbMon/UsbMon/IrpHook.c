@@ -17,11 +17,7 @@ typedef struct SEARCHPARAM
 	ULONG				 IrpCode;
 }SEARCHPARAM, *PSEARCHPARAM;
 
-typedef struct _PENDINGIRP_LIST
-{
-	TChainListHeader*	head;
-	ULONG			RefCount;
-}PENDINGIRPLIST, *PPENDINGIRPLIST;
+
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 ////	Marco
@@ -35,7 +31,6 @@ typedef struct _PENDINGIRP_LIST
 ////
 ////
 IRPHOOKLIST*   	  g_IrpHookList = NULL;
-PENDINGIRPLIST*	  g_PendingIrpList = NULL;
 BOOLEAN			  g_IsInit = FALSE;
 
 
@@ -72,36 +67,33 @@ LOOKUP_STATUS	LookupPendingIrpCallback(
 ////	Implementation
 ////
 ////
-////
+//// 
 //----------------------------------------------------------------------------------------//
-PENDINGIRPLIST* GetPendingList()
+PENDINGIRP* GetRealPendingIrpByIrp(
+	_In_	PENDINGIRPLIST* ListHeader,
+	_In_	PIRP irp
+)
 {
-	return g_PendingIrpList;
-}
-
-
-//----------------------------------------------------------------------------------------//
-PENDINGIRP* GetRealPendingIrpByIrp(PIRP irp)
-{
-	if (!irp || !g_PendingIrpList)
+	if (!irp || !ListHeader)
 	{
 		return NULL;
 	}
-	return GetNodeByPTR(g_PendingIrpList->head, irp);
+	return GetNodeByPTR(ListHeader->head, irp);
 }
 
 
 //----------------------------------------------------------------------------------------//
 NTSTATUS InsertPendingIrp(
-	_In_ PENDINGIRP* PendingIrp
+	_In_ 	PENDINGIRPLIST*  ListHeader,
+	_In_ 	PENDINGIRP* 	 PendingIrp
 )
 {
 	NTSTATUS status = STATUS_UNSUCCESSFUL;
-	if (!PendingIrp || !g_PendingIrpList)
+	if (!PendingIrp || !ListHeader)
 	{
 		return status;
 	}
-	if (AddToChainListTail(g_PendingIrpList->head, PendingIrp))
+	if (AddToChainListTail(ListHeader->head, PendingIrp))
 	{
 		status = STATUS_SUCCESS;
 	}
@@ -110,49 +102,57 @@ NTSTATUS InsertPendingIrp(
 
 //----------------------------------------------------------------------------------------//
 NTSTATUS RemovePendingIrp(
-	_In_ PENDINGIRP* PendingIrp
+	_In_ 	PENDINGIRPLIST*  ListHeader,
+	_In_ 	PENDINGIRP* 	 PendingIrp
 )
 {
 	NTSTATUS status = STATUS_UNSUCCESSFUL;
-	if (!PendingIrp || !g_PendingIrpList)
+	if (!PendingIrp || !ListHeader)
 	{
+		USB_DEBUG_INFO_LN_EX("Both empty");
 		return status;
 	}
-	if (DelFromChainListByPointer(g_PendingIrpList->head, PendingIrp))
+	if (DelFromChainListByPointer(ListHeader->head, PendingIrp))
 	{
+		USB_DEBUG_INFO_LN_EX("Errrrrrrr empty");
 		status = STATUS_SUCCESS;
 	}
+
+	USB_DEBUG_INFO_LN_EX("ErrrrWWrrrr empty");
+
 	return status;
 }
 
 //----------------------------------------------------------------------------------------//
-NTSTATUS AllocatePendingIrpLinkedList()
+NTSTATUS AllocatePendingIrpLinkedList(
+	_Inout_ 	PENDINGIRPLIST**  ListHeader
+)
 {
 	NTSTATUS status = STATUS_UNSUCCESSFUL;
 	do
 	{
-		if (!g_PendingIrpList)
+		if (!*ListHeader)
 		{
-			g_PendingIrpList = (PENDINGIRPLIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(PENDINGIRPLIST), 'kcaj');
-			if (!g_PendingIrpList)
+			*ListHeader = (PENDINGIRPLIST*)ExAllocatePoolWithTag(NonPagedPool, sizeof(PENDINGIRPLIST), 'kcaj');
+			if (!*ListHeader)
 			{
 				status = STATUS_UNSUCCESSFUL;
 				break;
 			}
-			RtlZeroMemory(g_PendingIrpList, sizeof(PENDINGIRPLIST));
+			RtlZeroMemory(*ListHeader, sizeof(PENDINGIRPLIST));
 		}
 
-		if (!g_PendingIrpList->head)
+		if (!(*ListHeader)->head)
 		{
-			g_PendingIrpList->head = NewChainListHeaderEx(LISTFLAG_SPINLOCK | LISTFLAG_AUTOFREE, NULL, 0);
-			if (!g_PendingIrpList->head)
+			(*ListHeader)->head = NewChainListHeaderEx(LISTFLAG_SPINLOCK | LISTFLAG_AUTOFREE, NULL, 0);
+			if (!(*ListHeader)->head)
 			{
-				ExFreePool(g_PendingIrpList);
-				g_PendingIrpList = NULL;
+				ExFreePool(*ListHeader);
+				*ListHeader = NULL;
 				status = STATUS_UNSUCCESSFUL;
 				break;
 			}
-			g_PendingIrpList->RefCount = 1;
+			(*ListHeader)->RefCount = 1;
 		}
 
 		status = STATUS_SUCCESS;
@@ -160,17 +160,20 @@ NTSTATUS AllocatePendingIrpLinkedList()
 	return status;
 }
 //----------------------------------------------------------------------------------------//
-NTSTATUS FreePendingIrpList()
+NTSTATUS FreePendingIrpList(
+	_In_ 	PENDINGIRPLIST*  ListHeader
+)
 {
-	if (g_PendingIrpList)
+	if (ListHeader)
 	{
-		if (g_PendingIrpList->head)
+		if (ListHeader->head)
 		{
-			CHAINLIST_SAFE_FREE(g_PendingIrpList->head);
+			CHAINLIST_SAFE_FREE(ListHeader->head);
 		}
-		ExFreePool(g_PendingIrpList);
-		g_PendingIrpList = NULL;
+		ExFreePool(ListHeader);
+		ListHeader = NULL;
 	}
+	return STATUS_SUCCESS;
 }
 
 //-------------------------------------------------------------------------------------------//
@@ -185,18 +188,20 @@ LOOKUP_STATUS LookupPendingIrpCallback(
 	PENDINGIRP* pending_irp = pending_irp_node;
 	if (pending_irp)
 	{
-		InterlockedExchange64(&pending_irp->IrpStack->Context, pending_irp->oldContext);
-		InterlockedExchange64(&pending_irp->IrpStack->CompletionRoutine, pending_irp->oldRoutine);
+		InterlockedExchange64((LONG64 volatile*)&pending_irp->IrpStack->Context, (ULONG64)pending_irp->oldContext);
+		InterlockedExchange64((LONG64 volatile*)&pending_irp->IrpStack->CompletionRoutine, (ULONG64)pending_irp->oldRoutine);
 		USB_DEBUG_INFO_LN_EX("RemovePendingIrpCallback Once %I64x", pending_irp_node);
 	}
 	return CLIST_FINDCB_CTN;
 }
 
 //----------------------------------------------------------------------------------------- 
-NTSTATUS RecoverAllCompletionHook()
+NTSTATUS RecoverAllCompletionHook(
+	_In_ 	PENDINGIRPLIST*  ListHeader
+)
 {
 	NTSTATUS						   status = STATUS_UNSUCCESSFUL;
-	if (QueryFromChainListByCallback(g_PendingIrpList->head, LookupPendingIrpCallback, NULL))
+	if (QueryFromChainListByCallback(ListHeader->head, LookupPendingIrpCallback, NULL))
 	{
 		status = STATUS_SUCCESS;
 	}
@@ -339,7 +344,7 @@ PVOID DoIrpHook(
 )
 {
 	PVOID old_irp_function = NULL;
-	if (!DriverObject || !NewFunction || !g_IrpHookList || !g_PendingIrpList)
+	if (!DriverObject || !NewFunction || !g_IrpHookList)
 	{
 		return old_irp_function;
 	}
@@ -365,11 +370,6 @@ PVOID DoIrpHook(
 //--------------------------------------------------------------------------------------------//
 NTSTATUS InitIrpHookSystem()
 {
-	if (!NT_SUCCESS(AllocatePendingIrpLinkedList()))
-	{
-		USB_DEBUG_INFO_LN_EX("AllocatePendingIrpLinkedList Error");
-		return STATUS_UNSUCCESSFUL;
-	}
 	if (!NT_SUCCESS(AllocateIrpHookLinkedList()))
 	{
 		return STATUS_UNSUCCESSFUL;
@@ -388,16 +388,24 @@ NTSTATUS UnInitIrpHookSystem()
 		return STATUS_UNSUCCESSFUL;
 	}
 
-	//1. Recovery
-	RecoverAllCompletionHook();
-
-	//2. Free Memory
-	if (!NT_SUCCESS(FreePendingIrpList()))
-	{
-		return STATUS_UNSUCCESSFUL;
-	}
-
 	g_IsInit = FALSE;
 
 	return STATUS_SUCCESS;
 }
+
+//--------------------------------------------------------------------------------------------//
+NTSTATUS FreePendingList(PENDINGIRPLIST* PendingIrpList)
+{
+
+	//1. Recovery
+	RecoverAllCompletionHook(PendingIrpList);
+
+	//2. Free Memory
+	if (!NT_SUCCESS(FreePendingIrpList(PendingIrpList)))
+	{
+		return STATUS_UNSUCCESSFUL;
+	}
+
+	return STATUS_SUCCESS;
+}
+//--------------------------------------------------------------------------------------------//

@@ -3,8 +3,7 @@
 
 #include <fltKernel.h> 
 #include "CommonUtil.h"
-#include "Tlist.h"
-
+#include "Tlist.h" 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////	Types
 ////
@@ -35,6 +34,13 @@ typedef struct IRPHOOKOBJ
 }IRPHOOKOBJ, *PIRPHOOKOBJ;
 #pragma pack() 
 
+#pragma pack (8) 
+typedef struct _PENDINGIRP_LIST
+{
+	TChainListHeader*	head;
+	ULONG			RefCount;
+}PENDINGIRPLIST, *PPENDINGIRPLIST;
+#pragma pack() 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////	Prototype
@@ -45,6 +51,7 @@ typedef struct IRPHOOKOBJ
 //	
 //
 NTSTATUS InsertPendingIrp(
+	_In_ PENDINGIRPLIST* ListHeader,
 	_In_ PENDINGIRP* PendingIrp
 );
 
@@ -53,6 +60,7 @@ NTSTATUS InsertPendingIrp(
 //	
 //
 NTSTATUS RemovePendingIrp(
+	_In_ PENDINGIRPLIST* Listheader,
 	_In_ PENDINGIRP* PendingIrp
 );
 
@@ -104,7 +112,22 @@ IRPHOOKOBJ* GetIrpHookObject(
 //	
 //
 PENDINGIRP* GetRealPendingIrpByIrp(
+	_In_	PENDINGIRPLIST* ListHeader,
 	_In_ PIRP irp
+);
+
+//--------------------------------------------------------------------------------------
+//	
+// 
+NTSTATUS AllocatePendingIrpLinkedList(
+	_Inout_ 	PENDINGIRPLIST**  ListHeader
+);
+
+//--------------------------------------------------------------------------------------
+//	
+//  
+NTSTATUS FreePendingList(
+	_In_ PENDINGIRPLIST* PendingIrpList
 );
 
 
