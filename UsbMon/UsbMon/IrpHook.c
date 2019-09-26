@@ -409,3 +409,43 @@ NTSTATUS FreePendingList(PENDINGIRPLIST* PendingIrpList)
 	return STATUS_SUCCESS;
 }
 //--------------------------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------------------//
+NTSTATUS IrpVerifyPendingIrpCompletionHookCallback(
+	_In_ PENDINGIRP* pending_irp_node,
+	_In_ void*		 context
+)
+{
+	NTSTATUS  	     status = STATUS_UNSUCCESSFUL;
+	PENDINGIRP* pending_irp = pending_irp_node;
+
+	if (!pending_irp)
+	{
+		return CLIST_FINDCB_CTN;
+	}
+
+	// if one of them is modified, return it.
+	if ((ULONG_PTR)pending_irp->IrpStack->CompletionRoutine != (ULONG_PTR)pending_irp->newRoutine)
+	{
+		return CLIST_FINDCB_RET;
+	}
+
+	return CLIST_FINDCB_CTN;
+}
+
+NTSTATUS IrpVerifyPendingIrpCompletionHookByIrp(
+	_In_	PENDINGIRPLIST* ListHeader,
+	_In_	PIRP Irp
+)
+{
+	NTSTATUS  status = STATUS_UNSUCCESSFUL;
+
+	//Return NOT NULL, if and only if a completion callback is modified.
+	//See: IrpVerifyPendingIrpCompletionHookCallback
+	if (!QueryFromChainListByCallback(ListHeader->head, IrpVerifyPendingIrpCompletionHookCallback, Irp))
+	{
+		status = STATUS_SUCCESS;
+	}
+	return status;
+}
+

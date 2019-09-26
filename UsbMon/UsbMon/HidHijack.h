@@ -76,7 +76,7 @@ Return Value:
 
 	-------------------------------------------------------*/
 NTSTATUS MapUsbDataToUserAddressSpace( 
-	_Inout_  	USERCONFIGEX*     UserModeConfigEx,
+	_Inout_  	void*     UserModeConfigEx,
 	_In_		ULONG			  Size
 );
 

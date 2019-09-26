@@ -1,7 +1,8 @@
 #ifndef __REPORT_UTIL_HEARER__
 #define __REPORT_UTIL_HEADER__
 
-#include <fltKernel.h>
+
+#include <ntddk.h> 
 #include "CommonUtil.h"
 #include "UsbType.h"
 
@@ -11,27 +12,27 @@
 
 //usage page-id
 //-------------------------------------------// 
-#define HID_GENERIC_DESKTOP_PAGE	0x1
+#define HID_GENERIC_DESKTOP_PAGE		0x1
 #define HID_SIMULATION_CONTROL		0x2
 #define HID_VR_CONTROL				0x3 
 #define HID_SPORT_CONTROL			0x4
 #define HID_GAME_CONTROL			0x5
 #define HID_GENERIC_DEVICE_CONTROL	0x6
 #define HID_KEYBOARD_OR_KEYPAD		0x7
-#define HID_LEDS					0x8
+#define HID_LEDS						0x8
 #define HID_BUTTON					0x9
-#define HID_ORIDINAL				0xA
+#define HID_ORIDINAL					0xA
 #define HID_TELEPHONY				0xB
 #define HID_CONSUMER				0xC
-#define HID_DIGITILZER				0xD
-#define HID_RESERVED				0xE
-#define HID_PID_PAGE				0xF
+#define HID_DIGITILZER					0xD
+#define HID_RESERVED					0xE
+#define HID_PID_PAGE					0xF
 #define HID_UNICODE					0x10
 #define HID_RESERVED1				0x11
 #define HID_RESERVED2				0x12
 #define HID_RESERVED3				0x13
-#define HID_ALPHA_DISPLAY			0x14 
-#define HID_MEDICAL_INSTR			0x40
+#define HID_ALPHA_DISPLAY				0x14 
+#define HID_MEDICAL_INSTR				0x40
 #define HID_MONITOR_PAGES			0x80
 #define HID_MONITOR_PAGES1			0x81
 #define HID_MONITOR_PAGES2			0x82 
@@ -73,9 +74,39 @@
 #define HID_USAGE_SLIDER		  0x36 
 #define HID_USAGE_DIAL			  0x37 
 #define HID_NOT_RANGE_USAGE_WHELL 0x38  
+ 
+/*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-//-------------------------------------------//
+Routine Description:
 
+			pContext 	- HIJACK_CONTEXT for allocation.
+			reportType	- specify which report typ
+Arguments:
+			report	- structure of HIDP_DEVICE_DESC, it saved all report, 
+					  we dump it all
+
+Return Value: 
+			No 
+-----------------------------------------------------------------------------------*/
+NTSTATUS 
+AllocateExtractData(
+	PEXTRACTDATA* Data
+);
+	
+/*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Routine Description:
+
+			ExtractKeyboardData
+			 
+Arguments:
+			collectionDesc	- Which collection should be extracted
+			type			- which report type
+			ExtractedData   - EXTRACTDATA* result
+Return Value: 
+			STATUS_SUCCESS		- Fetch SUCCESS
+			STATUS_UNSUCESSFUL	- Fetch FAIL
+-----------------------------------------------------------------------------------*/
 NTSTATUS
 ExtractKeyboardData(
 	_In_	 PHIDP_COLLECTION_DESC collectionDesc,
@@ -83,6 +114,20 @@ ExtractKeyboardData(
 	_Inout_  EXTRACTDATA* ExtractedData
 );
 
+/*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Routine Description:
+
+			ExtractKeyboardData
+			 
+Arguments:
+			collectionDesc	- Which collection should be extracted
+			type			- which report type
+			ExtractedData   - EXTRACTDATA* result
+Return Value: 
+			STATUS_SUCCESS		- Fetch SUCCESS
+			STATUS_UNSUCESSFUL	- Fetch FAIL
+-----------------------------------------------------------------------------------*/
 NTSTATUS
 ExtractMouseData(
 	PHIDP_COLLECTION_DESC collectionDesc,

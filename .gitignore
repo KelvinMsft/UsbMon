@@ -1,2 +1,10 @@
 UsbMon/UsbMon.VC.db
 *.opendb
+UsbMon/.vs/UsbMon/v14/.suo
+*.obj
+*.tlog
+*.tlog
+*.tlog
+*.tlog
+*.cer
+*.lastbuildstate

@@ -1,2 +1,2 @@
-#TargetFrameworkVersion=v4.5:PlatformToolSet=WindowsKernelModeDriver10.0:EnableManagedIncrementalBuild=false:VCToolArchitecture=Native32Bit:WindowsTargetPlatformVersion=10.0.10586.0
-Debug|x64|C:\Users\kelvinchan\Documents\Visual Studio 2015\Projects\UsbMon\|
+#TargetFrameworkVersion=v4.5:PlatformToolSet=WindowsKernelModeDriver10.0:EnableManagedIncrementalBuild=false:VCToolArchitecture=Native32Bit:WindowsTargetPlatformVersion=10.0.14393.0
+Debug|x64|C:\github\UsbMon\UsbMon\|

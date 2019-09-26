@@ -96,7 +96,7 @@ typedef struct _HIDP_CHANNEL_DESC
 	ULONG  Reserved : 20;
 	ULONG  NumGlobalUnknowns : 4;
 
-	struct _HIDP_UNKNOWN_TOKEN GlobalUnknowns[HIDP_MAX_UNKNOWN_ITEMS];
+	struct _HIDP_UNKNOWN_TOKEN GlobalUnknowns[4];
 
 
 	//Describing a Local Usage for a Usage Page :

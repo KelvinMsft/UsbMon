@@ -4,7 +4,7 @@
 #include <fltKernel.h>  
 #include "CommonUtil.h"
 #include "local.h"
-
+#include "UsbType.h"
 
 #define HID_USB_DEVICE				 	 L"\\Driver\\hidusb"
 
@@ -59,9 +59,8 @@ Return Value:
 						 - false , if it initial faile
 -----------------------------------------------------------------------------------*/
 NTSTATUS InitHidSubSystem(
-	_Out_ PULONG		ClientPdoListSize
-);
- 
+	_In_  HIDCONTEXT* Context,
+	_Out_ PULONG 	  ClientPdoListSize);
 
 
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -78,9 +77,9 @@ Return Value:
 						 - STATUS_UNSUCCESSFUL , if it is hid device and unsuccessfully
 -----------------------------------------------------------------------------------*/
 NTSTATUS VerifyAndInsertIntoHidList(
-	_In_ PDEVICE_OBJECT DeviceObject
+	_In_ PDEVICE_OBJECT DeviceObject,
+	_In_ HIDCONTEXT*	Context
 );
-
 
 /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

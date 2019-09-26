@@ -1,7 +1,6 @@
-#include <fltKernel.h> 
+#include <ntddk.h> 
 #include "CommonUtil.h"
-
-
+#include "IrpHook.h" 
 
 /////////////////////////////////////////////////////////////////////////////////////////////// 
 //// Marco
@@ -12,6 +11,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////// 
 //// Global/Extern Variable
 //// 
+extern ULONG g_iClientUUID;
+extern ULONG g_iGameID;
+
+extern ULONG64			  g_IsEnableModuleChecksum;  
+extern ULONG 			  g_EncryptKey[4];
+
 extern POBJECT_TYPE *IoDriverObjectType;
 
 extern NTSTATUS ObReferenceObjectByName(
@@ -25,24 +30,63 @@ extern NTSTATUS ObReferenceObjectByName(
 	PVOID *Object
 );
 
+NTSTATUS ObQueryNameString(
+	PVOID                    Object,
+	POBJECT_NAME_INFORMATION ObjectNameInfo,
+	ULONG                    Length,
+	PULONG                   ReturnLength
+);
+
+ULONG g_MajorVersion = 0 ;
+ULONG g_MinorVersion = 0 ;
+ULONG g_BuildNumber  = 0 ; 
 
 /////////////////////////////////////////////////////////////////////////////////////////////// 
 //// Prototype
 //// 
-
+PVOID NTAPI RtlPcToFileHeader(_In_ PVOID PcValue, _Out_ PVOID *BaseOfImage);
 
 /////////////////////////////////////////////////////////////////////////////////////////////// 
 //// Implementation
-//// 
-//----------------------------------------------------------------------------------------//
-NTSTATUS KernelSleep(LONG msec)
+////   
+// A wrapper of RtlPcToFileHeader
+PVOID UtilPcToFileHeader(PVOID pc_value) 
 {
-	LARGE_INTEGER my_interval;
-	my_interval.QuadPart = DELAY_ONE_MILLISECOND;
-	my_interval.QuadPart *= msec;
-	return KeDelayExecutionThread(KernelMode, 0, &my_interval);
+  void *base = NULL;
+  return RtlPcToFileHeader(pc_value,&base); 
 }
+ 
 
+
+//----------------------------------------------------------------------------------------//
+ULONG GetNextFdoExtOffset()
+{
+	ULONG Offset = 0;
+	PsGetVersion(&g_MajorVersion, &g_MinorVersion, &g_BuildNumber, NULL);
+
+	if(g_BuildNumber == 6000)
+	{
+		Offset = 0x1D0;
+	}
+	else if(g_BuildNumber==7600 || g_BuildNumber==7601)//windows7
+	{
+		Offset = 0x1E0; 
+	}
+	else if(g_BuildNumber==9200)//windows8
+	{
+		Offset = 0x1E0; 
+	}
+	else if(g_BuildNumber==9600)//windows8.1
+	{
+		Offset = 0x1A8; 
+	}
+	else if(g_BuildNumber > 10000)
+	{
+		Offset = 0x1A8;
+	} 
+	
+	return Offset ; 
+}
 //----------------------------------------------------------------------------------------//
 NTSTATUS GetDriverObjectByName(WCHAR* name, PDRIVER_OBJECT* pDriverObj)
 {
@@ -67,7 +111,22 @@ NTSTATUS GetDriverObjectByName(WCHAR* name, PDRIVER_OBJECT* pDriverObj)
 
 	return status;
 }
-
+//----------------------------------------------------------------------------------------//
+NTSTATUS ReleaseDriverObject(PDRIVER_OBJECT pDriverObj)
+{
+	// use such API  
+	NTSTATUS status = STATUS_SUCCESS;
+	if(!pDriverObj)
+	{
+		status = STATUS_UNSUCCESSFUL;
+		return status;
+	}
+	
+	ObDereferenceObject(pDriverObj);
+	pDriverObj = NULL; 
+	return status;
+}
+	 
 //----------------------------------------------------------------------------------------//
 NTSTATUS GetDeviceName(PDEVICE_OBJECT device_object, WCHAR* DeviceNameBuf)
 {
@@ -87,6 +146,7 @@ NTSTATUS GetDeviceName(PDEVICE_OBJECT device_object, WCHAR* DeviceNameBuf)
 	} 
 	return status;
 }
+
 
 //----------------------------------------------------------------------------------------//
 NTSTATUS USBSymLinkToPath(PUNICODE_STRING pusSymLink, PUNICODE_STRING pusDosPath) 

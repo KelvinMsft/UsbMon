@@ -1,12 +1,20 @@
 ﻿  Building 'UsbMon' with toolset 'WindowsKernelModeDriver10.0' and the 'Desktop' target platform.
-  Stamping x64\Debug\UsbMon.inf [Version] section with DriverVer=02/21/2017,19.45.3.174
+  Stamping x64\Debug\UsbMon.inf [Version] section with DriverVer=09/26/2019,0.36.53.522
+  CommonUtil.c
   Driver.c
-  UsbMon.vcxproj -> C:\Users\kelvinchan\Documents\Visual Studio 2015\Projects\UsbMon\x64\Debug\UsbMon.sys
-  UsbMon.vcxproj -> C:\Users\kelvinchan\Documents\Visual Studio 2015\Projects\UsbMon\x64\Debug\UsbMon.pdb (Full PDB)
+  HidHijack.c
+  IrpHook.c
+  OpenLoopBuffer.c
+  ReportUtil.c
+  UsbHid.c
+  UsbUtil.c
+  Generating Code...
+  UsbMon.vcxproj -> C:\github\UsbMon\UsbMon\x64\Debug\UsbMon.sys
+  UsbMon.vcxproj -> C:\github\UsbMon\UsbMon\x64\Debug\UsbMon.pdb (Full PDB)
   Done Adding Additional Store
-  Successfully signed: C:\Users\kelvinchan\Documents\Visual Studio 2015\Projects\UsbMon\x64\Debug\UsbMon.sys
+  Successfully signed: C:\github\UsbMon\UsbMon\x64\Debug\UsbMon.sys
   
-  ........................
+  .........................
   Signability test complete.
   
   Errors:
@@ -16,7 +24,7 @@
   None
   
   Catalog generation complete.
-  C:\Users\kelvinchan\Documents\Visual Studio 2015\Projects\UsbMon\x64\Debug\UsbMon\stacktrace.cat
+  C:\github\UsbMon\UsbMon\x64\Debug\UsbMon\stacktrace.cat
   Done Adding Additional Store
-  Successfully signed: C:\Users\kelvinchan\Documents\Visual Studio 2015\Projects\UsbMon\x64\Debug\UsbMon\stacktrace.cat
+  Successfully signed: C:\github\UsbMon\UsbMon\x64\Debug\UsbMon\stacktrace.cat
   

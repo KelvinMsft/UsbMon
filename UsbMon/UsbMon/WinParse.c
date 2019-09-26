@@ -2089,54 +2089,6 @@ HidP_FreeCollectionDescription(
 }
 
 #define PHIDP_SYS_POWER_EVENT_BUTTON_LENGTH 0x20
-NTSTATUS
-HidP_SysPowerEvent(
-	IN  PCHAR                   HidPacket,
-	IN  USHORT                  HidPacketLength,
-	IN  PHIDP_PREPARSED_DATA    Ppd,
-	OUT PULONG                  OutputBuffer
-)
-{
-	USAGE       buttonList[PHIDP_SYS_POWER_EVENT_BUTTON_LENGTH]; // BUGBUG
-	ULONG       length = PHIDP_SYS_POWER_EVENT_BUTTON_LENGTH;
-	NTSTATUS    status = STATUS_NOT_SUPPORTED;
-	ULONG       i;
-
-	*OutputBuffer = 0;
-
-	if (Ppd->PowerButtonMask) {
-
-		status = HidP_GetUsages(HidP_Input,
-			HIDP_USAGE_SYSCTL_PAGE,
-			0,
-			buttonList,
-			&length,
-			Ppd,
-			HidPacket,
-			HidPacketLength);
-
-		if (NT_SUCCESS(status)) {
-			for (i = 0; i < length; i++) {
-
-				switch (buttonList[i]) {
-				case HIDP_USAGE_SYSCTL_POWER:
-					*OutputBuffer |= SYS_BUTTON_POWER;
-					break;
-
-				case HIDP_USAGE_SYSCTL_WAKE:
-					*OutputBuffer |= SYS_BUTTON_WAKE;
-					break;
-
-
-				case HIDP_USAGE_SYSCTL_SLEEP:
-					*OutputBuffer |= SYS_BUTTON_SLEEP;
-					break;
-				}
-			}
-		}
-	}
-	return status;
-}
 
 NTSTATUS
 HidP_SysPowerCaps(

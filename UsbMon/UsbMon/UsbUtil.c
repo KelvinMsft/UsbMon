@@ -1,6 +1,5 @@
 #include "UsbUtil.h"
-
-
+#include "ReportUtil.h"
 
 /////////////////////////////////////////////////////////////////////////////////////////////// 
 ////	Global/Extern Variable 
@@ -19,7 +18,7 @@ extern NTSTATUS ObReferenceObjectByName(
 	PVOID *Object
 );
 
-
+BOOLEAN g_IsTestReported[0xFF] = {0};
 /////////////////////////////////////////////////////////////////////////////////////////////// 
 ////	Marco
 //// 
@@ -318,3 +317,176 @@ VOID DumpUrb(
 
 	}
 }
+ 
+//-----------------------------------------------------------------------------------//
+PHIDP_REPORT_IDS GetReportIdentifier(	
+	_In_ HIDP_DEVICE_DESC* 	 	 pDesc, 
+	_In_ ULONG 				  reportId
+)
+{
+    PHIDP_REPORT_IDS result = NULL;
+    PHIDP_DEVICE_DESC deviceDesc = pDesc;
+    ULONG i;
+	if(!deviceDesc)
+	{
+		return result;
+	}
+	if(!deviceDesc->ReportIDs)
+	{
+		return result;
+	}
+	
+	 
+    for (i = 0; i < deviceDesc->ReportIDsLength; i++)
+	{
+        if (deviceDesc->ReportIDs[i].ReportID == reportId)
+		{
+            result = &deviceDesc->ReportIDs[i];
+            break;
+		}
+    }  
+    return result;
+}
+
+//-----------------------------------------------------------------------------------//
+PHIDP_COLLECTION_DESC GetCollectionDesc(	
+	_In_ HIDP_DEVICE_DESC* 	 	 pDesc,
+	_In_ ULONG 				collectionId
+)
+{
+    PHIDP_COLLECTION_DESC result = NULL;
+    PHIDP_DEVICE_DESC deviceDesc =  pDesc;
+    ULONG i;
+
+    if (deviceDesc->CollectionDesc){
+        for (i = 0; i < deviceDesc->CollectionDescLength; i++){
+            if (deviceDesc->CollectionDesc[i].CollectionNumber == collectionId){
+                result = &deviceDesc->CollectionDesc[i];
+                break;
+            }
+        }
+    }
+    return result;
+}
+//-----------------------------------------------------------------------------------// 
+NTSTATUS VerifyUsageInCollection( 
+	_In_ ULONG					 Usage,
+	_In_ UCHAR*					 pSourceReport, 
+	_In_ HIDP_DEVICE_DESC* 	 	 pDesc,
+	_Out_ PHIDP_COLLECTION_DESC* pCollection
+)
+{
+	NTSTATUS status  = STATUS_UNSUCCESSFUL;
+	ULONG 	colIndex = 0;
+	UCHAR ReportId = 0;
+    PHIDP_REPORT_IDS 		reportIdentifier;
+	PHIDP_COLLECTION_DESC	collectionDesc; 
+ 
+	if(!pSourceReport  || !pDesc || !pCollection)
+	{	
+		USB_DEBUG_INFO_LN_EX("pSourceReport: %I64x  pDesc: %I64x pCollection: %I64x",
+			pSourceReport, 
+			pDesc, 
+			pCollection
+		); 
+		
+		if(pCollection)
+		{
+			*pCollection = NULL;	
+		}
+		
+ 		return status;
+	} 
+	
+	if(pDesc->ReportIDs[0].ReportID == 0)
+	{
+		ReportId = 0; 
+	}
+	else
+	{
+		ReportId = (ULONG)*pSourceReport; 
+	}
+	
+	USB_DEBUG_INFO_LN_EX("Report ID: %x", ReportId);
+
+ 	reportIdentifier = GetReportIdentifier(pDesc, ReportId);	
+	
+	USB_DEBUG_INFO_LN_EX("Report Identifier: %I64x ", reportIdentifier);
+	
+    if (!reportIdentifier)
+	{       
+		USB_DEBUG_INFO_LN_EX("reportIdentifier: %I64x",reportIdentifier );
+		
+		*pCollection = NULL;	
+		status =  STATUS_UNSUCCESSFUL;
+		return status;
+	}	
+
+    collectionDesc = GetCollectionDesc(pDesc, reportIdentifier->CollectionNumber);
+	
+	USB_DEBUG_INFO_LN_EX("CollectionDesc: %I64x  reportIdentifier->CollectionNumber: %x ", collectionDesc,  reportIdentifier->CollectionNumber);
+
+	if(!collectionDesc)
+	{	
+		USB_DEBUG_INFO_LN_EX("collectionDesc: %I64x",collectionDesc);
+		
+		*pCollection = NULL;	
+		status =  STATUS_UNSUCCESSFUL;
+		return status;
+	}
+	
+	if(collectionDesc->Usage == Usage  && collectionDesc->UsagePage == HID_GENERIC_DESKTOP_PAGE)
+	{
+		if(!g_IsTestReported[Usage])
+		{
+			USB_DEBUG_INFO_LN_EX("It is mou collection");
+			g_IsTestReported[Usage] = TRUE;			
+		} 
+		
+		*pCollection = collectionDesc;
+		status = STATUS_SUCCESS; 
+	}	
+	else
+	{	
+		*pCollection = NULL;		
+		status =  STATUS_UNSUCCESSFUL;
+	}
+	return status;
+}
+ 
+//----------------------------------------------------------------------------------------//
+ 
+LONG ReadHidCoordinate(
+	_In_	PCHAR Src , 
+	_In_	ULONG ByteOffset, 
+	_In_	ULONG BitOffset,  
+	_In_	ULONG BitLen)
+{
+	LONG64    Ret=0;
+	UCHAR*    lpret = (UCHAR*)&Ret ; 
+	long      higthNullbitlen=64-(BitLen+BitOffset);
+	
+	if(!Src)
+	{
+		return 0; 
+	}
+	
+	memcpy(lpret,Src+ByteOffset,(BitLen+BitOffset+7)/8);
+	
+	Ret=(Ret<<higthNullbitlen);
+	
+	if(Ret&0x8000000000000000)
+	{
+		ULONGLONG tmp = -1;
+		Ret=(Ret>>(higthNullbitlen+BitOffset));
+		Ret=Ret|(tmp<<BitLen);
+	}
+	else 
+	{
+		Ret=(Ret>>(higthNullbitlen+BitOffset));
+	}
+	
+	return (long)Ret;
+}  
+
+//-----------------------------------------------------------------------------------//

@@ -1,6 +1,6 @@
 
 #include "ReportUtil.h" 
-#include "WinParse.h"  
+#include "WinParse.h" 
 
 typedef struct _SELECTED_CHANNEL
 {
@@ -9,6 +9,9 @@ typedef struct _SELECTED_CHANNEL
 	ULONG							  end;
 	CHAR				  reportType[256];
 }SELETEDCHANNEL, *PSELECTEDCHANNEL;
+
+BOOLEAN g_IsCompatibleModeReported = FALSE;
+extern BOOLEAN GetKeyboardCompatibleMode();
 
 //------------------------------------------------------------------------------------------------------------------------------//
 VOID DumpReport(
@@ -19,26 +22,26 @@ VOID DumpReport(
 	PHIDP_COLLECTION_DESC collectionDesc = &report->CollectionDesc[0];
 	for (i = 0; i < report->CollectionDescLength; i++)
 	{
-		ASSERT(collectionDesc->PreparsedData->Signature1 == HIDP_PREPARSED_DATA_SIGNATURE1);
-		ASSERT(collectionDesc->PreparsedData->Signature2 == HIDP_PREPARSED_DATA_SIGNATURE2);
+		ASSERT(collectionDesc[i].PreparsedData->Signature1 == HIDP_PREPARSED_DATA_SIGNATURE1);
+		ASSERT(collectionDesc[i].PreparsedData->Signature2 == HIDP_PREPARSED_DATA_SIGNATURE2);
 
 		USB_DEBUG_INFO_LN_EX("+++++++++++++++++++++++++++++++++++++++++++++++++++++++");
-		USB_DEBUG_INFO_LN_EX("[Collection] Usage: %xh", collectionDesc->Usage);
-		USB_DEBUG_INFO_LN_EX("[Collection] UsagePage: %xh ", collectionDesc->UsagePage);
-		USB_DEBUG_INFO_LN_EX("[Collection] InputLength: %xh ", collectionDesc->InputLength);
-		USB_DEBUG_INFO_LN_EX("[Collection] OutputLength: %xh ", collectionDesc->OutputLength);
-		USB_DEBUG_INFO_LN_EX("[Collection] FeatureLength: %xh ", collectionDesc->FeatureLength);
-		USB_DEBUG_INFO_LN_EX("[Collection] CollectionNumber: %x ", collectionDesc->CollectionNumber);
-		USB_DEBUG_INFO_LN_EX("[Collection] PreparsedData: %I64x ", collectionDesc->PreparsedData);
+		USB_DEBUG_INFO_LN_EX("[Collection] Usage: %xh", collectionDesc[i].Usage);
+		USB_DEBUG_INFO_LN_EX("[Collection] UsagePage: %xh ", collectionDesc[i].UsagePage);
+		USB_DEBUG_INFO_LN_EX("[Collection] InputLength: %xh ", collectionDesc[i].InputLength);
+		USB_DEBUG_INFO_LN_EX("[Collection] OutputLength: %xh ", collectionDesc[i].OutputLength);
+		USB_DEBUG_INFO_LN_EX("[Collection] FeatureLength: %xh ", collectionDesc[i].FeatureLength);
+		USB_DEBUG_INFO_LN_EX("[Collection] CollectionNumber: %x ", collectionDesc[i].CollectionNumber);
+		USB_DEBUG_INFO_LN_EX("[Collection] PreparsedData: %I64x ", collectionDesc[i].PreparsedData);
 
-		USB_DEBUG_INFO_LN_EX("[Collection] Input Offset: %x  Index: %x ", collectionDesc->PreparsedData->Input.Offset, collectionDesc->PreparsedData->Input.Index);
-		USB_DEBUG_INFO_LN_EX("[Collection] Output Offset: %x Index: %x ", collectionDesc->PreparsedData->Output.Offset, collectionDesc->PreparsedData->Output.Index);
-		USB_DEBUG_INFO_LN_EX("[Collection] Feature Offset: %x Index: %x ", collectionDesc->PreparsedData->Feature.Offset, collectionDesc->PreparsedData->Feature.Index);
+		USB_DEBUG_INFO_LN_EX("[Collection] Input Offset: %x  Index: %x ", collectionDesc[i].PreparsedData->Input.Offset, collectionDesc[i].PreparsedData->Input.Index);
+		USB_DEBUG_INFO_LN_EX("[Collection] Output Offset: %x Index: %x ", collectionDesc[i].PreparsedData->Output.Offset, collectionDesc[i].PreparsedData->Output.Index);
+		USB_DEBUG_INFO_LN_EX("[Collection] Feature Offset: %x Index: %x ", collectionDesc[i].PreparsedData->Feature.Offset, collectionDesc[i].PreparsedData->Feature.Index);
 
 
-		DumpChannel(collectionDesc, HidP_Input, CHANNEL_DUMP_ALL);
-		DumpChannel(collectionDesc, HidP_Output, CHANNEL_DUMP_ALL);
-		DumpChannel(collectionDesc, HidP_Feature, CHANNEL_DUMP_ALL);
+		DumpChannel(&collectionDesc[i], HidP_Input, CHANNEL_DUMP_ALL);
+		DumpChannel(&collectionDesc[i], HidP_Output, CHANNEL_DUMP_ALL);
+		DumpChannel(&collectionDesc[i], HidP_Feature, CHANNEL_DUMP_ALL);
 
 		USB_DEBUG_INFO_LN_EX("+++++++++++++++++++++++++++++++++++++++++++++++++++++++");
 		collectionDesc++;
@@ -221,6 +224,28 @@ VOID DumpChannel(
 		channel++;
 	}
 }
+
+//---------------------------------------------------------------------------------------------
+NTSTATUS AllocateExtractData(
+	_Inout_  PEXTRACTDATA* ExtractedData)
+{
+	NTSTATUS status = STATUS_UNSUCCESSFUL;
+
+	if (!ExtractedData)
+	{
+		return status;
+	}
+
+	*ExtractedData = (EXTRACTDATA*)ExAllocatePoolWithTag(NonPagedPoolMustSucceed, sizeof(EXTRACTDATA), 'exdt');
+	if (!*ExtractedData)
+	{
+		return status;
+	}
+	RtlZeroMemory(*ExtractedData, sizeof(EXTRACTDATA));
+	status = STATUS_SUCCESS;
+	return status;
+}
+
 //------------------------------------------------------------------------------------------------------------------------------//
 NTSTATUS SelectChannel(
 	_In_ HIDP_REPORT_TYPE				type,
@@ -283,26 +308,52 @@ NTSTATUS ExtractKeyboardData(
 	channel = selected_channel.channel;
 	for (k = selected_channel.start; k < selected_channel.end; k++)
 	{
+		USB_DEBUG_INFO_LN_EX("###$ UsagePage: %d Max : %d Min: %d ", channel->UsagePage, channel->Range.UsageMax, channel->Range.UsageMin);
 		switch (channel->UsagePage)
 		{
-			//Output use
-		case HID_LEDS:
-		{
-			ExtractedData->KBDDATA.LedKeyOffset = channel->ByteOffset - 1;
-			ExtractedData->KBDDATA.LedKeySize = channel->ByteEnd - channel->ByteOffset;
-		}
-		break;
 		case HID_KEYBOARD_OR_KEYPAD:
 		{
-			if (channel->Range.UsageMax == 0xFF)
+			if (channel->button.LogicalMin == 0 && channel->button.LogicalMax == 255)
 			{
-				ExtractedData->KBDDATA.NormalKeyOffset = channel->ByteOffset - 1;
-				ExtractedData->KBDDATA.NormalKeySize = channel->ByteEnd - channel->ByteOffset;
+				ExtractedData->KBDDATA.NormalKeyByteOffset = channel->ByteOffset - 1;
+				ExtractedData->KBDDATA.NormalKeyBitOffset = channel->BitOffset;
+				ExtractedData->KBDDATA.NormalKeySize = channel->BitLength;
+				ExtractedData->KBDDATA.ReportId = channel->ReportID;
+				if (channel->ReportID)
+				{
+					ExtractedData->KBDDATA.NormalKeyByteOffset++;
+				}
+				USB_DEBUG_INFO_LN_EX("###$Normal key Offset: %X", ExtractedData->KBDDATA.NormalKeyByteOffset);
+			}
+			else if (channel->Range.UsageMax == 231 && channel->Range.UsageMin == 224)
+			{
+				ExtractedData->KBDDATA.SpecialKeyByteOffset = channel->ByteOffset - 1;
+				ExtractedData->KBDDATA.SpecialKeyBitOffset = channel->BitOffset;
+				ExtractedData->KBDDATA.SpecialKeySize = channel->BitLength;
+				if (channel->ReportID)
+				{
+					ExtractedData->KBDDATA.SpecialKeyByteOffset++;
+				}
+				USB_DEBUG_INFO_LN_EX("###$Special key Offset: %X", ExtractedData->KBDDATA.SpecialKeyByteOffset);
 			}
 			else
 			{
-				ExtractedData->KBDDATA.SpecialKeyOffset = channel->ByteOffset - 1;
-				ExtractedData->KBDDATA.SpecialKeySize = channel->ByteEnd - channel->ByteOffset;
+				if (!ExtractedData->KBDDATA.NormalKeyByteOffset && GetKeyboardCompatibleMode())
+				{
+					ExtractedData->KBDDATA.NormalKeyByteOffset = channel->ByteOffset - 1;
+					ExtractedData->KBDDATA.NormalKeyBitOffset = channel->BitOffset;
+					ExtractedData->KBDDATA.NormalKeySize = channel->BitLength;
+					ExtractedData->KBDDATA.ReportId = channel->ReportID;
+					if (channel->ReportID)
+					{
+						ExtractedData->KBDDATA.NormalKeyByteOffset++;
+					}
+					if (!g_IsCompatibleModeReported)
+					{
+						g_IsCompatibleModeReported = TRUE;
+					}
+					USB_DEBUG_INFO_LN_EX("###Compatible Mode Is On ");
+				}
 			}
 		}
 		break;
@@ -310,9 +361,13 @@ NTSTATUS ExtractKeyboardData(
 			USB_MON_COMMON_DBG_BREAK();
 			break;
 		}
-		ExtractedData->MOUDATA.IsAbsolute = channel->IsAbsolute;
 		channel++;
 	}
+
+#ifdef DBG	
+	DumpChannel(collectionDesc, type, CHANNEL_DUMP_ATTRIBUTE_RELATED | CHANNEL_DUMP_RANGE_RELATED);
+#endif
+
 	return status;
 }
 
@@ -326,6 +381,7 @@ NTSTATUS ExtractMouseData(
 	SELETEDCHANNEL			     selected_channel = { 0 };
 	NTSTATUS status = STATUS_SUCCESS;
 	ULONG k = 0;
+	ULONG btnIndex = 0;
 	if (!collectionDesc || !ExtractedData)
 	{
 		status = STATUS_UNSUCCESSFUL;
@@ -345,18 +401,31 @@ NTSTATUS ExtractMouseData(
 	{
 		if (channel->IsButton)
 		{
+			//skip if more than one set button (binary set)
+			if (btnIndex >= 2)
+			{
+				channel++;
+				continue;
+			}
+
 			if (channel->IsRange)
 			{
-				ExtractedData->MOUDATA.ByteOffsetBtn = channel->ByteOffset - 1;
-				ExtractedData->MOUDATA.BitOffsetBtn = channel->BitOffset;
-				ExtractedData->MOUDATA.BtnOffsetSize = channel->BitLength;
+				ExtractedData->MOUDATA.BtnDescriptor.ByteOffsetBtn[btnIndex] = channel->ByteOffset - 1;
+				ExtractedData->MOUDATA.BtnDescriptor.BitOffsetBtn[btnIndex] = channel->BitOffset;
+				ExtractedData->MOUDATA.BtnDescriptor.BtnOffsetSize[btnIndex] = channel->BitLength;
+				ExtractedData->MOUDATA.ReportIdDesc[0].Usage = channel->UsagePage; 	//Diff from X/Y/Z Usage , it is usage page.
+				ExtractedData->MOUDATA.ReportIdDesc[0].ReportId = channel->ReportID;
+				// Compatible for those report with id or without id 
 				if (channel->ReportID)
 				{
-					ExtractedData->MOUDATA.ByteOffsetBtn++;
+					ExtractedData->MOUDATA.BtnDescriptor.ByteOffsetBtn[btnIndex]++;
 				}
+
+				ExtractedData->MOUDATA.BtnDescriptor.BtnUsageMin[btnIndex] = channel->Range.UsageMin;
 			}
+			btnIndex++;
 		}
-		else // not a bug means it is data.
+		else // not a btn means it is data.
 		{
 			// Not a range data 
 			if (!channel->IsRange)
@@ -365,33 +434,38 @@ NTSTATUS ExtractMouseData(
 				switch (channel->NotRange.Usage)
 				{
 				case HID_NOT_RANGE_USAGE_X:		 //coordinate - X  
-					ExtractedData->MOUDATA.ByteOffsetX = channel->ByteOffset - 1;
-					ExtractedData->MOUDATA.BitOffsetX = channel->BitOffset; //(channel->ByteOffset - 1) * 8 +channel->BitOffset;
-					ExtractedData->MOUDATA.XOffsetSize = channel->BitLength; //channel->ByteEnd - channel->ByteOffset; 
+					ExtractedData->MOUDATA.X_Descriptor.ByteOffset = channel->ByteOffset - 1;
+					ExtractedData->MOUDATA.X_Descriptor.BitOffset = channel->BitOffset; //(channel->ByteOffset - 1) * 8 +channel->BitOffset;
+					ExtractedData->MOUDATA.X_Descriptor.OffsetSize = channel->BitLength; //channel->ByteEnd - channel->ByteOffset; 
 					ExtractedData->MOUDATA.IsAbsolute = channel->IsAbsolute;
-					ExtractedData->MOUDATA.ReportId = channel->ReportID;
+					ExtractedData->MOUDATA.ReportIdDesc[1].Usage = channel->NotRange.Usage;
+					ExtractedData->MOUDATA.ReportIdDesc[1].ReportId = channel->ReportID;
 					if (channel->ReportID)
 					{
-						ExtractedData->MOUDATA.ByteOffsetX++;
+						ExtractedData->MOUDATA.X_Descriptor.ByteOffset++;
 					}
 					break;
 				case HID_NOT_RANGE_USAGE_Y:		 //coordinate - Y
-					ExtractedData->MOUDATA.ByteOffsetY = channel->ByteOffset - 1;
-					ExtractedData->MOUDATA.BitOffsetY = channel->BitOffset; //	ExtractedData->MOUDATA.BitOffsetY  = (channel->ByteOffset - 1) * 8 +channel->BitOffset; 
-					ExtractedData->MOUDATA.YOffsetSize = channel->BitLength; //channel->ByteEnd - channel->ByteOffset;  
+					ExtractedData->MOUDATA.Y_Descriptor.ByteOffset = channel->ByteOffset - 1;
+					ExtractedData->MOUDATA.Y_Descriptor.BitOffset = channel->BitOffset; //	ExtractedData->MOUDATA.BitOffsetY  = (channel->ByteOffset - 1) * 8 +channel->BitOffset; 
+					ExtractedData->MOUDATA.Y_Descriptor.OffsetSize = channel->BitLength; //channel->ByteEnd - channel->ByteOffset;  
 					ExtractedData->MOUDATA.IsAbsolute = channel->IsAbsolute;
+					ExtractedData->MOUDATA.ReportIdDesc[2].Usage = channel->NotRange.Usage;
+					ExtractedData->MOUDATA.ReportIdDesc[2].ReportId = channel->ReportID;
 					if (channel->ReportID)
 					{
-						ExtractedData->MOUDATA.ByteOffsetY++;
+						ExtractedData->MOUDATA.Y_Descriptor.ByteOffset++;
 					}
 					break;
 				case HID_NOT_RANGE_USAGE_WHELL:  //coordinate - Z
-					ExtractedData->MOUDATA.ByteOffsetZ = channel->ByteOffset - 1;
-					ExtractedData->MOUDATA.BitOffsetZ = channel->BitOffset; //	ExtractedData->MOUDATA.BitOffsetY  = (channel->ByteOffset - 1) * 8 +channel->BitOffset;  
-					ExtractedData->MOUDATA.ZOffsetSize = channel->BitLength; //channel->ByteEnd - channel->ByteOffset; 
+					ExtractedData->MOUDATA.Z_Descriptor.ByteOffset = channel->ByteOffset - 1;
+					ExtractedData->MOUDATA.Z_Descriptor.BitOffset = channel->BitOffset; //	ExtractedData->MOUDATA.BitOffsetY  = (channel->ByteOffset - 1) * 8 +channel->BitOffset;  
+					ExtractedData->MOUDATA.Z_Descriptor.OffsetSize = channel->BitLength; //channel->ByteEnd - channel->ByteOffset; 
+					ExtractedData->MOUDATA.ReportIdDesc[3].Usage = channel->NotRange.Usage;
+					ExtractedData->MOUDATA.ReportIdDesc[3].ReportId = channel->ReportID;
 					if (channel->ReportID)
 					{
-						ExtractedData->MOUDATA.ByteOffsetZ++;
+						ExtractedData->MOUDATA.Z_Descriptor.ByteOffset++;
 					}
 					break;
 				default:

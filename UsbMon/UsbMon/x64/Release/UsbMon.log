@@ -1,0 +1,30 @@
+﻿  Building 'UsbMon' with toolset 'WindowsKernelModeDriver10.0' and the 'Desktop' target platform.
+  Stamping x64\Release\UsbMon.inf [Version] section with DriverVer=09/26/2019,0.37.4.518
+  CommonUtil.c
+  Driver.c
+  HidHijack.c
+  IrpHook.c
+  OpenLoopBuffer.c
+  ReportUtil.c
+  UsbHid.c
+  UsbUtil.c
+  Generating Code...
+  UsbMon.vcxproj -> C:\github\UsbMon\UsbMon\x64\Release\UsbMon.sys
+  UsbMon.vcxproj -> C:\github\UsbMon\UsbMon\x64\Release\UsbMon.pdb (Full PDB)
+  Done Adding Additional Store
+  Successfully signed: C:\github\UsbMon\UsbMon\x64\Release\UsbMon.sys
+  
+  .........................
+  Signability test complete.
+  
+  Errors:
+  None
+  
+  Warnings:
+  None
+  
+  Catalog generation complete.
+  C:\github\UsbMon\UsbMon\x64\Release\UsbMon\stacktrace.cat
+  Done Adding Additional Store
+  Successfully signed: C:\github\UsbMon\UsbMon\x64\Release\UsbMon\stacktrace.cat
+  
