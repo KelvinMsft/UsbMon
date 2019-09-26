@@ -176,3 +176,49 @@ NTSTATUS USBSymLinkToPath(PUNICODE_STRING pusSymLink, PUNICODE_STRING pusDosPath
 	ObDereferenceObject(pfVolume);
 	return ntStatus;
 }
+//-----------------------------------------------------------------------------------
+void* MapNonpagedMemToSpace(void* base, ULONG size, PMDL* Lpmdl, KPROCESSOR_MODE  AccessMode, ULONG Protect)
+{
+	PMDL	 		Mdl = NULL;
+	void*			ret = NULL;
+
+	if (Lpmdl)
+	{
+		*Lpmdl = NULL;
+	}
+
+	Mdl = IoAllocateMdl(base, size, FALSE, FALSE, NULL);
+	if (Mdl)
+	{
+
+		MmBuildMdlForNonPagedPool(Mdl);
+
+		if (AccessMode == UserMode){
+			ret = MmMapLockedPagesSpecifyCache(Mdl, AccessMode, MmCached, NULL, FALSE, NormalPagePriority);
+		}
+
+		if (ret == NULL)
+		{
+			IoFreeMdl(Mdl);
+			return NULL;
+		}
+
+		if (Protect)
+		{
+			NTSTATUS  status = MmProtectMdlSystemAddress(Mdl, Protect);
+			if (!NT_SUCCESS(status))
+			{
+				MmUnmapLockedPages(ret, Mdl);
+				ret = NULL;
+				IoFreeMdl(Mdl);
+				Mdl = NULL;
+				DbgPrint("MmProtectMdlSystemAddress.\n");
+			}
+		}
+		if (Lpmdl)
+		{
+			*Lpmdl = Mdl;
+		}
+	}
+	return ret;
+}

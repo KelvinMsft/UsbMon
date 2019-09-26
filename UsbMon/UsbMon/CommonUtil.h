@@ -82,6 +82,15 @@ NTSTATUS GetDeviceName(
 	_In_  PDEVICE_OBJECT device_object, 
 	_Out_ WCHAR* DeviceNameBuf
 );
+
+void* MapNonpagedMemToSpace(
+	void* base,
+	ULONG size,
+	PMDL* Lpmdl,
+	KPROCESSOR_MODE  AccessMode,
+	ULONG Protect
+);
+
   
 
 #endif

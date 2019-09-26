@@ -1865,13 +1865,13 @@ NTSTATUS CreateProcessInfo(
 	{
 		processInfo->MouseMdl = NULL;
 		processInfo->MappedMouseAddr = NULL;
-	//	processInfo->MappedMouseAddr = MapNonpagedMemToSpace(source, length, &processInfo->MouseMdl, UserMode, 0);
+		processInfo->MappedMouseAddr = MapNonpagedMemToSpace(source, length, &processInfo->MouseMdl, UserMode, 0);
 	}
 	else
 	{
 		processInfo->KeyboardMdl = NULL;
 		processInfo->MappedKeyboardAddr = NULL;
-	//	processInfo->MappedKeyboardAddr = MapNonpagedMemToSpace(source, length, &processInfo->KeyboardMdl, UserMode, 0);
+		processInfo->MappedKeyboardAddr = MapNonpagedMemToSpace(source, length, &processInfo->KeyboardMdl, UserMode, 0);
 	}
 
 	if (processInfo)
@@ -1922,7 +1922,7 @@ NTSTATUS MappingUsbMemoryForMouse(
 	if (!processInfo->MappedMouseAddr)
 	{
 		processInfo->MouseMdl = NULL;
-//		processInfo->MappedMouseAddr = MapNonpagedMemToSpace(source, length, &processInfo->MouseMdl, UserMode, 0);
+		processInfo->MappedMouseAddr = MapNonpagedMemToSpace(source, length, &processInfo->MouseMdl, UserMode, 0);
 	}
 
 	*mapped_user_address = processInfo->MappedMouseAddr;
@@ -1970,7 +1970,7 @@ NTSTATUS MappingUsbMemoryForKeyboard(
 	if (!processInfo->MappedKeyboardAddr)
 	{
 		processInfo->KeyboardMdl = NULL;
-//		processInfo->MappedKeyboardAddr = MapNonpagedMemToSpace(source, length, &processInfo->KeyboardMdl, UserMode, 0);
+		processInfo->MappedKeyboardAddr = MapNonpagedMemToSpace(source, length, &processInfo->KeyboardMdl, UserMode, 0);
 	}
 
 	*mapped_user_address = processInfo->MappedKeyboardAddr;
