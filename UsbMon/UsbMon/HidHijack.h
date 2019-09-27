@@ -25,7 +25,9 @@ Return Value:
 				- STATUS_UNSUCCESSFUL if failed
 
 -------------------------------------------------------*/
-NTSTATUS InitializeHidPenetrate();
+NTSTATUS InitializeHidPenetrate(
+	_In_ ULONG RequiredDevice
+);
 
 
   

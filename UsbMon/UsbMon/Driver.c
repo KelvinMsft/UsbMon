@@ -248,7 +248,7 @@ NTSTATUS DriverEntry(
 	NTSTATUS						  status = STATUS_UNSUCCESSFUL; 
 
 
-	InitializeHidPenetrate();
+	UsbPenerateConfigInit();
 
 	object->DriverUnload			     = DriverUnload;
 	return status;
