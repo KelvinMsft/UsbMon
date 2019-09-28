@@ -1470,7 +1470,7 @@ NTSTATUS UsbIrpCompletionHandler(
 
 	if (pContext)
 	{
-		ExFreePool(pContext);
+	//	ExFreePool(pContext);
 		pContext = NULL;
 	}
 

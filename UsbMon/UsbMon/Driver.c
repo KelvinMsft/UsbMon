@@ -245,10 +245,8 @@ NTSTATUS DriverEntry(
 	_In_ PDRIVER_OBJECT object, 
 	_In_ PUNICODE_STRING String)
 { 
-	NTSTATUS						  status = STATUS_UNSUCCESSFUL; 
-
-
-	UsbPenerateConfigInit();
+	NTSTATUS						  status = STATUS_UNSUCCESSFUL;
+	status = UsbPenerateConfigInit();
 
 	object->DriverUnload			     = DriverUnload;
 	return status;

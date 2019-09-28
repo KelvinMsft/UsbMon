@@ -1,4 +1,4 @@
-#include <fltKernel.h>
+#include <ntddk.h>
 #include "UsbType.h"
 #include "Hidpddi.h" 
 
@@ -326,6 +326,7 @@ typedef struct _HIDCLASS_PINGPONG {
 *  Stores information about a Functional Device Object (FDO) which HIDCLASS attaches
 *  to the top of the Physical Device Object (PDO) that it get from the minidriver below.
 */
+#pragma pack(push, 8)
 typedef struct _FDO_EXTENSION {
 
 	//
@@ -467,12 +468,13 @@ typedef struct _FDO_EXTENSION {
 
 
 } FDO_EXTENSION;
-
+#pragma pack(pop)
 
 /*
 *  Stores information about a Physical Device Object (PDO) which HIDCLASS creates
 *  for each HID device-collection.
 */
+#pragma pack(push, 8)
 typedef struct _PDO_EXTENSION {
 
 	enum collectionState    state;
@@ -507,8 +509,7 @@ typedef struct _PDO_EXTENSION {
 	ULONG                       restrictionsForAnyOpen;
 
 } PDO_EXTENSION;
-
-
+#pragma pack(pop)
 /*
 *  This contains info about either a device FDO or a device-collection PDO.
 *  Some of the same functions process both, so we need one structure.
@@ -533,14 +534,14 @@ typedef struct _HIDCLASS_DEVICE_EXTENSION {
 	*/
 #define             HID_DEVICE_EXTENSION_SIG 'EddH'
 	ULONG               Signature;
-	 
+
 	union {
 		FDO_EXTENSION       fdoExt;
 		PDO_EXTENSION       pdoExt;
 	};
 
 
-} HIDCLASS_DEVICE_EXTENSION; 
+} HIDCLASS_DEVICE_EXTENSION;
 
 //
 // HIDCLASS_FILE_EXTENSION is private data we keep per file object.
@@ -720,5 +721,5 @@ typedef struct _HIDCLASS_REPORT {
 
 } HIDCLASS_REPORT;
 
- 
+
 
