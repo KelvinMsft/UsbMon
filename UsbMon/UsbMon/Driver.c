@@ -236,7 +236,7 @@ VOID DriverUnload(
 { 
 	UNREFERENCED_PARAMETER(DriverObject);
 	UnInitializeHidPenetrate();
-	DeleteDevice();
+	//DeleteDevice();
 	return;
 } 
 
